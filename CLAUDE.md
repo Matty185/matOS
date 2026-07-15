@@ -8,7 +8,7 @@ MatOS is a multi-tenant BJJ gym management platform. Current phase: **alpha** �
 
 ## Stack (do not deviate without flagging)
 
-- Node 20 LTS, npm, Next.js 14 App Router, TypeScript **strict** (`strict: true`, `noUncheckedIndexedAccess: true`)
+- Node 24 LTS (updated 2026-07-15 from Node 20, which reached EOL 2026-04-30; see decision note below), npm, Next.js 14 App Router, TypeScript **strict** (`strict: true`, `noUncheckedIndexedAccess: true`)
 - Tailwind + shadcn/ui. Primary colour deep navy `#1B4F72`. Inter body, Bebas Neue headings
 - Supabase: Postgres + RLS + Auth + Storage (photos/documents ONLY — never video)
 - TanStack Query for server state; useState for UI state; no global state library
@@ -71,3 +71,18 @@ MatOS is a multi-tenant BJJ gym management platform. Current phase: **alpha** �
 ## Out of Scope — Do Not Build
 
 Real video analysis, payment processing, notification emails, React Native app, tests, Sentry, staff role, per-session class instances, waitlists, 2FA. If a task seems to require one of these, stop and flag it instead.
+
+## Decision Log
+
+### 2026-07-15 — Node version pin: 20 → 24
+
+**Context.** CLAUDE.md and `package.json` (`engines`) pinned Node 20 LTS. Node 20 reached EOL 2026-04-30 (no further security patches). The local dev machine has been running Node 24.18.0 the entire time regardless of the pin, causing `EBADENGINE` warnings on every `npm install`. Node 22 (Active LTS, → Maintenance ~Oct 2026, EOL Apr 2027) and Node 24 (Active LTS, EOL Apr 2028, now Vercel's default for new projects) were the live options.
+
+**Decision.** Pinned to Node 24 (`engines: ">=24 <25"`, `@types/node: ^24`).
+
+**Reasoning.** The dev environment and almost certainly CI/Vercel builds have already been running on Node 24 in practice, so this pin change codifies the status quo rather than introducing a new untested runtime — Node 22 would mean adopting a _third_, still-unexercised version. Node 24 also has the longest runway (Apr 2028) of the two live options and is Vercel's new default, minimizing future churn for a solo-maintained alpha. Flagging per CLAUDE.md's "do not deviate without flagging" clause: this was resolved autonomously while the human was AFK; no code changes beyond the version pin were made, and a build/smoke test against Node 24 is still recommended before the next deploy.
+
+**Alternatives considered.**
+
+- _Node 22 (conservative Active LTS):_ rejected — less runway than 24, and would still be a version never actually run locally, so it doesn't remove the drift between documented and actual runtime.
+- _Install Node 20 via nvm to match the existing pin:_ rejected — reinstalling an EOL, unpatched runtime for a network-facing demo app (Supabase Auth, Claude API, invite emails) to preserve a stale pin has real downside and no upside; "flag deviations" is satisfied by this log entry, not by manually enforcing a dead version.
