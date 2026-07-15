@@ -94,6 +94,24 @@ These were raised at the end of the Stage 0 turn and are repeated here for the r
 5. **CSP allows `'unsafe-inline' 'unsafe-eval'` on `script-src`.** This is required for Next 14 dev-mode HMR to function under a static (non-middleware, non-nonce) CSP. A nonce-based CSP would be tighter and is the more "correct" answer for the "restrictive CSP" requirement in CLAUDE.md §Working Conventions, but it needs per-request middleware to inject a nonce into both the CSP header and every inline script tag — meaningfully more complexity than Stage 0 warranted. Flagged for the pre-demo security pass (project plan §9/§11) rather than solved now.
 6. **Local Node is v24; the project pins `>=20 <21` via `package.json` `engines` and `.nvmrc`.** Every `npm install` this session emitted an `EBADENGINE` warning (non-blocking). Everything installed and built fine under v24, but CLAUDE.md specifies Node 20 LTS specifically — worth switching the local dev shell to Node 20 via nvm at some point so local behavior can't silently diverge from what Vercel will run.
 
+## Addendum (2026-07-15, later session): ECC agents installed
+
+Resolved consideration #3 above, narrowly. Did **not** run the upstream `install.sh`/`install.ps1`
+or the `/plugin marketplace` route — inspecting github.com/affaan-m/ECC first showed it's a much
+larger system than CLAUDE.md's "security-reviewer, code-reviewer, database-reviewer, planner,
+architect" implies (67+ agents, hooks that auto-load into _future_ Claude Code sessions globally,
+bundled MCP server configs, a Python dashboard). Running its installer would have modified global
+`~/.claude` config unsupervised, which wasn't warranted just to get five reviewer prompts.
+
+Instead, copied exactly those five agent definition files (unmodified, MIT-licensed) into this
+repo's `.claude/agents/` — project-scoped only, no hooks, no MCP servers, no global config touched.
+See `.claude/agents/README.md` for provenance (source commit, license). This satisfies the Stage 1
+blocking gate requirement (security-reviewer + database-reviewer) and the later all-reviewer gates.
+If a later stage wants ECC's broader feature set, that's a deliberate separate call, not a default.
+
+Also confirmed here: the "no GitHub remote / nothing pushed" note above is now stale — `origin/main`
+matches local `HEAD` (`0482f6d`), so Stage 0's three commits are already on GitHub.
+
 ## Not done (intentionally, out of Stage 0 scope)
 
 - Supabase schema, migrations, RLS policies (Stage 1).
