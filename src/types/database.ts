@@ -700,7 +700,7 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      increment_invite_attempt: { Args: { invite_id: string }; Returns: number };
     };
     Enums: {
       analysis_status: "pending" | "complete" | "failed";
@@ -724,7 +724,7 @@ export type Database = {
         | "black";
       checked_in_by: "self" | "coach";
       class_type: "gi" | "no_gi" | "comp" | "open_mat";
-      initiated_by: "coach_manual" | "agent";
+      initiated_by: "coach_manual" | "agent" | "self_service";
       member_role: "gym_owner" | "coach" | "athlete";
       membership_plan: "monthly" | "casual" | "comp_team";
       payment_status: "paid" | "unpaid" | "waived";
@@ -874,7 +874,7 @@ export const Constants = {
       ],
       checked_in_by: ["self", "coach"],
       class_type: ["gi", "no_gi", "comp", "open_mat"],
-      initiated_by: ["coach_manual", "agent"],
+      initiated_by: ["coach_manual", "agent", "self_service"],
       member_role: ["gym_owner", "coach", "athlete"],
       membership_plan: ["monthly", "casual", "comp_team"],
       payment_status: ["paid", "unpaid", "waived"],

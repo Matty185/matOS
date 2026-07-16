@@ -1,5 +1,11 @@
 # Stage 2 Checkpoint — mid-stage, written for context-loss recovery
 
+**SUPERSEDED — Stage 2 completed later the same session. See `docs/stage-2-notes.md` for the actual
+final account of what was built and found. Kept as-is below for historical record; the "next steps"
+described here were carried out (sometimes with minor deviations, e.g. `redirectedFrom` handling
+during login instead of a client-side signInWithPassword `data` field — check stage-2-notes.md
+rather than assuming this doc's plan was followed exactly).**
+
 **Written:** 2026-07-16, mid-session. The user was about to restart the Claude Code process
 (`claude --dangerously-skip-permissions --continue`) to enable autonomous work while AFK, and asked
 for a durable checkpoint in case that restart drops conversation context. **If you're reading this in
