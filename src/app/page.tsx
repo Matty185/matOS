@@ -1,8 +1,12 @@
-export default function Home() {
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-2 p-8">
-      <h1 className="font-heading text-4xl tracking-wide text-primary">MatOS</h1>
-      <p className="text-muted-foreground">Stage 0 scaffold — build starts at Stage 1.</p>
-    </main>
-  );
+import { redirect } from "next/navigation";
+import { getCurrentMember } from "@/lib/auth/current-member";
+
+// Middleware guarantees a session reaches this point (Stage 3: "/" was
+// removed from the public allowlist, since there's now a real destination
+// to send everyone to instead of a static placeholder).
+export default async function RootPage() {
+  const member = await getCurrentMember();
+
+  if (!member) redirect("/login");
+  redirect(member.role === "athlete" ? "/home" : "/dashboard");
 }

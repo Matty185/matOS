@@ -1,16 +1,15 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// Route groups like (coach)/(athlete) are invisible in the URL — they can't
-// be matched by path, and Stage 3 hasn't decided the actual URL structure
-// under them yet. So instead of guessing future protected paths, this is an
-// allowlist of what's public; everything else defaults to requiring a
+// Route groups like (coach)/(athlete) are invisible in the URL, so this is
+// an allowlist of what's public; everything else defaults to requiring a
 // session. New pages are protected automatically without editing this file.
+// "/" was public through Stage 2 (a static placeholder); Stage 3 gave it a
+// real job (role-based redirect to /dashboard or /home) that itself needs
+// a session, so it moved off this list.
 const PUBLIC_PATHS = ["/login", "/invite"];
-const PUBLIC_EXACT_PATHS = ["/"];
 
 function isPublicPath(pathname: string): boolean {
-  if (PUBLIC_EXACT_PATHS.includes(pathname)) return true;
   // Boundary-based, not a bare startsWith: a future route literally named
   // e.g. /logins or /invitexyz must not accidentally become public.
   return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
