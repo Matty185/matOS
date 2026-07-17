@@ -22,10 +22,20 @@ export type AuthContext = {
   role: Role;
 };
 
+// Next.js populates this for any dynamic route segment (the second
+// argument every App Router route handler receives). Threading it through
+// properly, instead of each handler re-parsing request.nextUrl.pathname
+// with a hardcoded `.at(-N)` — found in Stage 4 security review: today's
+// three nested routes are safe, but that pattern silently breaks the
+// moment a copy-pasted route sits at a different nesting depth, and
+// Stages 5-8 add several more dynamic segments.
+type RouteParams = Record<string, string>;
+
 type Handler<TInput> = (
   request: NextRequest,
   context: AuthContext,
   input: TInput,
+  params: RouteParams,
 ) => Promise<Response>;
 
 type WithAuthOptions<TInput> = {
@@ -52,7 +62,10 @@ export function withAuth<TInput = undefined>(
   handler: Handler<TInput>,
   options: WithAuthOptions<TInput> = {},
 ) {
-  return async (request: NextRequest): Promise<Response> => {
+  return async (
+    request: NextRequest,
+    routeContext?: { params?: RouteParams },
+  ): Promise<Response> => {
     const supabase = createClient();
 
     const {
@@ -106,7 +119,7 @@ export function withAuth<TInput = undefined>(
     };
 
     try {
-      return await handler(request, context, input);
+      return await handler(request, context, input, routeContext?.params ?? {});
     } catch (error) {
       console.error("[withAuth] unhandled error in route handler", error);
       return apiError(500, "INTERNAL_ERROR", "Something went wrong — the change wasn't saved.");
