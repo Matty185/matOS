@@ -13,7 +13,7 @@ import { deactivateMemberSchema } from "@/lib/validation/member";
 // (Agentic Interface Rules), not this direct dashboard action, which uses a
 // standard confirm-dialog pattern instead.
 export const POST = withAuth(
-  async (_request: NextRequest, context, _input, params) => {
+  async (_request: NextRequest, context, input, params) => {
     const id = params.id;
     if (!id) return apiError(400, "MISSING_ID", "No member id provided.");
     const supabase = createClient();
@@ -62,7 +62,13 @@ export const POST = withAuth(
       entityId: id,
       beforeState: { active: true },
       afterState: { active: false },
-      initiatedBy: "coach_manual",
+      // Extra audit detail for this action per CLAUDE.md's agentic-interface
+      // rules ("deactivate_member requires typed confirmation... extra audit
+      // detail") — the raw NL query is the extra detail; the typed "yes"/
+      // "confirm" itself is enforced client-side before this request is ever
+      // sent, backed by this schema's own confirm:true requirement.
+      initiatedBy: input.agent_query ? "agent" : "coach_manual",
+      agentQuery: input.agent_query ?? null,
     });
 
     return NextResponse.json({ success: true });

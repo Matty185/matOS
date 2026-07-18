@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { agentQueryField } from "@/lib/validation/agent";
 
 // Coach manual marking — any member, any class, any date (including
 // backdated, per Stage 1's attendance.checked_in_date design comment,
@@ -11,6 +12,7 @@ export const markAttendanceSchema = z.object({
     .datetime()
     .refine((v) => new Date(v) <= new Date(), "checked_in_at cannot be in the future")
     .optional(),
+  agent_query: agentQueryField,
 });
 
 export type MarkAttendanceInput = z.infer<typeof markAttendanceSchema>;

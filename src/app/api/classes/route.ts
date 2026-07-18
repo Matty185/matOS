@@ -40,7 +40,8 @@ export const POST = withAuth(
         day_of_week: input.day_of_week,
         start_time: input.start_time,
       },
-      initiatedBy: "coach_manual",
+      initiatedBy: input.agent_query ? "agent" : "coach_manual",
+      agentQuery: input.agent_query ?? null,
     });
 
     return NextResponse.json({ success: true, classId: created.id }, { status: 201 });

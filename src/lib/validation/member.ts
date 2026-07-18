@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { agentQueryField } from "@/lib/validation/agent";
 
 const BELT_VALUES = [
   "white",
@@ -39,7 +40,9 @@ export type CreateMemberInput = z.infer<typeof createMemberSchema>;
 // with is an auth.users concern, not a plain member-record edit; out of
 // scope here (belt/stripes/role/active all have their own dedicated
 // actions — promote, and deactivate — not this generic edit).
-export const editMemberSchema = createMemberSchema.omit({ email: true });
+export const editMemberSchema = createMemberSchema
+  .omit({ email: true })
+  .extend({ agent_query: agentQueryField });
 
 export type EditMemberInput = z.infer<typeof editMemberSchema>;
 
@@ -47,12 +50,14 @@ export const promoteBeltSchema = z.object({
   belt: z.enum(BELT_VALUES),
   stripes: z.number().int().min(0).max(4),
   notes: z.string().trim().max(1000).optional().or(z.literal("")),
+  agent_query: agentQueryField,
 });
 
 export type PromoteBeltInput = z.infer<typeof promoteBeltSchema>;
 
 export const deactivateMemberSchema = z.object({
   confirm: z.literal(true, { message: "Confirmation is required." }),
+  agent_query: agentQueryField,
 });
 
 export type DeactivateMemberInput = z.infer<typeof deactivateMemberSchema>;

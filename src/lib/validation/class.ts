@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { agentQueryField } from "@/lib/validation/agent";
 
 const CLASS_TYPE_VALUES = ["gi", "no_gi", "comp", "open_mat"] as const;
 
@@ -9,6 +10,7 @@ export const createClassSchema = z.object({
   start_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Enter a valid time (HH:MM)."),
   duration_minutes: z.number().int().min(1).max(600),
   max_capacity: z.number().int().min(1).max(500).nullable().optional(),
+  agent_query: agentQueryField,
 });
 
 export type CreateClassInput = z.infer<typeof createClassSchema>;

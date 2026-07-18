@@ -61,7 +61,8 @@ export const POST = withAuth(
       entityId: id,
       beforeState: { belt: member.belt, stripes: member.stripes },
       afterState: { belt: input.belt, stripes: input.stripes },
-      initiatedBy: "coach_manual",
+      initiatedBy: input.agent_query ? "agent" : "coach_manual",
+      agentQuery: input.agent_query ?? null,
     });
 
     return NextResponse.json({ success: true });

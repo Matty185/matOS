@@ -700,6 +700,10 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      increment_agent_query_count: {
+        Args: { p_date: string; p_gym_id: string };
+        Returns: number;
+      };
       increment_invite_attempt: { Args: { invite_id: string }; Returns: number };
     };
     Enums: {

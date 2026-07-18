@@ -38,6 +38,21 @@ function scrub(value: Record<string, Json> | null | undefined): Json | null {
   return clean;
 }
 
+// `agent_query` is raw freeform text (a coach's literal chat message), not a
+// keyed object — SCRUBBED_KEYS can't apply to it. A coach could accidentally
+// paste a password/token into a chat query; this is a coarse safety net
+// (redact the whole message rather than try to surgically excise a
+// substring) for the rare case, not a precision filter.
+const SECRET_LIKE_PATTERN =
+  /(password|passwd|api[_-]?key|secret|bearer|access[_-]?token)\s*[:=]?\s*\S{6,}|[A-Za-z0-9_-]{25,}/i;
+
+function scrubAgentQuery(query: string | null | undefined): string | null {
+  if (!query) return null;
+  return SECRET_LIKE_PATTERN.test(query)
+    ? "[redacted — message text withheld, resembled a secret/token]"
+    : query;
+}
+
 /**
  * Insert-only, service-role write into audit_log — matches Stage 1 RLS
  * (no authenticated INSERT policy exists; the table's own trigger also
@@ -56,7 +71,7 @@ export async function writeAuditLog(params: WriteAuditLogParams): Promise<void> 
     before_state: scrub(params.beforeState),
     after_state: scrub(params.afterState),
     initiated_by: params.initiatedBy ?? "coach_manual",
-    agent_query: params.agentQuery ?? null,
+    agent_query: scrubAgentQuery(params.agentQuery),
   });
 
   if (error) {

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentMember } from "@/lib/auth/current-member";
 import { AppShell } from "@/components/shared/app-shell";
+import { AgentChat } from "@/components/shared/agent-chat";
 
 const ROLE_LABEL = { gym_owner: "Owner", coach: "Coach", athlete: "Athlete" } as const;
 
@@ -22,6 +23,7 @@ export default async function CoachLayout({ children }: { children: React.ReactN
       roleLabel={ROLE_LABEL[member.role]}
     >
       {children}
+      <AgentChat />
     </AppShell>
   );
 }

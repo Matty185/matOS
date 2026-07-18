@@ -63,7 +63,8 @@ export const PATCH = withAuth(
         membership_plan: input.membership_plan,
         notes: input.notes || null,
       },
-      initiatedBy: "coach_manual",
+      initiatedBy: input.agent_query ? "agent" : "coach_manual",
+      agentQuery: input.agent_query ?? null,
     });
 
     return NextResponse.json({ success: true });

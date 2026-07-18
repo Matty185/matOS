@@ -73,7 +73,8 @@ export const POST = withAuth(
         period_month: input.period_month,
         period_year: input.period_year,
       },
-      initiatedBy: "coach_manual",
+      initiatedBy: input.agent_query ? "agent" : "coach_manual",
+      agentQuery: input.agent_query ?? null,
     });
 
     return NextResponse.json({ success: true }, { status: 200 });

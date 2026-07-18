@@ -57,7 +57,8 @@ export const POST = withAuth(
         class_id: input.class_id,
         checked_in_at: checkedInAt,
       },
-      initiatedBy: "coach_manual",
+      initiatedBy: input.agent_query ? "agent" : "coach_manual",
+      agentQuery: input.agent_query ?? null,
     });
 
     return NextResponse.json({ success: true }, { status: 201 });

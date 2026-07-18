@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { agentQueryField } from "@/lib/validation/agent";
 
 export const markPaidSchema = z.object({
   member_ids: z.array(z.string().uuid()).min(1, "Select at least one member."),
@@ -22,6 +23,7 @@ export const recordPaymentSchema = z.object({
     .nullable()
     .optional(),
   notes: z.string().max(500).optional(),
+  agent_query: agentQueryField,
 });
 
 export type RecordPaymentInput = z.infer<typeof recordPaymentSchema>;
