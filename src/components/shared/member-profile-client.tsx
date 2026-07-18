@@ -12,6 +12,7 @@ import { BeltDisplay } from "@/components/shared/belt-display";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PromoteBeltDialog } from "@/components/shared/promote-belt-dialog";
 import { PLAN_LABELS } from "@/lib/constants/member-labels";
+import { isOverdue } from "@/lib/payments/overdue";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -374,26 +375,38 @@ function PaymentsTab({ memberId, onMarkedPaid }: { memberId: string; onMarkedPai
         <EmptyState
           icon={CreditCard}
           title="No payment history yet"
-          description="The full monthly grid lands in a later stage — this member's payments will list here as they're recorded."
+          description="This member's payments will list here as they're recorded — see the full gym-wide grid under Payments."
         />
       ) : (
         <ul className="flex flex-col gap-2">
-          {data.map((row, i) => (
-            <li key={i} className="flex justify-between rounded-md border p-3 text-sm">
-              <span>{format(new Date(row.period_year, row.period_month - 1), "MMMM yyyy")}</span>
-              <Badge
-                variant={
-                  row.status === "paid"
-                    ? "default"
-                    : row.status === "waived"
-                      ? "secondary"
-                      : "destructive"
-                }
-              >
-                {row.status}
-              </Badge>
-            </li>
-          ))}
+          {data.map((row, i) => {
+            // Rule 8: overdue is computed at query time, never stored — a
+            // stored 'unpaid' row only reads as "Overdue" once its period
+            // has actually ended, no grace period.
+            const overdue = isOverdue(row.status, {
+              month: row.period_month,
+              year: row.period_year,
+            });
+            const label = overdue ? "overdue" : row.status;
+            return (
+              <li key={i} className="flex justify-between rounded-md border p-3 text-sm">
+                <span>{format(new Date(row.period_year, row.period_month - 1), "MMMM yyyy")}</span>
+                <Badge
+                  variant={
+                    overdue
+                      ? "destructive"
+                      : row.status === "paid"
+                        ? "default"
+                        : row.status === "waived"
+                          ? "secondary"
+                          : "outline"
+                  }
+                >
+                  {label}
+                </Badge>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
