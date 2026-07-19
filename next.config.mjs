@@ -25,7 +25,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: *.supabase.co",
               "font-src 'self' data:",
-              "connect-src 'self' *.supabase.co api.anthropic.com",
+              "connect-src 'self' *.supabase.co wss://*.supabase.co api.anthropic.com",
               "frame-ancestors 'none'",
             ].join("; "),
           },
