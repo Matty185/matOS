@@ -1,17 +1,22 @@
-import { TrendingUp } from "lucide-react";
-import { EmptyState } from "@/components/shared/empty-state";
+import { getCurrentMember } from "@/lib/auth/current-member";
+import { createClient } from "@/lib/supabase/server";
+import { ProgressClient } from "@/components/shared/progress-client";
 
-// Attendance history, belt timeline, and personal logs (working
-// on/struggling with) land in Stages 4-5.
-export default function ProgressPage() {
+export default async function ProgressPage() {
+  const member = await getCurrentMember();
+  if (!member) return null;
+
+  const supabase = createClient();
+  const { data: memberRow } = await supabase
+    .from("members")
+    .select("join_date")
+    .eq("id", member.memberId)
+    .single();
+
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="font-heading text-3xl tracking-wide">My Progress</h1>
-      <EmptyState
-        icon={TrendingUp}
-        title="Nothing tracked yet"
-        description="Your attendance history, belt timeline, and training logs will show up here."
-      />
-    </div>
+    <ProgressClient
+      memberId={member.memberId}
+      joinDate={memberRow?.join_date ?? new Date().toISOString().slice(0, 10)}
+    />
   );
 }
