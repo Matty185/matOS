@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { Bot, Loader2, Send } from "lucide-react";
@@ -41,6 +41,40 @@ type DisplayItem =
 
 const CAPABILITIES_HINT =
   'Ask me about members, attendance, payments, classes, or belts — e.g. "who\'s overdue?" or "mark John Murphy paid for June."';
+
+// The model naturally reaches for **bold** to emphasize names/amounts in
+// its free-text answers — found live: literal asterisks were showing up
+// verbatim in the chat (e.g. "1. **Darragh Walsh** — June 2026"), since
+// this text was rendered as a plain string. Fixed by parsing into React
+// text/<strong> nodes only, never dangerouslySetInnerHTML or any HTML
+// parsing — CLAUDE.md: "Model output... never rendered as raw HTML." Model
+// text (and anything echoed back from an untrusted tool result) still
+// can't ever be interpreted as markup, only as literal text inside a
+// handful of known-safe elements this component itself chose to render.
+function renderBoldSpans(line: string) {
+  return line
+    .split(/(\*\*[^*]+\*\*)/g)
+    .map((part, i) =>
+      part.startsWith("**") && part.endsWith("**") && part.length > 4 ? (
+        <strong key={i}>{part.slice(2, -2)}</strong>
+      ) : (
+        part
+      ),
+    );
+}
+
+function FormattedText({ text }: { text: string }) {
+  return (
+    <>
+      {text.split("\n").map((line, i) => (
+        <Fragment key={i}>
+          {i > 0 ? <br /> : null}
+          {renderBoldSpans(line)}
+        </Fragment>
+      ))}
+    </>
+  );
+}
 
 // Floating button (React portal, fixed position) -> Sheet chat panel, per
 // plan §6. In-session history only: `history` lives in component state and
@@ -237,7 +271,7 @@ export function AgentChat() {
                       </div>
                     ) : item.kind === "answer" ? (
                       <div className="max-w-[85%] rounded-md bg-muted px-3 py-2 text-sm">
-                        {item.text}
+                        <FormattedText text={item.text} />
                       </div>
                     ) : item.kind === "error" ? (
                       <div className="max-w-[85%] rounded-md border border-destructive/50 bg-destructive/5 px-3 py-2 text-sm text-destructive">
@@ -251,7 +285,9 @@ export function AgentChat() {
                             : ""
                         }`}
                       >
-                        <p className="mb-2">{item.text}</p>
+                        <p className="mb-2">
+                          <FormattedText text={item.text} />
+                        </p>
                         <ul className="mb-3 flex flex-col gap-1.5">
                           {item.actions.map((action, actionIndex) => (
                             <li
