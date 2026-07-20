@@ -67,32 +67,52 @@ export function periodKey(memberId: string, period: MonthPeriod): string {
   return `${memberId}-${period.month}-${period.year}`;
 }
 
+function buildStatusByKey(payments: PaymentRowForOverdue[]): Map<string, PaymentStatus> {
+  return new Map(
+    payments.map((p) => [
+      periodKey(p.member_id, { month: p.period_month, year: p.period_year }),
+      p.status,
+    ]),
+  );
+}
+
 // A member has no applicable payment obligation for months before they
-// joined — excluded from both the grid (rendered as "—") and this count.
+// joined — excluded from both the grid (rendered as "—") and any overdue
+// computation. Single source of truth for "which periods, in this window,
+// is this member actually overdue for" — getOverdueMemberIds and the
+// agent's get_overdue_payments tool both need this exact list (the latter
+// independently reimplemented it without the join-date filter, which is
+// how a member who joined 2 months ago got reported as "5 months
+// overdue": every pre-join month in the 6-month window has no payment
+// row, defaults to 'unpaid', and its period has already ended — so
+// without this filter every one of them reads as overdue too).
+export function getOverduePeriodsForMember(
+  member: MemberForOverdue,
+  statusByKey: Map<string, PaymentStatus>,
+  window: MonthPeriod[],
+  now: Date = new Date(),
+): MonthPeriod[] {
+  const joinMonth = startOfMonth(new Date(member.join_date));
+  return window.filter((period) => {
+    const periodStart = new Date(period.year, period.month - 1, 1);
+    if (periodStart < joinMonth) return false;
+    const status = statusByKey.get(periodKey(member.id, period)) ?? "unpaid";
+    return isOverdue(status, period, now);
+  });
+}
+
 export function getOverdueMemberIds(
   members: MemberForOverdue[],
   payments: PaymentRowForOverdue[],
   window: MonthPeriod[],
   now: Date = new Date(),
 ): Set<string> {
-  const statusByKey = new Map(
-    payments.map((p) => [
-      periodKey(p.member_id, { month: p.period_month, year: p.period_year }),
-      p.status,
-    ]),
-  );
+  const statusByKey = buildStatusByKey(payments);
   const overdue = new Set<string>();
 
   for (const member of members) {
-    const joinMonth = startOfMonth(new Date(member.join_date));
-    for (const period of window) {
-      const periodStart = new Date(period.year, period.month - 1, 1);
-      if (periodStart < joinMonth) continue;
-      const status = statusByKey.get(periodKey(member.id, period)) ?? "unpaid";
-      if (isOverdue(status, period, now)) {
-        overdue.add(member.id);
-        break;
-      }
+    if (getOverduePeriodsForMember(member, statusByKey, window, now).length > 0) {
+      overdue.add(member.id);
     }
   }
 

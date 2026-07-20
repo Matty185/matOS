@@ -8,6 +8,7 @@ import { Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BeltDisplay, ALL_BELTS, BELT_LABELS } from "@/components/shared/belt-display";
 import { EmptyState } from "@/components/shared/empty-state";
+import { PaymentCellDialog } from "@/components/shared/payment-cell-dialog";
 import { PLAN_LABELS } from "@/lib/constants/member-labels";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,6 +71,8 @@ function useMembers() {
   });
 }
 
+type CurrentPeriodPayment = { status: PaymentStatus; amount: number | null; notes: string | null };
+
 function useCurrentPeriodPayments() {
   const now = new Date();
   const periodMonth = now.getMonth() + 1;
@@ -81,12 +84,14 @@ function useCurrentPeriodPayments() {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("payments")
-        .select("member_id, status")
+        .select("member_id, status, amount, notes")
         .eq("period_month", periodMonth)
         .eq("period_year", periodYear);
       if (error) throw error;
-      const map = new Map<string, PaymentStatus>();
-      for (const row of data) map.set(row.member_id, row.status);
+      const map = new Map<string, CurrentPeriodPayment>();
+      for (const row of data) {
+        map.set(row.member_id, { status: row.status, amount: row.amount, notes: row.notes });
+      }
       return map;
     },
   });
@@ -121,6 +126,14 @@ export default function MembersPage() {
   const [showInactive, setShowInactive] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isMarkingPaid, setIsMarkingPaid] = useState(false);
+  const [paymentDialogMember, setPaymentDialogMember] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+
+  const now = new Date();
+  const currentPeriodMonth = now.getMonth() + 1;
+  const currentPeriodYear = now.getFullYear();
 
   const filtered = useMemo(() => {
     if (!members) return [];
@@ -129,7 +142,7 @@ export default function MembersPage() {
       if (beltFilter !== "all" && !m.belt.startsWith(beltFilter)) return false;
       if (planFilter !== "all" && m.membership_plan !== planFilter) return false;
       if (paymentFilter !== "all") {
-        const status = payments?.get(m.id) ?? "no_record";
+        const status = payments?.get(m.id)?.status ?? "no_record";
         if (status !== paymentFilter) return false;
       }
       if (search) {
@@ -330,12 +343,26 @@ export default function MembersPage() {
                   </TableCell>
                   <TableCell>{PLAN_LABELS[member.membership_plan]}</TableCell>
                   <TableCell>
-                    <PaymentBadge
-                      status={
-                        paymentsError ? "no_record" : (payments?.get(member.id) ?? "no_record")
+                    <button
+                      type="button"
+                      className="flex h-11 w-full items-center rounded-md"
+                      aria-label={`${member.first_name} ${member.last_name}'s payment status — edit`}
+                      onClick={() =>
+                        setPaymentDialogMember({
+                          id: member.id,
+                          name: `${member.first_name} ${member.last_name}`,
+                        })
                       }
-                      isLoading={paymentsLoading}
-                    />
+                    >
+                      <PaymentBadge
+                        status={
+                          paymentsError
+                            ? "no_record"
+                            : (payments?.get(member.id)?.status ?? "no_record")
+                        }
+                        isLoading={paymentsLoading}
+                      />
+                    </button>
                   </TableCell>
                   <TableCell>
                     {member.active ? (
@@ -350,6 +377,22 @@ export default function MembersPage() {
           </Table>
         </div>
       )}
+
+      <PaymentCellDialog
+        open={paymentDialogMember !== null}
+        onOpenChange={(open) => {
+          if (!open) setPaymentDialogMember(null);
+        }}
+        memberName={paymentDialogMember?.name ?? ""}
+        memberId={paymentDialogMember?.id ?? ""}
+        periodMonth={currentPeriodMonth}
+        periodYear={currentPeriodYear}
+        existing={paymentDialogMember ? (payments?.get(paymentDialogMember.id) ?? null) : null}
+        onSaved={() => {
+          setPaymentDialogMember(null);
+          queryClient.invalidateQueries({ queryKey: ["payments", "current-period"] });
+        }}
+      />
     </div>
   );
 }

@@ -4,8 +4,8 @@ import type { Database } from "@/types/database";
 import {
   trailingMonthWindow,
   getOverdueMemberIds,
+  getOverduePeriodsForMember,
   periodKey,
-  isOverdue,
 } from "@/lib/payments/overdue";
 
 type Client = SupabaseClient<Database>;
@@ -160,12 +160,16 @@ export async function executeReadTool(
       return (members ?? [])
         .filter((m) => overdueIds.has(m.id))
         .map((m) => {
-          const overduePeriods = window
-            .filter((period) => {
-              const status = statusByKey.get(periodKey(m.id, period)) ?? "unpaid";
-              return isOverdue(status as never, period);
-            })
-            .map((p) => `${p.year}-${String(p.month).padStart(2, "0")}`);
+          // Must use the same join-date-aware helper getOverdueMemberIds
+          // itself uses, not an independent re-filter of the raw window —
+          // a second implementation here previously skipped the join-date
+          // check, so a member who joined 2 months ago showed every
+          // payment-row-less month in the 6-month window as "overdue,"
+          // reporting something like "overdue 5 months" for someone who
+          // was never even a member yet for 4 of those months.
+          const overduePeriods = getOverduePeriodsForMember(m, statusByKey, window).map(
+            (p) => `${p.year}-${String(p.month).padStart(2, "0")}`,
+          );
           return {
             member_id: m.id,
             name: `${m.first_name} ${m.last_name}`,

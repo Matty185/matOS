@@ -12,8 +12,9 @@ import { BeltDisplay } from "@/components/shared/belt-display";
 import { EmptyState } from "@/components/shared/empty-state";
 import { AttendanceCalendar } from "@/components/shared/attendance-calendar";
 import { PromoteBeltDialog } from "@/components/shared/promote-belt-dialog";
+import { PaymentCellDialog } from "@/components/shared/payment-cell-dialog";
 import { PLAN_LABELS } from "@/lib/constants/member-labels";
-import { isOverdue } from "@/lib/payments/overdue";
+import { isOverdue, type PaymentStatus } from "@/lib/payments/overdue";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -200,7 +201,8 @@ export function MemberProfileClient({
         <TabsContent value="payments" className="pt-4">
           <PaymentsTab
             memberId={member.id}
-            onMarkedPaid={() =>
+            memberName={`${member.first_name} ${member.last_name}`}
+            onPaymentChanged={() =>
               queryClient.invalidateQueries({ queryKey: ["member-payments", member.id] })
             }
           />
@@ -359,15 +361,28 @@ function AttendanceTab({ memberId, joinDate }: { memberId: string; joinDate: str
   );
 }
 
-function PaymentsTab({ memberId, onMarkedPaid }: { memberId: string; onMarkedPaid: () => void }) {
+function PaymentsTab({
+  memberId,
+  memberName,
+  onPaymentChanged,
+}: {
+  memberId: string;
+  memberName: string;
+  onPaymentChanged: () => void;
+}) {
   const [isMarking, setIsMarking] = useState(false);
+  const [selectedPeriod, setSelectedPeriod] = useState<{
+    month: number;
+    year: number;
+    existing: { status: PaymentStatus; amount: number | null; notes: string | null };
+  } | null>(null);
   const { data, isLoading } = useQuery({
     queryKey: ["member-payments", memberId],
     queryFn: async () => {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("payments")
-        .select("period_month, period_year, status, amount, paid_at")
+        .select("period_month, period_year, status, amount, notes, paid_at")
         .eq("member_id", memberId)
         .order("period_year", { ascending: false })
         .order("period_month", { ascending: false });
@@ -386,7 +401,7 @@ function PaymentsTab({ memberId, onMarkedPaid }: { memberId: string; onMarkedPai
       });
       if (res.ok) {
         toast.success("Marked paid for this month.");
-        onMarkedPaid();
+        onPaymentChanged();
       } else {
         toast.error("Couldn't mark this payment.");
       }
@@ -424,27 +439,60 @@ function PaymentsTab({ memberId, onMarkedPaid }: { memberId: string; onMarkedPai
               year: row.period_year,
             });
             const label = overdue ? "overdue" : row.status;
+            const periodLabel = format(
+              new Date(row.period_year, row.period_month - 1),
+              "MMMM yyyy",
+            );
             return (
-              <li key={i} className="flex justify-between rounded-md border p-3 text-sm">
-                <span>{format(new Date(row.period_year, row.period_month - 1), "MMMM yyyy")}</span>
-                <Badge
-                  variant={
-                    overdue
-                      ? "destructive"
-                      : row.status === "paid"
-                        ? "default"
-                        : row.status === "waived"
-                          ? "secondary"
-                          : "outline"
+              <li key={i}>
+                <button
+                  type="button"
+                  className="flex h-11 w-full items-center justify-between rounded-md border px-3 text-sm hover:bg-muted"
+                  aria-label={`${periodLabel}: ${label} — edit`}
+                  onClick={() =>
+                    setSelectedPeriod({
+                      month: row.period_month,
+                      year: row.period_year,
+                      existing: { status: row.status, amount: row.amount, notes: row.notes },
+                    })
                   }
                 >
-                  {label}
-                </Badge>
+                  <span>{periodLabel}</span>
+                  <Badge
+                    variant={
+                      overdue
+                        ? "destructive"
+                        : row.status === "paid"
+                          ? "default"
+                          : row.status === "waived"
+                            ? "secondary"
+                            : "outline"
+                    }
+                  >
+                    {label}
+                  </Badge>
+                </button>
               </li>
             );
           })}
         </ul>
       )}
+
+      <PaymentCellDialog
+        open={selectedPeriod !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedPeriod(null);
+        }}
+        memberName={memberName}
+        memberId={memberId}
+        periodMonth={selectedPeriod?.month ?? 1}
+        periodYear={selectedPeriod?.year ?? new Date().getFullYear()}
+        existing={selectedPeriod?.existing ?? null}
+        onSaved={() => {
+          setSelectedPeriod(null);
+          onPaymentChanged();
+        }}
+      />
     </div>
   );
 }
