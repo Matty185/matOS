@@ -142,7 +142,17 @@ export function AgentChat() {
         const res = await fetch(action.endpoint, {
           method: action.method,
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...action.body, agent_query: item.query }),
+          body: JSON.stringify({
+            ...action.body,
+            agent_query: item.query,
+            // The server independently re-validates this for actions that
+            // require it (e.g. deactivate_member) — this button is already
+            // disabled unless typedConfirmInputs[index] matches yes/confirm,
+            // but that's a client-side convenience gate, not the real check.
+            ...(action.requiresTypedConfirmation
+              ? { typed_confirmation: typedConfirmInputs[index] ?? "" }
+              : {}),
+          }),
         });
         if (!res.ok) {
           allOk = false;

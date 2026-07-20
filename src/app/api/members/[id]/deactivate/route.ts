@@ -12,10 +12,35 @@ import { deactivateMemberSchema } from "@/lib/validation/member";
 // CLAUDE.md is specifically for the agent's deactivate_member tool call
 // (Agentic Interface Rules), not this direct dashboard action, which uses a
 // standard confirm-dialog pattern instead.
+//
+// Security review found that the typed text itself was never actually sent
+// to (or checked by) the server — the agent-chat client only gated its
+// Confirm *button* on the typed input matching /^(yes|confirm)$/i, then
+// sent the same static {confirm:true} regardless of what was typed or
+// whether anything was typed at all, fully bypassable by calling this
+// endpoint directly. `typed_confirmation` now carries the literal string
+// the coach typed; for agent-initiated calls (identified by agent_query
+// being present, same signal every other write endpoint already uses to
+// distinguish agent vs. direct-UI origin) it's independently re-validated
+// here, server-side.
+const TYPED_CONFIRMATION_PATTERN = /^(yes|confirm)$/i;
+
 export const POST = withAuth(
   async (_request: NextRequest, context, input, params) => {
     const id = params.id;
     if (!id) return apiError(400, "MISSING_ID", "No member id provided.");
+
+    if (
+      input.agent_query &&
+      !TYPED_CONFIRMATION_PATTERN.test((input.typed_confirmation ?? "").trim())
+    ) {
+      return apiError(
+        400,
+        "TYPED_CONFIRMATION_REQUIRED",
+        'Deactivating a member via the assistant requires typing "yes" or "confirm".',
+      );
+    }
+
     const supabase = createClient();
 
     const { data: member, error: memberError } = await supabase

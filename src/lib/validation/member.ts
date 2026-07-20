@@ -58,6 +58,10 @@ export type PromoteBeltInput = z.infer<typeof promoteBeltSchema>;
 export const deactivateMemberSchema = z.object({
   confirm: z.literal(true, { message: "Confirmation is required." }),
   agent_query: agentQueryField,
+  // Only meaningful (and only validated) for agent-initiated calls — see
+  // the route handler. Optional so the direct-dashboard confirm-dialog
+  // path (which never sends it) still validates.
+  typed_confirmation: z.string().optional(),
 });
 
 export type DeactivateMemberInput = z.infer<typeof deactivateMemberSchema>;

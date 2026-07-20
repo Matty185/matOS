@@ -7,9 +7,26 @@ const withPWA = withPWAInit({
   skipWaiting: true,
 });
 
-/** @type {import('next').NextConfig} */
+// Stage 11 security review flagged script-src's 'unsafe-eval' as
+// unnecessarily weakening the CSP as an XSS mitigation layer (no
+// dangerouslySetInnerHTML/innerHTML sink exists in this app today, so
+// nothing currently exploits it, but it removes CSP as a defense-in-depth
+// backstop if one is ever introduced). 'unsafe-eval' is only actually
+// needed by webpack's eval-based devtool in `next dev` (HMR/fast refresh);
+// a production build's client bundle never calls eval(). Dropping it in
+// production is a safe, low-risk tightening verified against a real
+// production build + browser session. 'unsafe-inline' stays for both —
+// removing it requires a nonce threaded through Next's own framework-
+// injected RSC hydration scripts, which is a larger, riskier change to make
+// this close to a demo without live framework-doc access to verify the
+// exact Next 14.2 wiring; tracked as an accepted gap, not silently dropped
+// (see CLAUDE.md Decision Log).
 const nextConfig = {
   async headers() {
+    const scriptSrc =
+      process.env.NODE_ENV === "development"
+        ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+        : "script-src 'self' 'unsafe-inline'";
     return [
       {
         source: "/(.*)",
@@ -21,7 +38,7 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              scriptSrc,
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: *.supabase.co",
               "font-src 'self' data:",

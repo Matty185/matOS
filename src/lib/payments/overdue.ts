@@ -35,6 +35,25 @@ export function trailingMonthWindow(
   });
 }
 
+// CLAUDE.md Rule 3: payment `amount` visibility to athletes is deliberately
+// two-layer — RLS (payments_select_self) is the first, but it lets an
+// athlete's own row through including `amount`, by design (row ownership,
+// not column redaction, is what RLS expresses). This mapper is the second,
+// application-layer, strip step for any *future* athlete-facing payments
+// screen. No such screen exists yet (Stage 8's athlete portal has no
+// payments view — confirmed in Stage 11 review), so nothing calls this
+// today; it exists now, ahead of that screen, specifically so the first PR
+// that adds one reaches for this instead of a plain `select("*")` copy-
+// pasted from the coach-side grid, which would leak `amount` with no
+// warning since RLS alone wouldn't stop it.
+export function toAthleteSafePayment<T extends { amount: number | null }>(
+  payment: T,
+): Omit<T, "amount"> {
+  const copy: Partial<T> = { ...payment };
+  delete copy.amount;
+  return copy as Omit<T, "amount">;
+}
+
 export type PaymentRowForOverdue = {
   member_id: string;
   period_month: number;

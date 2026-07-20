@@ -64,6 +64,51 @@ export const POST = withAuth(
     // already-deleted row, re-nulling an already-null column, re-marking
     // executed_at), so on any failure this aborts before marking anything
     // "executed," and a retry is always safe.
+    //
+    // Stage 11 review found a subtler version of that same false-assurance
+    // bug: the auth-user deletion below was gated on `member.user_id`, which
+    // the members-anonymize step (further down) nulls. If a run got past
+    // anonymizing the member but failed on a later step, a retry would
+    // re-fetch `member` fresh, see `user_id` already null, and silently skip
+    // ever deleting the real auth.users row — leaving a live, still-loggable
+    // account behind while `deletion_requests` eventually reports success.
+    // Fixed by deleting the auth user (and anonymizing the audit actor)
+    // FIRST, while `member.user_id` is still guaranteed accurate, and only
+    // then nulling it on the members row. A retry after the auth user is
+    // already gone re-attempts `deleteUser` on that now-nonexistent id —
+    // treated as success (idempotent), not a failure.
+    const originalUserId = member.user_id;
+    if (originalUserId) {
+      // Audit rows where this member was the ACTOR (self check-ins, self-
+      // service requests, etc.) get their actor anonymised — rows where they
+      // were merely the ENTITY of a coach's action keep the coach as actor,
+      // since that attribution is about the coach's action, not the member.
+      const { error: auditAnonymizeError } = await serviceClient
+        .from("audit_log")
+        .update({ actor_id: null })
+        .eq("actor_id", originalUserId);
+      if (auditAnonymizeError) {
+        console.error("[gdpr] failed to anonymize audit_log actor", auditAnonymizeError);
+        return apiError(
+          500,
+          "DELETION_FAILED",
+          "Something went wrong — the deletion wasn't completed. It's safe to retry.",
+        );
+      }
+
+      const { error: deleteUserError } = await serviceClient.auth.admin.deleteUser(originalUserId);
+      // "User not found" means a prior attempt already deleted it — safe to
+      // treat as success rather than blocking the retry on it forever.
+      if (deleteUserError && deleteUserError.status !== 404) {
+        console.error("[gdpr] failed to delete auth user", deleteUserError);
+        return apiError(
+          500,
+          "DELETION_FAILED",
+          "Something went wrong — the deletion wasn't completed. It's safe to retry.",
+        );
+      }
+    }
+
     const { error: anonymizeError } = await serviceClient
       .from("members")
       .update({
@@ -107,35 +152,6 @@ export const POST = withAuth(
     ] as const) {
       if (result.error) {
         console.error(`[gdpr] failed to clean up ${label}`, result.error);
-        return apiError(
-          500,
-          "DELETION_FAILED",
-          "Something went wrong — the deletion wasn't completed. It's safe to retry.",
-        );
-      }
-    }
-
-    if (member.user_id) {
-      // Audit rows where this member was the ACTOR (self check-ins, self-
-      // service requests, etc.) get their actor anonymised — rows where they
-      // were merely the ENTITY of a coach's action keep the coach as actor,
-      // since that attribution is about the coach's action, not the member.
-      const { error: auditAnonymizeError } = await serviceClient
-        .from("audit_log")
-        .update({ actor_id: null })
-        .eq("actor_id", member.user_id);
-      if (auditAnonymizeError) {
-        console.error("[gdpr] failed to anonymize audit_log actor", auditAnonymizeError);
-        return apiError(
-          500,
-          "DELETION_FAILED",
-          "Something went wrong — the deletion wasn't completed. It's safe to retry.",
-        );
-      }
-
-      const { error: deleteUserError } = await serviceClient.auth.admin.deleteUser(member.user_id);
-      if (deleteUserError) {
-        console.error("[gdpr] failed to delete auth user", deleteUserError);
         return apiError(
           500,
           "DELETION_FAILED",
