@@ -40,8 +40,13 @@ function loadEnvLocal() {
   for (const raw of content.split("\n")) {
     const line = raw.replace(/\r$/, "");
     const match = line.match(/^([A-Z_]+)=(.*)$/);
-    if (match && !process.env[match[1]]) {
-      process.env[match[1]] = match[2].replace(/^"|"$/g, "");
+    if (!match) continue;
+    // Both groups are mandatory in the pattern above, so a successful match
+    // guarantees they're defined — noUncheckedIndexedAccess just can't see
+    // that through a regex match array.
+    const [, key, value] = match as [string, string, string];
+    if (!process.env[key]) {
+      process.env[key] = value.replace(/^"|"$/g, "");
     }
   }
 }
@@ -56,6 +61,13 @@ const supabase = createClient<Database>(
 function must<T>(value: T | null | undefined, message: string): T {
   if (value === null || value === undefined) throw new Error(message);
   return value;
+}
+
+// Insert-then-select returns rows in the same order the array was given in
+// (reliable in practice for a single batch insert), so a parallel forEach
+// index always lines up — noUncheckedIndexedAccess just can't see that.
+function at<T>(arr: T[], i: number, message: string): T {
+  return must(arr[i], message);
 }
 
 function assertNoError(error: { message: string } | null, context: string) {
@@ -257,18 +269,20 @@ type ClassKey = (typeof CLASSES)[number]["key"];
 
 // ── roster ───────────────────────────────────────────────────────────────
 
+type BeltColor = Database["public"]["Enums"]["belt_color"];
+
 type AthleteDef = {
   key: string;
   first: string;
   last: string;
-  belt: string;
+  belt: BeltColor;
   stripes: number;
   plan: "monthly" | "casual" | "comp_team";
   joinDaysAgo: number;
   regularClasses: ClassKey[];
   attendanceProbability: number;
   login?: boolean;
-  promotion?: { fromBelt: string; fromStripes: number; promotedDaysAgo: number };
+  promotion?: { fromBelt: BeltColor; fromStripes: number; promotedDaysAgo: number };
 };
 
 const ATHLETES: AthleteDef[] = [
@@ -485,7 +499,10 @@ const MOCK_TECHNIQUES = [
 ];
 
 function mockReport(seed: number) {
-  const picked = [MOCK_TECHNIQUES[seed % 4], MOCK_TECHNIQUES[(seed + 1) % 4]];
+  const picked = [
+    at(MOCK_TECHNIQUES, seed % 4, "mock technique"),
+    at(MOCK_TECHNIQUES, (seed + 1) % 4, "mock technique"),
+  ];
   return {
     summary: "Automated placeholder analysis — no real video processing occurs in the alpha.",
     detected_techniques: picked,
@@ -581,7 +598,8 @@ async function main() {
     .select("id, name, day_of_week, start_time");
   assertNoError(classError, "insert classes");
   const classIdByKey = new Map<ClassKey, string>();
-  CLASSES.forEach((c, i) => classIdByKey.set(c.key, must(insertedClasses, "classes")[i].id));
+  const classRowsById = must(insertedClasses, "classes");
+  CLASSES.forEach((c, i) => classIdByKey.set(c.key, at(classRowsById, i, "class row").id));
 
   const today = todayUTC();
 
@@ -647,7 +665,8 @@ async function main() {
     .select("id");
   assertNoError(athleteError, "insert athletes");
   const memberIdByKey = new Map<string, string>();
-  ATHLETES.forEach((a, i) => memberIdByKey.set(a.key, must(insertedAthletes, "athletes")[i].id));
+  const athleteRowsById = must(insertedAthletes, "athletes");
+  ATHLETES.forEach((a, i) => memberIdByKey.set(a.key, at(athleteRowsById, i, "athlete row").id));
   memberIdByKey.set("__owner", ownerMemberId);
   memberIdByKey.set("__coach", coachMemberId);
 
@@ -745,6 +764,10 @@ async function main() {
           gym_id: gymId,
           checked_in_at: dublinISO(dateStr, `${cls.start_time}:00`),
           checked_in_by: Math.random() < 0.15 ? "coach" : "self",
+          // Placeholder the generated Insert type requires — Stage 1's
+          // attendance_set_checked_in_date trigger unconditionally
+          // overwrites it, same as the real mark/check-in routes.
+          checked_in_date: dateStr,
         });
       }
     }
@@ -845,7 +868,7 @@ async function main() {
     const memberId = memberIdByKey.get(key)!;
     const entryCount = key === "aoife" ? 2 : 1;
     for (let i = 0; i < entryCount; i++) {
-      const content = logContent[i % logContent.length];
+      const content = at(logContent, i % logContent.length, "log content");
       logRows.push({
         member_id: memberId,
         gym_id: gymId,

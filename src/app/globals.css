@@ -18,7 +18,14 @@
     --muted-foreground: 215.4 16.3% 46.9%;
     --accent: 210 40% 96.1%;
     --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
+    /* Stage 10 polish: shadcn's default light-mode destructive (0 84.2%
+       60.2%, i.e. red-500) is ~3.76:1 against white — fails WCAG AA's 4.5:1
+       text minimum both as text-destructive (inline validation/errors) and
+       as the destructive button's white-on-red fill. Flagged repeatedly in
+       Stages 5-7 UX reviews and deferred here. red-600 (0 72.2% 50.6%) is
+       ~4.83:1 against white, clearing AA with margin in both directions
+       since button text and background use the same white reference. */
+    --destructive: 0 72.2% 50.6%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;

@@ -301,16 +301,27 @@ export default function MembersPage() {
               {filtered.map((member) => (
                 <TableRow key={member.id}>
                   <TableCell>
-                    <div className="flex h-11 w-11 items-center justify-center">
+                    {/* A plain wrapping div reserves 44x44 of visual space but
+                    doesn't extend the actual click/tap hit area beyond the
+                    16x16 checkbox itself — a <label> does, via native
+                    implicit label-control association, with no visual
+                    change and no extra JS. */}
+                    <label className="flex h-11 w-11 items-center justify-center">
                       <Checkbox
                         checked={selected.has(member.id)}
                         onCheckedChange={() => toggleSelected(member.id)}
                         aria-label={`Select ${member.first_name} ${member.last_name}`}
                       />
-                    </div>
+                    </label>
                   </TableCell>
                   <TableCell>
-                    <Link href={`/members/${member.id}`} className="font-medium hover:underline">
+                    {/* py-3/-my-3 grows the tap target to a full 44px without
+                    shifting the row's visual layout (the negative margin
+                    cancels the padding). */}
+                    <Link
+                      href={`/members/${member.id}`}
+                      className="-my-3 block w-full py-3 font-medium hover:underline"
+                    >
                       {member.first_name} {member.last_name}
                     </Link>
                   </TableCell>

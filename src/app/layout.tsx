@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Bebas_Neue } from "next/font/google";
 import { QueryProvider } from "@/components/providers/query-provider";
+import { ServiceWorkerRegister } from "@/components/providers/service-worker-register";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -39,6 +40,7 @@ export default function RootLayout({
       <body>
         <QueryProvider>{children}</QueryProvider>
         <Toaster position="top-center" />
+        <ServiceWorkerRegister />
       </body>
     </html>
   );
