@@ -10,6 +10,7 @@ import { CalendarCheck, CreditCard, Award, Video, NotebookText, ChevronLeft } fr
 import { createClient } from "@/lib/supabase/client";
 import { BeltDisplay } from "@/components/shared/belt-display";
 import { EmptyState } from "@/components/shared/empty-state";
+import { AttendanceCalendar } from "@/components/shared/attendance-calendar";
 import { PromoteBeltDialog } from "@/components/shared/promote-belt-dialog";
 import { PLAN_LABELS } from "@/lib/constants/member-labels";
 import { isOverdue } from "@/lib/payments/overdue";
@@ -271,6 +272,13 @@ function InfoCard({ label, value }: { label: string; value: string }) {
 }
 
 function AttendanceTab({ memberId, joinDate }: { memberId: string; joinDate: string }) {
+  const [view, setView] = useState<"calendar" | "list">("calendar");
+  // Unbounded (well, a generous cap) rather than the old last-50 — a
+  // calendar month view needs whichever months have data, not just the
+  // most recent 50 check-ins, and this is a small per-member dataset at
+  // alpha scale (matches the "fetch broadly" approach already used in
+  // src/lib/payments/overdue.ts and the dashboard's not-seen-30-days
+  // computation).
   const { data, isLoading } = useQuery({
     queryKey: ["member-attendance", memberId],
     queryFn: async () => {
@@ -280,7 +288,7 @@ function AttendanceTab({ memberId, joinDate }: { memberId: string; joinDate: str
         .select("checked_in_at, checked_in_by")
         .eq("member_id", memberId)
         .order("checked_in_at", { ascending: false })
-        .limit(50);
+        .limit(500);
       if (error) throw error;
       return data;
     },
@@ -305,20 +313,48 @@ function AttendanceTab({ memberId, joinDate }: { memberId: string; joinDate: str
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="rounded-md border p-3">
-        <p className="text-xs text-muted-foreground">Average per week</p>
-        <p className="text-2xl font-semibold">{avgPerWeek}</p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="rounded-md border p-3">
+          <p className="text-xs text-muted-foreground">Average per week</p>
+          <p className="text-2xl font-semibold">{avgPerWeek}</p>
+        </div>
+        <div className="flex gap-1">
+          <Button
+            variant={view === "calendar" ? "default" : "outline"}
+            className="h-11"
+            onClick={() => setView("calendar")}
+          >
+            Calendar
+          </Button>
+          <Button
+            variant={view === "list" ? "default" : "outline"}
+            className="h-11"
+            onClick={() => setView("list")}
+          >
+            List
+          </Button>
+        </div>
       </div>
-      <ul className="flex flex-col gap-2">
-        {data.map((row, i) => (
-          <li key={i} className="flex justify-between rounded-md border p-3 text-sm">
-            <span>{format(new Date(row.checked_in_at), "EEE, MMM d, yyyy 'at' h:mm a")}</span>
-            <span className="text-muted-foreground">
-              {row.checked_in_by === "self" ? "Self check-in" : "Marked by coach"}
-            </span>
-          </li>
-        ))}
-      </ul>
+
+      {view === "calendar" ? (
+        <AttendanceCalendar
+          entries={data.map((row) => ({
+            checkedInAt: row.checked_in_at,
+            checkedInBy: row.checked_in_by,
+          }))}
+        />
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {data.map((row, i) => (
+            <li key={i} className="flex justify-between rounded-md border p-3 text-sm">
+              <span>{format(new Date(row.checked_in_at), "EEE, MMM d, yyyy 'at' h:mm a")}</span>
+              <span className="text-muted-foreground">
+                {row.checked_in_by === "self" ? "Self check-in" : "Marked by coach"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
