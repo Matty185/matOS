@@ -67,36 +67,51 @@ export type Database = {
           analysed_at: string | null;
           created_at: string;
           created_by: string | null;
+          duration_seconds: number | null;
           gym_id: string;
           id: string;
           member_id: string;
-          report: Json | null;
+          method: Database["public"]["Enums"]["analysis_method"];
+          opponent_name: string | null;
+          result: Database["public"]["Enums"]["analysis_result"] | null;
+          result_method: Database["public"]["Enums"]["analysis_result_method"] | null;
           status: Database["public"]["Enums"]["analysis_status"];
           title: string;
+          updated_at: string;
           visible_to_athlete: boolean;
         };
         Insert: {
           analysed_at?: string | null;
           created_at?: string;
           created_by?: string | null;
+          duration_seconds?: number | null;
           gym_id: string;
           id?: string;
           member_id: string;
-          report?: Json | null;
+          method?: Database["public"]["Enums"]["analysis_method"];
+          opponent_name?: string | null;
+          result?: Database["public"]["Enums"]["analysis_result"] | null;
+          result_method?: Database["public"]["Enums"]["analysis_result_method"] | null;
           status?: Database["public"]["Enums"]["analysis_status"];
           title: string;
+          updated_at?: string;
           visible_to_athlete?: boolean;
         };
         Update: {
           analysed_at?: string | null;
           created_at?: string;
           created_by?: string | null;
+          duration_seconds?: number | null;
           gym_id?: string;
           id?: string;
           member_id?: string;
-          report?: Json | null;
+          method?: Database["public"]["Enums"]["analysis_method"];
+          opponent_name?: string | null;
+          result?: Database["public"]["Enums"]["analysis_result"] | null;
+          result_method?: Database["public"]["Enums"]["analysis_result_method"] | null;
           status?: Database["public"]["Enums"]["analysis_status"];
           title?: string;
+          updated_at?: string;
           visible_to_athlete?: boolean;
         };
         Relationships: [
@@ -109,6 +124,67 @@ export type Database = {
           },
           {
             foreignKeyName: "analyses_member_id_fkey";
+            columns: ["member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      analysis_events: {
+        Row: {
+          analysis_id: string;
+          created_at: string;
+          created_by: string | null;
+          duration_seconds: number | null;
+          event_type: Database["public"]["Enums"]["analysis_event_type"];
+          gym_id: string;
+          id: string;
+          member_id: string;
+          notes: string | null;
+          timestamp_seconds: number;
+        };
+        Insert: {
+          analysis_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          duration_seconds?: number | null;
+          event_type: Database["public"]["Enums"]["analysis_event_type"];
+          gym_id: string;
+          id?: string;
+          member_id: string;
+          notes?: string | null;
+          timestamp_seconds: number;
+        };
+        Update: {
+          analysis_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          duration_seconds?: number | null;
+          event_type?: Database["public"]["Enums"]["analysis_event_type"];
+          gym_id?: string;
+          id?: string;
+          member_id?: string;
+          notes?: string | null;
+          timestamp_seconds?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "analysis_events_analysis_id_fkey";
+            columns: ["analysis_id"];
+            isOneToOne: false;
+            referencedRelation: "analyses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "analysis_events_gym_id_fkey";
+            columns: ["gym_id"];
+            isOneToOne: false;
+            referencedRelation: "gyms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "analysis_events_member_id_fkey";
             columns: ["member_id"];
             isOneToOne: false;
             referencedRelation: "members";
@@ -707,6 +783,26 @@ export type Database = {
       increment_invite_attempt: { Args: { invite_id: string }; Returns: number };
     };
     Enums: {
+      analysis_event_type:
+        | "wrestling"
+        | "underhook"
+        | "takedown"
+        | "guard_pull"
+        | "sweep"
+        | "submission_attempt"
+        | "submission"
+        | "escape"
+        | "reversal"
+        | "guard_pass"
+        | "mount_control"
+        | "back_control"
+        | "side_control"
+        | "half_guard"
+        | "guard_bottom"
+        | "stalling";
+      analysis_method: "ai_stub" | "manual";
+      analysis_result: "win" | "loss" | "draw";
+      analysis_result_method: "submission" | "points" | "decision" | "dq" | "other";
       analysis_status: "pending" | "complete" | "failed";
       belt_color:
         | "white"
@@ -856,6 +952,27 @@ export const Constants = {
   },
   public: {
     Enums: {
+      analysis_event_type: [
+        "wrestling",
+        "underhook",
+        "takedown",
+        "guard_pull",
+        "sweep",
+        "submission_attempt",
+        "submission",
+        "escape",
+        "reversal",
+        "guard_pass",
+        "mount_control",
+        "back_control",
+        "side_control",
+        "half_guard",
+        "guard_bottom",
+        "stalling",
+      ],
+      analysis_method: ["ai_stub", "manual"],
+      analysis_result: ["win", "loss", "draw"],
+      analysis_result_method: ["submission", "points", "decision", "dq", "other"],
       analysis_status: ["pending", "complete", "failed"],
       belt_color: [
         "white",

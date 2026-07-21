@@ -13,8 +13,11 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { AttendanceCalendar } from "@/components/shared/attendance-calendar";
 import { PromoteBeltDialog } from "@/components/shared/promote-belt-dialog";
 import { PaymentCellDialog } from "@/components/shared/payment-cell-dialog";
+import { AnalysisStatsSummary } from "@/components/shared/analysis-stats-summary";
 import { PLAN_LABELS } from "@/lib/constants/member-labels";
 import { isOverdue, type PaymentStatus } from "@/lib/payments/overdue";
+import { computeAthleteAnalysisStats } from "@/lib/analysis/stats";
+import { RESULT_LABELS, formatEventTimestamp } from "@/lib/analysis/labels";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -541,13 +544,16 @@ function BeltHistoryTab({ memberId }: { memberId: string }) {
 }
 
 function AnalysisTab({ memberId }: { memberId: string }) {
+  const router = useRouter();
+  const [creatingManual, setCreatingManual] = useState(false);
+
   const { data, isLoading } = useQuery({
     queryKey: ["member-analyses", memberId],
     queryFn: async () => {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("analyses")
-        .select("title, status, analysed_at")
+        .select("id, title, status, method, analysed_at, duration_seconds, result")
         .eq("member_id", memberId)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -555,26 +561,114 @@ function AnalysisTab({ memberId }: { memberId: string }) {
     },
   });
 
-  if (isLoading) return <p className="text-sm text-muted-foreground">Loading...</p>;
-  if (!data || data.length === 0) {
-    return (
-      <EmptyState
-        icon={Video}
-        title="No analyses yet"
-        description="Video analysis reports this member uploads will show up here."
-      />
-    );
+  const { data: statsInputs } = useQuery({
+    queryKey: ["member-analysis-stats", memberId],
+    queryFn: async () => {
+      const supabase = createClient();
+      const [
+        { data: analysisRows, error: analysesError },
+        { data: eventRows, error: eventsError },
+      ] = await Promise.all([
+        supabase
+          .from("analyses")
+          .select("id, status, duration_seconds, result")
+          .eq("member_id", memberId),
+        supabase
+          .from("analysis_events")
+          .select("analysis_id, event_type")
+          .eq("member_id", memberId),
+      ]);
+      if (analysesError) throw analysesError;
+      if (eventsError) throw eventsError;
+      return { analyses: analysisRows ?? [], events: eventRows ?? [] };
+    },
+  });
+
+  const stats = statsInputs
+    ? computeAthleteAnalysisStats(statsInputs.analyses, statsInputs.events)
+    : null;
+
+  async function startManualLog() {
+    setCreatingManual(true);
+    try {
+      const res = await fetch("/api/analyses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          member_id: memberId,
+          title: `Match — ${format(new Date(), "MMM d, yyyy")}`,
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        toast.error(body.error ?? "Something went wrong.");
+        return;
+      }
+      router.push(`/members/${memberId}/analysis/${body.analysis.id}`);
+    } catch {
+      toast.error("Something went wrong — try again.");
+    } finally {
+      setCreatingManual(false);
+    }
   }
 
   return (
-    <ul className="flex flex-col gap-2">
-      {data.map((row, i) => (
-        <li key={i} className="flex justify-between rounded-md border p-3 text-sm">
-          <span>{row.title}</span>
-          <Badge variant="outline">{row.status}</Badge>
-        </li>
-      ))}
-    </ul>
+    <div className="flex flex-col gap-4">
+      {stats ? <AnalysisStatsSummary stats={stats} /> : null}
+
+      <Button
+        variant="outline"
+        className="h-11 self-start"
+        disabled={creatingManual}
+        onClick={startManualLog}
+      >
+        {creatingManual ? "Starting..." : "Log a match manually"}
+      </Button>
+
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading...</p>
+      ) : !data || data.length === 0 ? (
+        <EmptyState
+          icon={Video}
+          title="No analyses yet"
+          description="Video analyses this athlete uploads, or matches you log for them, will show up here."
+        />
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {data.map((row) => (
+            <li key={row.id}>
+              <Link
+                href={`/members/${memberId}/analysis/${row.id}`}
+                className="flex items-center justify-between rounded-md border p-3 text-sm hover:bg-accent/50"
+              >
+                <div className="flex flex-col gap-0.5">
+                  <span>{row.title}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {row.method === "manual" ? "Manually logged" : "AI quick analysis"}
+                    {row.analysed_at
+                      ? ` · ${format(new Date(row.analysed_at), "MMM d, yyyy 'at' h:mm a")}`
+                      : ""}
+                    {row.duration_seconds ? ` · ${formatEventTimestamp(row.duration_seconds)}` : ""}
+                    {row.result ? ` · ${RESULT_LABELS[row.result]}` : ""}
+                  </span>
+                </div>
+                <Badge
+                  variant={
+                    row.status === "complete"
+                      ? "default"
+                      : row.status === "failed"
+                        ? "destructive"
+                        : "outline"
+                  }
+                >
+                  {row.status === "pending" && row.method === "manual" ? "in progress" : row.status}
+                </Badge>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
