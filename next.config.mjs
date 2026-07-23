@@ -41,6 +41,12 @@ const nextConfig = {
               scriptSrc,
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: *.supabase.co",
+              // media-src covers <video>/<source> — falls back to
+              // default-src ('self' only) without this, which silently
+              // blocks the manual analysis player's blob: video playback
+              // (the video is deliberately never uploaded anywhere, loaded
+              // client-side only via URL.createObjectURL).
+              "media-src 'self' blob:",
               "font-src 'self' data:",
               "connect-src 'self' *.supabase.co wss://*.supabase.co api.anthropic.com",
               "frame-ancestors 'none'",

@@ -82,12 +82,19 @@ export function AnalysisLogger({ analysisId, backHref }: { analysisId: string; b
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [captureStart, setCaptureStart] = useState<number | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const videoUrlRef = useRef<string | null>(null);
 
+  // Revoke only on genuine unmount (empty deps) — not keyed on [videoUrl].
+  // React 18 Strict Mode double-invokes effects in dev, which would run
+  // this cleanup immediately after a fresh URL.createObjectURL() call if
+  // it were keyed on videoUrl, revoking the blob before the <video> ever
+  // loads it. Replacement (picking a different file) is handled explicitly
+  // in handleFileChange instead, via the ref.
   useEffect(() => {
     return () => {
-      if (videoUrl) URL.revokeObjectURL(videoUrl);
+      if (videoUrlRef.current) URL.revokeObjectURL(videoUrlRef.current);
     };
-  }, [videoUrl]);
+  }, []);
 
   const { data: analysis, isLoading: analysisLoading } = useQuery({
     queryKey: ["analysis", analysisId],
@@ -141,8 +148,10 @@ export function AnalysisLogger({ analysisId, backHref }: { analysisId: string; b
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (videoUrl) URL.revokeObjectURL(videoUrl);
-    setVideoUrl(URL.createObjectURL(file));
+    if (videoUrlRef.current) URL.revokeObjectURL(videoUrlRef.current);
+    const url = URL.createObjectURL(file);
+    videoUrlRef.current = url;
+    setVideoUrl(url);
   }
 
   function useCurrentTime() {
