@@ -132,7 +132,7 @@ export const READ_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_analysis_stubs",
     description:
-      "List match/video analysis records (hard timestamped metrics — no video is ever stored) — title, status, method (ai_stub/manual), duration, result, optionally for one member.",
+      "List video analysis records (stub reports — no video is ever stored), optionally for one member.",
     input_schema: {
       type: "object",
       properties: {

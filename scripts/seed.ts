@@ -479,49 +479,37 @@ const PLAN_AMOUNT: Record<AthleteDef["plan"], number> = {
   comp_team: 140,
 };
 
-// Hard, timestamped event data — not technique commentary. Two
-// deterministic demo matches (not randomly generated, unlike
-// buildMockEventLog in /api/video/upload) so the seeded demo always looks
-// the same across reseeds.
-type MockAnalysisEvent = {
-  event_type: Database["public"]["Enums"]["analysis_event_type"];
-  timestamp_seconds: number;
-  duration_seconds: number | null;
-};
-
-const MOCK_MATCHES: {
-  events: MockAnalysisEvent[];
-  durationSeconds: number;
-  result: Database["public"]["Enums"]["analysis_result"];
-  resultMethod: Database["public"]["Enums"]["analysis_result_method"];
-}[] = [
+const MOCK_TECHNIQUES = [
   {
-    events: [
-      { event_type: "wrestling", timestamp_seconds: 8, duration_seconds: 12 },
-      { event_type: "takedown", timestamp_seconds: 25, duration_seconds: null },
-      { event_type: "guard_pass", timestamp_seconds: 40, duration_seconds: null },
-      { event_type: "mount_control", timestamp_seconds: 45, duration_seconds: 30 },
-      { event_type: "submission_attempt", timestamp_seconds: 80, duration_seconds: null },
-      { event_type: "submission", timestamp_seconds: 95, duration_seconds: null },
-    ],
-    durationSeconds: 110,
-    result: "win",
-    resultMethod: "submission",
+    name: "Closed guard retention",
+    note: "Good hip movement, keep elbows tighter to the body on the recovery.",
   },
   {
-    events: [
-      { event_type: "takedown", timestamp_seconds: 5, duration_seconds: null },
-      { event_type: "guard_pull", timestamp_seconds: 20, duration_seconds: null },
-      { event_type: "sweep", timestamp_seconds: 35, duration_seconds: null },
-      { event_type: "side_control", timestamp_seconds: 50, duration_seconds: 40 },
-      { event_type: "escape", timestamp_seconds: 95, duration_seconds: null },
-      { event_type: "stalling", timestamp_seconds: 110, duration_seconds: 15 },
-    ],
-    durationSeconds: 180,
-    result: "loss",
-    resultMethod: "points",
+    name: "Armbar from mount",
+    note: "Solid isolation of the arm — work on controlling the far hip earlier.",
+  },
+  {
+    name: "Takedown entry",
+    note: "Level change looked strong; follow through faster on the finish.",
+  },
+  {
+    name: "Back escape",
+    note: "Nice hip bump — chain a second escape option if the first is stuffed.",
   },
 ];
+
+function mockReport(seed: number) {
+  const picked = [
+    at(MOCK_TECHNIQUES, seed % 4, "mock technique"),
+    at(MOCK_TECHNIQUES, (seed + 1) % 4, "mock technique"),
+  ];
+  return {
+    summary: "Automated placeholder analysis — no real video processing occurs in the alpha.",
+    detected_techniques: picked,
+    overall_notes:
+      "This is a mock report. Real video analysis (technique detection, form scoring) is a later phase — MatOS never stores uploaded video either way; it's processed and discarded.",
+  };
+}
 
 // ── main ─────────────────────────────────────────────────────────────────
 
@@ -897,51 +885,30 @@ async function main() {
 
   console.log("Inserting mock analyses...");
   const demoAthleteMemberId = memberIdByKey.get("aoife")!;
-  const analysisSeeds = [
+  const analysisRows = [
     {
-      title: "Guard passing drills — July session.mp4",
-      analysed_at: dublinISO(addDaysUTC(today, -4), "20:15:00"),
-      match: at(MOCK_MATCHES, 0, "mock match"),
-    },
-    {
-      title: "Sparring round vs blue belt.mp4",
-      analysed_at: dublinISO(addDaysUTC(today, -11), "20:45:00"),
-      match: at(MOCK_MATCHES, 1, "mock match"),
-    },
-  ];
-
-  for (const seed of analysisSeeds) {
-    const { data: analysis, error: analysisError } = await supabase
-      .from("analyses")
-      .insert({
-        member_id: demoAthleteMemberId,
-        gym_id: gymId,
-        title: seed.title,
-        status: "complete",
-        method: "ai_stub",
-        analysed_at: seed.analysed_at,
-        duration_seconds: seed.match.durationSeconds,
-        result: seed.match.result,
-        result_method: seed.match.resultMethod,
-        created_by: athleteAuth.id,
-        visible_to_athlete: true,
-      })
-      .select("id")
-      .single();
-    assertNoError(analysisError, "insert analyses");
-
-    const eventRows = seed.match.events.map((event) => ({
-      analysis_id: analysis!.id,
       member_id: demoAthleteMemberId,
       gym_id: gymId,
-      event_type: event.event_type,
-      timestamp_seconds: event.timestamp_seconds,
-      duration_seconds: event.duration_seconds,
+      title: "Guard passing drills — July session.mp4",
+      status: "complete" as const,
+      analysed_at: dublinISO(addDaysUTC(today, -4), "20:15:00"),
+      report: mockReport(0),
       created_by: athleteAuth.id,
-    }));
-    const { error: eventsError } = await supabase.from("analysis_events").insert(eventRows);
-    assertNoError(eventsError, "insert analysis_events");
-  }
+      visible_to_athlete: true,
+    },
+    {
+      member_id: demoAthleteMemberId,
+      gym_id: gymId,
+      title: "Sparring round vs blue belt.mp4",
+      status: "complete" as const,
+      analysed_at: dublinISO(addDaysUTC(today, -11), "20:45:00"),
+      report: mockReport(2),
+      created_by: athleteAuth.id,
+      visible_to_athlete: true,
+    },
+  ];
+  const { error: analysisError } = await supabase.from("analyses").insert(analysisRows);
+  assertNoError(analysisError, "insert analyses");
 
   console.log("\nDone.\n");
   console.log("Gym:", GYM_NAME, gymId);

@@ -72,6 +72,39 @@ MatOS is a multi-tenant BJJ gym management platform. Current phase: **alpha** �
 
 Real video analysis, payment processing, notification emails, React Native app, tests, Sentry, staff role, per-session class instances, waitlists, 2FA. If a task seems to require one of these, stop and flag it instead.
 
+## Match Analysis Module
+
+Companion spec: `matos_analysis_module_plan.md` — where they conflict, the plan wins.
+
+### What This Module Is
+
+Layer 1: manual match breakdown — client-side video player + tagging tool producing a timestamped record (positional intervals with roles + discrete events with modifiers/outcomes). Layer 2: computed athlete profiles from accumulated breakdowns, with side-by-side comparison. AI tagging is **phase 2, not now** — do not build it, but do not block it (the `source` field on events exists from day one).
+
+### Non-Negotiables
+
+1. **Video never touches the server.** Playback is a local file via `URL.createObjectURL`. No upload endpoint, no storage, no video URLs in the database. Only `video_filename` + `video_duration_seconds` are stored (resume mismatch check).
+2. **Single focus athlete per breakdown.** Everything is tagged from their perspective — the opponent's takedown attempt is the focus athlete's `takedown_defended`. Never design UI or data for two-athlete tagging.
+3. **Taxonomy is data, not code.** Events, modifiers, and outcome rules live in the `event_types` seed table. Coach edits to the taxonomy must never require schema or component changes.
+4. **Outcomes are conditionally required** per event_types (`outcome_required`). Validate server-side against `outcome_options`; the confirm sheet blocks only on required fields.
+5. **Breakdowns are standalone artifacts** identified by name + user-entered `match_date` (required — it drives all trajectory ordering, since analysis can happen long after the match). Not replayable against video.
+6. **Profiles are computed, not authored.** Gi/no-gi always separate. Every metric renders its n. Shown from n=1. Trajectory ordered by match_date, never created_at.
+7. **External people** are gym-scoped analyst records (free-named, unlinked to accounts). No merging into member profiles — don't build for it.
+8. **Ownership:** author owns a breakdown; one author, no collaboration. Coach/owner see all in gym. Breakdown deletion cascades its positions/events (allowed — unlike member records).
+9. **Agent tools are read-only and factual.** Profile/metric/comparison queries return numbers. Never coaching advice — "what should X work on" gets the weakest metrics reported factually, nothing more. Same server-side gym_id injection and parameter validation as all existing tools.
+10. **GDPR:** member deletion also deletes their member-linked breakdowns. The AI-transit compliance question (third-party opponents in footage) is deliberately deferred to phase 2 — do not introduce any server-side video processing in v1.
+
+### Tagging UX Contract
+
+Tap event → auto-pause → modifier/outcome sheet → confirm → resume. Two taps total for no-modifier events. Position tags open an interval; the next position tag closes the previous one. Timeline strip with tappable markers for edit/delete/timestamp adjust. Continuous local draft + explicit server save; resume warns on filename/duration mismatch but allows proceeding. Speeds 0.25×–2×. All alpha UI standards apply (390px, 44px targets, empty/loading/error states).
+
+### Build Gates
+
+Stage A1 (schema + RLS + event_types seed) is BLOCKING on security-reviewer + database-reviewer, same as alpha Stage 1. All-reviewer gates after tagging screen (A3), profiles (A5), and integration (A7). Full pass at A9. Never proceed past a security or critic BLOCKED item.
+
+### Out of Scope — Match Analysis Module
+
+AI tagging, video storage/upload/URLs, keyboard shortcuts, two-athlete tagging, canonical match linking, ruleset/points events, collaborative breakdowns, external-person merging, breakdown replay against video. Flag, don't build.
+
 ## Decision Log
 
 ### 2026-07-15 — Node version pin: 20 → 24
@@ -100,3 +133,17 @@ Real video analysis, payment processing, notification emails, React Native app, 
 - _Implement a nonce-based CSP now, dropping `'unsafe-inline'` entirely:_ rejected for this pass — correct implementation requires per-request nonce generation in middleware plus confirming Next 14.2.35's exact framework-script nonce-detection behavior, which isn't something to get subtly wrong three days before a demo without the ability to verify against live Next.js framework documentation. Worth doing properly in a dedicated pass, not squeezed into this review's remaining scope.
 - _Upgrade to Next 15 now to clear the audit advisories:_ rejected — breaking change, no patched 14.x point release exists, and forcing it this late trades a disclosed-but-unconfirmed risk for a real, immediate one (an upgrade regression during final demo prep).
 - _Silently leave both as they were:_ rejected — CLAUDE.md's own "flag deviations" rule and the fact that this is literally the "pre-demo security pass" the Stage 0 deferral was written to be resolved at.
+
+### 2026-07-23 — Scrapped the pre-plan "hard-metrics event log" analysis rework
+
+**Context.** Before the Match Analysis Module plan (`matos_analysis_module_plan.md`) existed, a prior session reworked the alpha's video-analysis stub into a timestamped hard-metrics event log: extended the `analyses` table (`method`/`duration_seconds`/`opponent_name`/`result`/`result_method`), added an `analysis_events` table, a manual client-side video-timestamping player, new `/api/analyses/*` routes, and a per-athlete stats aggregation. All of it shipped and was deployed live. It does not match the plan's actual data model (`breakdowns`/`breakdown_positions`/`breakdown_events`/`event_types`/`external_people` — positional intervals with roles, discrete events with modifiers/outcomes, focus-athlete perspective) or UX (tap-to-tag with auto-pause, not free-form event logging).
+
+**Decision.** Scrapped entirely rather than adapted. Deleted the 14 files that were new work (components, `/api/analyses/*` routes, `src/lib/analysis/*`, the two migrations), reverted the 8 files that were modified in place back to their exact pre-rework alpha-stub state (the athlete upload page, the coach `AnalysisTab`, `/api/video/upload`, the agent's `get_analysis_stubs` tool, the seed script, `next.config.mjs`'s CSP), and wrote one new migration (`20260723170000_revert_analysis_events_rework.sql`) restoring the live `analyses` table to byte-identical shape with the original alpha stub — verified against the live schema, not assumed. `src/types/database.ts` was regenerated fresh from the restored schema rather than git-reverted, to guarantee it matches reality rather than trusting history.
+
+**Reasoning.** Adapting the existing tables/components toward the plan's shape would have meant carrying forward a data model and UX that the plan explicitly supersedes (event logging vs. tap-to-tag interval/event tagging with a completely different table structure) — more total work and more risk of subtle leftover assumptions than a clean scrap before Stage A1 lays down the real schema. The original alpha mock Analysis tab (prose "technique breakdown" stub) was deliberately preserved, not removed — the addendum's own build sequence keeps it in place until Stage A7 replaces it, so athletes/coaches aren't left with a broken screen in the interim.
+
+**Alternatives considered.**
+
+- _Adapt the existing `analyses`/`analysis_events` tables toward the plan's schema instead of scrapping:_ rejected — the plan's tables are structurally different (positions-as-intervals + events-with-modifiers-and-outcomes vs. a flat event log), so "adapting" would mean rewriting nearly everything anyway while carrying forward migration cruft and RLS policies shaped around the wrong model.
+- _Delete the two forward migration files and leave the live database as-is (schema drift between repo and DB):_ rejected — CLAUDE.md's own "RLS at the database layer is the security boundary" posture depends on the schema in migrations matching what's actually deployed; leaving them mismatched would make every future migration author from a false picture of the live schema.
+- _Edit the two applied migration files in place to "fix" them:_ rejected outright — directly conflicts with CLAUDE.md's "schema changes are new migration files, never edits to applied migrations" rule; a new revert migration preserves the true history (this was tried, then reverted) instead of rewriting it.

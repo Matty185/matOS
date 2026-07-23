@@ -192,9 +192,7 @@ export async function executeReadTool(
     case "get_analysis_stubs": {
       let query = supabase
         .from("analyses")
-        .select(
-          "id, member_id, title, status, method, analysed_at, duration_seconds, result, result_method, visible_to_athlete",
-        )
+        .select("id, member_id, title, status, analysed_at, visible_to_athlete")
         .order("created_at", { ascending: false })
         .limit(50);
       if (typeof input.member_id === "string") query = query.eq("member_id", input.member_id);
