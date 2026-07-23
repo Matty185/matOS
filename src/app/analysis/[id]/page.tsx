@@ -1,0 +1,146 @@
+"use client";
+
+import Link from "next/link";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { ChevronLeft, Video } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { BreakdownEditDialog } from "@/components/shared/breakdown-edit-dialog";
+import { Badge } from "@/components/ui/badge";
+
+const RESULT_LABELS = { win: "Win", loss: "Loss", draw: "Draw" } as const;
+const METHOD_LABELS = {
+  submission: "Submission",
+  points: "Points",
+  decision: "Decision",
+  dq: "DQ",
+} as const;
+
+type BreakdownDetail = {
+  id: string;
+  name: string;
+  match_date: string;
+  gi: boolean;
+  status: "in_progress" | "complete";
+  result: keyof typeof RESULT_LABELS | null;
+  method: keyof typeof METHOD_LABELS | null;
+  author_id: string | null;
+  members: { first_name: string; last_name: string } | null;
+  external_people: { display_name: string } | null;
+};
+
+function useCurrentUserId() {
+  return useQuery({
+    queryKey: ["current-user-id"],
+    queryFn: async () => {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      return user?.id ?? null;
+    },
+  });
+}
+
+// Metadata display + edit only — the actual video-tagging screen is Stage
+// A3, not built yet. This page is the honest placeholder for it rather
+// than a broken/half-wired link, per CLAUDE.md's "proper... loading states
+// on every async action" standard extended to "no dead ends" in spirit.
+export default function BreakdownDetailPage({ params }: { params: { id: string } }) {
+  const queryClient = useQueryClient();
+  const { data: currentUserId } = useCurrentUserId();
+
+  const {
+    data: breakdown,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["breakdown", params.id],
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("breakdowns")
+        .select(
+          "id, name, match_date, gi, status, result, method, author_id, members(first_name, last_name), external_people(display_name)",
+        )
+        .eq("id", params.id)
+        .single();
+      if (error) throw error;
+      return data as unknown as BreakdownDetail;
+    },
+  });
+
+  if (isLoading) {
+    return <p className="text-sm text-muted-foreground">Loading...</p>;
+  }
+
+  if (error || !breakdown) {
+    return (
+      <p className="text-sm text-destructive">
+        Couldn&apos;t load this breakdown — it may not exist, or you may not have access to it.
+      </p>
+    );
+  }
+
+  const focusName = breakdown.members
+    ? `${breakdown.members.first_name} ${breakdown.members.last_name}`
+    : (breakdown.external_people?.display_name ?? "Unknown");
+
+  // RLS grants staff SELECT on every breakdown in the gym but UPDATE only
+  // on ones they authored (plan §7) — showing Edit unconditionally led a
+  // coach straight into a working-looking dialog whose save silently 404s
+  // (RLS blocks the write). Only render it when the viewer can actually
+  // use it. Found in Stage A2 code review.
+  const canEdit = currentUserId !== undefined && breakdown.author_id === currentUserId;
+
+  return (
+    <div className="flex flex-col gap-6">
+      <Link
+        href="/analysis"
+        className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+      >
+        <ChevronLeft className="h-4 w-4" /> Back to breakdowns
+      </Link>
+
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-heading text-2xl tracking-wide">{breakdown.name}</h1>
+          <p className="text-sm text-muted-foreground">
+            {focusName} · {format(new Date(breakdown.match_date), "MMM d, yyyy")}
+          </p>
+        </div>
+        {canEdit ? (
+          <BreakdownEditDialog
+            breakdownId={breakdown.id}
+            defaultValues={{
+              name: breakdown.name,
+              match_date: breakdown.match_date,
+              gi: breakdown.gi,
+              result: breakdown.result ?? undefined,
+              method: breakdown.method ?? undefined,
+            }}
+            onSaved={() => queryClient.invalidateQueries({ queryKey: ["breakdown", params.id] })}
+          />
+        ) : null}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Badge variant="outline">{breakdown.gi ? "Gi" : "No-Gi"}</Badge>
+        <Badge variant={breakdown.status === "complete" ? "default" : "outline"}>
+          {breakdown.status === "complete" ? "complete" : "in progress"}
+        </Badge>
+        {breakdown.result ? (
+          <Badge variant="outline">{RESULT_LABELS[breakdown.result]}</Badge>
+        ) : null}
+        {breakdown.method ? (
+          <Badge variant="outline">{METHOD_LABELS[breakdown.method]}</Badge>
+        ) : null}
+      </div>
+
+      <div className="flex flex-col items-center gap-2 rounded-md border border-dashed p-8 text-center text-muted-foreground">
+        <Video className="h-8 w-8" />
+        <p className="text-sm">Video tagging is coming in a later stage.</p>
+      </div>
+    </div>
+  );
+}

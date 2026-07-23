@@ -16,6 +16,7 @@ import {
   TrendingUp,
   Upload,
   UserCog,
+  Swords,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,7 @@ const COACH_NAV: NavItem[] = [
   { label: "Attendance", href: "/attendance", icon: CalendarCheck },
   { label: "Classes", href: "/classes", icon: CalendarDays },
   { label: "Payments", href: "/payments", icon: CreditCard },
+  { label: "Analysis", href: "/analysis", icon: Swords },
   { label: "Audit Log", href: "/audit-log", icon: ScrollText },
 ];
 
@@ -46,6 +48,7 @@ const ATHLETE_NAV: NavItem[] = [
   { label: "Check In", href: "/check-in", icon: CalendarCheck },
   { label: "My Progress", href: "/progress", icon: TrendingUp },
   { label: "Upload", href: "/upload", icon: Upload },
+  { label: "Analysis", href: "/analysis", icon: Swords },
   { label: "Account", href: "/account", icon: UserCog },
 ];
 

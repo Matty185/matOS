@@ -2,8 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentMember } from "@/lib/auth/current-member";
 import { AppShell } from "@/components/shared/app-shell";
 import { AgentChat } from "@/components/shared/agent-chat";
-
-const ROLE_LABEL = { gym_owner: "Owner", coach: "Coach", athlete: "Athlete" } as const;
+import { ROLE_LABEL } from "@/lib/constants/member-labels";
 
 export default async function CoachLayout({ children }: { children: React.ReactNode }) {
   const member = await getCurrentMember();
