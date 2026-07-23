@@ -320,6 +320,195 @@ export type Database = {
           },
         ];
       };
+      breakdown_events: {
+        Row: {
+          breakdown_id: string;
+          created_at: string;
+          event_type_id: string;
+          gym_id: string;
+          id: string;
+          modifier: string | null;
+          outcome: string | null;
+          source: Database["public"]["Enums"]["breakdown_event_source"];
+          ts: number;
+        };
+        Insert: {
+          breakdown_id: string;
+          created_at?: string;
+          event_type_id: string;
+          gym_id: string;
+          id?: string;
+          modifier?: string | null;
+          outcome?: string | null;
+          source?: Database["public"]["Enums"]["breakdown_event_source"];
+          ts: number;
+        };
+        Update: {
+          breakdown_id?: string;
+          created_at?: string;
+          event_type_id?: string;
+          gym_id?: string;
+          id?: string;
+          modifier?: string | null;
+          outcome?: string | null;
+          source?: Database["public"]["Enums"]["breakdown_event_source"];
+          ts?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "breakdown_events_breakdown_id_fkey";
+            columns: ["breakdown_id"];
+            isOneToOne: false;
+            referencedRelation: "breakdowns";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "breakdown_events_event_type_id_fkey";
+            columns: ["event_type_id"];
+            isOneToOne: false;
+            referencedRelation: "event_types";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "breakdown_events_gym_id_fkey";
+            columns: ["gym_id"];
+            isOneToOne: false;
+            referencedRelation: "gyms";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      breakdown_positions: {
+        Row: {
+          breakdown_id: string;
+          end_ts: number | null;
+          gym_id: string;
+          id: string;
+          position_id: string;
+          role: string | null;
+          start_ts: number;
+        };
+        Insert: {
+          breakdown_id: string;
+          end_ts?: number | null;
+          gym_id: string;
+          id?: string;
+          position_id: string;
+          role?: string | null;
+          start_ts: number;
+        };
+        Update: {
+          breakdown_id?: string;
+          end_ts?: number | null;
+          gym_id?: string;
+          id?: string;
+          position_id?: string;
+          role?: string | null;
+          start_ts?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "breakdown_positions_breakdown_id_fkey";
+            columns: ["breakdown_id"];
+            isOneToOne: false;
+            referencedRelation: "breakdowns";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "breakdown_positions_gym_id_fkey";
+            columns: ["gym_id"];
+            isOneToOne: false;
+            referencedRelation: "gyms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "breakdown_positions_position_id_fkey";
+            columns: ["position_id"];
+            isOneToOne: false;
+            referencedRelation: "positions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      breakdowns: {
+        Row: {
+          author_id: string;
+          created_at: string;
+          duration_seconds: number | null;
+          external_person_id: string | null;
+          gi: boolean;
+          gym_id: string;
+          id: string;
+          match_date: string;
+          member_id: string | null;
+          method: Database["public"]["Enums"]["breakdown_method"] | null;
+          name: string;
+          result: Database["public"]["Enums"]["breakdown_result"] | null;
+          status: Database["public"]["Enums"]["breakdown_status"];
+          updated_at: string;
+          video_duration_seconds: number | null;
+          video_filename: string | null;
+        };
+        Insert: {
+          author_id: string;
+          created_at?: string;
+          duration_seconds?: number | null;
+          external_person_id?: string | null;
+          gi: boolean;
+          gym_id: string;
+          id?: string;
+          match_date: string;
+          member_id?: string | null;
+          method?: Database["public"]["Enums"]["breakdown_method"] | null;
+          name: string;
+          result?: Database["public"]["Enums"]["breakdown_result"] | null;
+          status?: Database["public"]["Enums"]["breakdown_status"];
+          updated_at?: string;
+          video_duration_seconds?: number | null;
+          video_filename?: string | null;
+        };
+        Update: {
+          author_id?: string;
+          created_at?: string;
+          duration_seconds?: number | null;
+          external_person_id?: string | null;
+          gi?: boolean;
+          gym_id?: string;
+          id?: string;
+          match_date?: string;
+          member_id?: string | null;
+          method?: Database["public"]["Enums"]["breakdown_method"] | null;
+          name?: string;
+          result?: Database["public"]["Enums"]["breakdown_result"] | null;
+          status?: Database["public"]["Enums"]["breakdown_status"];
+          updated_at?: string;
+          video_duration_seconds?: number | null;
+          video_filename?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "breakdowns_external_person_id_fkey";
+            columns: ["external_person_id"];
+            isOneToOne: false;
+            referencedRelation: "external_people";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "breakdowns_gym_id_fkey";
+            columns: ["gym_id"];
+            isOneToOne: false;
+            referencedRelation: "gyms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "breakdowns_member_id_fkey";
+            columns: ["member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       classes: {
         Row: {
           active: boolean;
@@ -402,6 +591,74 @@ export type Database = {
             columns: ["member_id"];
             isOneToOne: false;
             referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      event_types: {
+        Row: {
+          active: boolean;
+          category: string;
+          id: string;
+          modifier_options: Json | null;
+          modifier_required: boolean;
+          name: string;
+          outcome_options: Json | null;
+          outcome_required: boolean;
+        };
+        Insert: {
+          active?: boolean;
+          category: string;
+          id?: string;
+          modifier_options?: Json | null;
+          modifier_required?: boolean;
+          name: string;
+          outcome_options?: Json | null;
+          outcome_required?: boolean;
+        };
+        Update: {
+          active?: boolean;
+          category?: string;
+          id?: string;
+          modifier_options?: Json | null;
+          modifier_required?: boolean;
+          name?: string;
+          outcome_options?: Json | null;
+          outcome_required?: boolean;
+        };
+        Relationships: [];
+      };
+      external_people: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          display_name: string;
+          gym_id: string;
+          id: string;
+          notes: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          display_name: string;
+          gym_id: string;
+          id?: string;
+          notes?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          display_name?: string;
+          gym_id?: string;
+          id?: string;
+          notes?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "external_people_gym_id_fkey";
+            columns: ["gym_id"];
+            isOneToOne: false;
+            referencedRelation: "gyms";
             referencedColumns: ["id"];
           },
         ];
@@ -695,6 +952,30 @@ export type Database = {
           },
         ];
       };
+      positions: {
+        Row: {
+          active: boolean;
+          id: string;
+          name: string;
+          notes: string | null;
+          roles: Json | null;
+        };
+        Insert: {
+          active?: boolean;
+          id?: string;
+          name: string;
+          notes?: string | null;
+          roles?: Json | null;
+        };
+        Update: {
+          active?: boolean;
+          id?: string;
+          name?: string;
+          notes?: string | null;
+          roles?: Json | null;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -726,6 +1007,10 @@ export type Database = {
         | "purple"
         | "brown"
         | "black";
+      breakdown_event_source: "manual" | "ai";
+      breakdown_method: "submission" | "points" | "decision" | "dq";
+      breakdown_result: "win" | "loss" | "draw";
+      breakdown_status: "in_progress" | "complete";
       checked_in_by: "self" | "coach";
       class_type: "gi" | "no_gi" | "comp" | "open_mat";
       initiated_by: "coach_manual" | "agent" | "self_service";
@@ -876,6 +1161,10 @@ export const Constants = {
         "brown",
         "black",
       ],
+      breakdown_event_source: ["manual", "ai"],
+      breakdown_method: ["submission", "points", "decision", "dq"],
+      breakdown_result: ["win", "loss", "draw"],
+      breakdown_status: ["in_progress", "complete"],
       checked_in_by: ["self", "coach"],
       class_type: ["gi", "no_gi", "comp", "open_mat"],
       initiated_by: ["coach_manual", "agent", "self_service"],
