@@ -221,8 +221,20 @@ export function AnalysisLogger({ analysisId, backHref }: { analysisId: string; b
 
       <div className="rounded-md border p-4">
         {videoUrl ? (
-          // eslint-disable-next-line jsx-a11y/media-has-caption -- local, ephemeral user footage, never transcoded/stored
-          <video ref={videoRef} src={videoUrl} controls className="w-full rounded-md" />
+          // Capped by height, not forced to full width — a vertically-shot
+          // phone video (portrait, ~9:16) would otherwise stretch to the
+          // full column width and become enormous. object-contain + a
+          // dark backdrop keeps both orientations looking like a normal,
+          // bounded video player instead.
+          <div className="flex justify-center overflow-hidden rounded-md bg-black">
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption -- local, ephemeral user footage, never transcoded/stored */}
+            <video
+              ref={videoRef}
+              src={videoUrl}
+              controls
+              className="max-h-[60vh] w-auto max-w-full"
+            />
+          </div>
         ) : (
           <div className="flex flex-col items-center gap-3 py-8 text-center">
             <p className="text-sm text-muted-foreground">
