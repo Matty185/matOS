@@ -12,6 +12,7 @@ export const EVENT_TYPE_LABELS: Record<AnalysisEventType, string> = {
   wrestling: "Wrestling / scrambling",
   underhook: "Underhook",
   takedown: "Takedown",
+  takedown_defence: "Takedown defence",
   guard_pull: "Guard pull",
   sweep: "Sweep",
   submission_attempt: "Submission attempt",

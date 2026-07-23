@@ -1,11 +1,13 @@
 import { z } from "zod";
 
 // Kept in sync with the analysis_event_type enum
-// (supabase/migrations/20260722130000_analysis_events_rework.sql).
+// (supabase/migrations/20260722130000_analysis_events_rework.sql,
+// supabase/migrations/20260723160000_add_takedown_defence_event_type.sql).
 export const ANALYSIS_EVENT_TYPES = [
   "wrestling",
   "underhook",
   "takedown",
+  "takedown_defence",
   "guard_pull",
   "sweep",
   "submission_attempt",

@@ -799,7 +799,8 @@ export type Database = {
         | "side_control"
         | "half_guard"
         | "guard_bottom"
-        | "stalling";
+        | "stalling"
+        | "takedown_defence";
       analysis_method: "ai_stub" | "manual";
       analysis_result: "win" | "loss" | "draw";
       analysis_result_method: "submission" | "points" | "decision" | "dq" | "other";
@@ -969,6 +970,7 @@ export const Constants = {
         "half_guard",
         "guard_bottom",
         "stalling",
+        "takedown_defence",
       ],
       analysis_method: ["ai_stub", "manual"],
       analysis_result: ["win", "loss", "draw"],

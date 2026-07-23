@@ -16,6 +16,7 @@ type AnalysisResultMethod = Database["public"]["Enums"]["analysis_result_method"
 const INSTANT_EVENT_TYPES: AnalysisEventType[] = [
   "underhook",
   "takedown",
+  "takedown_defence",
   "guard_pull",
   "sweep",
   "submission_attempt",
