@@ -432,7 +432,7 @@ export type Database = {
       };
       breakdowns: {
         Row: {
-          author_id: string;
+          author_id: string | null;
           created_at: string;
           duration_seconds: number | null;
           external_person_id: string | null;
@@ -450,7 +450,7 @@ export type Database = {
           video_filename: string | null;
         };
         Insert: {
-          author_id: string;
+          author_id?: string | null;
           created_at?: string;
           duration_seconds?: number | null;
           external_person_id?: string | null;
@@ -468,7 +468,7 @@ export type Database = {
           video_filename?: string | null;
         };
         Update: {
-          author_id?: string;
+          author_id?: string | null;
           created_at?: string;
           duration_seconds?: number | null;
           external_person_id?: string | null;
