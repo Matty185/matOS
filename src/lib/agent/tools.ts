@@ -131,6 +131,18 @@ export const READ_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "get_external_person",
+    description:
+      "Look up an external person (an opponent/analyst record, not a gym member) by name, to find their id before calling get_athlete_profile/get_metric/compare_profiles/get_breakdowns with external_person_id. Returns every matching person — if more than one comes back, list them for the coach and ask which one, rather than guessing.",
+    input_schema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Full or partial name to search for." },
+      },
+      required: ["name"],
+    },
+  },
+  {
     name: "get_athlete_profile",
     description:
       "Get a computed match-analysis profile for a gym member or external person: style card, wrestling/passing/guard/submission/escape success rates, all as factual numbers with their sample size (n). Never returns coaching advice — if asked what someone should work on, report the metrics with the smallest n or weakest values, factually, and stop there.",
@@ -167,7 +179,10 @@ export const READ_TOOLS: Anthropic.Tool[] = [
         },
         external_person_id: { type: "string", description: "UUID of an external person." },
         metric_name: { type: "string", enum: METRIC_NAMES },
-        gi: { type: "boolean", description: "true for gi, false for no-gi. Defaults to gi." },
+        gi: {
+          type: "boolean",
+          description: "true for gi, false for no-gi. Omit to get both rulesets.",
+        },
       },
       required: ["metric_name"],
     },
@@ -189,7 +204,10 @@ export const READ_TOOLS: Anthropic.Tool[] = [
           type: "string",
           description: "Subject B: UUID of an external person.",
         },
-        gi: { type: "boolean", description: "true for gi, false for no-gi. Defaults to gi." },
+        gi: {
+          type: "boolean",
+          description: "true for gi, false for no-gi. Omit to get both rulesets.",
+        },
       },
     },
   },

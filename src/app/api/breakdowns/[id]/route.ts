@@ -62,3 +62,46 @@ export const PATCH = withAuth(
   },
   { schema: updateBreakdownSchema },
 );
+
+// DELETE /api/breakdowns/[id] — author-only, enforced by RLS
+// (breakdowns_all_own), not a role check here. Non-Negotiable #8: "deletion
+// cascades its positions/events (allowed) — unlike member records," a
+// deliberate exception to CLAUDE.md Rule 6's "deletes are mostly disabled"
+// since this is the author's own draft-like tagging artifact. No 23503-style
+// guard needed the way external-people's DELETE has one — breakdown_positions/
+// breakdown_events are ON DELETE CASCADE, not RESTRICT, so this always
+// succeeds once RLS allows it at all. Flagged as a missing gap at Stage A9's
+// full-pass gate (both database-reviewer and code-reviewer independently) —
+// the DB/RLS support for this existed since Stage A1, nothing ever called it.
+export const DELETE = withAuth(async (_request, context, _input, params) => {
+  const id = params.id;
+  if (!id) return apiError(400, "MISSING_ID", "No breakdown id provided.");
+  const supabase = createClient();
+
+  const { data: existing } = await supabase
+    .from("breakdowns")
+    .select("name, author_id")
+    .eq("id", id)
+    .single();
+  if (!existing) {
+    return apiError(404, "BREAKDOWN_NOT_FOUND", "No breakdown found with that id.");
+  }
+
+  const { error: deleteError } = await supabase.from("breakdowns").delete().eq("id", id);
+
+  if (deleteError) {
+    return apiError(500, "DELETE_FAILED", "Something went wrong — the breakdown wasn't deleted.");
+  }
+
+  await writeAuditLog({
+    gymId: context.gymId,
+    actorId: context.userId,
+    action: "breakdown.deleted",
+    entityType: "breakdowns",
+    entityId: id,
+    beforeState: { name: existing.name },
+    initiatedBy: existing.author_id === context.userId ? "self_service" : "coach_manual",
+  });
+
+  return NextResponse.json({ success: true });
+});

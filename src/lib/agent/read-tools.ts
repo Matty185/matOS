@@ -218,6 +218,17 @@ export async function executeReadTool(
       return data;
     }
 
+    case "get_external_person": {
+      const name = String(input.name ?? "").trim();
+      if (!name) return [];
+      const { data, error } = await supabase
+        .from("external_people")
+        .select("id, display_name, notes");
+      if (error) throw error;
+      const query = name.toLowerCase();
+      return (data ?? []).filter((p) => p.display_name.toLowerCase().includes(query)).slice(0, 10);
+    }
+
     case "get_athlete_profile": {
       const subject = resolveSubject(input);
       if (!subject) {
@@ -239,8 +250,17 @@ export async function executeReadTool(
         return { error: `Unknown metric_name "${metricName}".` };
       }
       const { gi, noGi } = await fetchAthleteProfileData(supabase, subject);
-      const profile = input.gi === false ? noGi : gi;
-      return { metric: entry.label, ...entry.get(profile) };
+      // Omitting `gi` returns both rulesets, matching get_athlete_profile —
+      // found via live testing that silently defaulting to gi-only here
+      // produced a misleading "no data" answer for a subject whose only
+      // recorded matches were no-gi (Stage A9 live-test, not a static-
+      // review finding). A coach's question rarely specifies a ruleset
+      // explicitly; guessing one is worse than returning both.
+      if (typeof input.gi === "boolean") {
+        const profile = input.gi ? gi : noGi;
+        return { metric: entry.label, ...entry.get(profile) };
+      }
+      return { metric: entry.label, gi: entry.get(gi), noGi: entry.get(noGi) };
     }
 
     case "compare_profiles": {
@@ -256,8 +276,15 @@ export async function executeReadTool(
         fetchAthleteProfileData(supabase, subjectA),
         fetchAthleteProfileData(supabase, subjectB),
       ]);
-      const useGi = input.gi !== false;
-      return { a: useGi ? dataA.gi : dataA.noGi, b: useGi ? dataB.gi : dataB.noGi };
+      // Same reasoning as get_metric above — omitting `gi` returns both
+      // rulesets for each subject rather than silently guessing one.
+      if (typeof input.gi === "boolean") {
+        return {
+          a: input.gi ? dataA.gi : dataA.noGi,
+          b: input.gi ? dataB.gi : dataB.noGi,
+        };
+      }
+      return { a: dataA, b: dataB };
     }
 
     case "get_breakdowns": {

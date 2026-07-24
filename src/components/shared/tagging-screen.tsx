@@ -314,6 +314,34 @@ export function TaggingScreen({
     const nextStatus = status === "complete" ? "in_progress" : "complete";
     setStatusUpdating(true);
     try {
+      // Stage A9 (database-reviewer): a still-open trailing interval is
+      // silently excluded from every time-based style metric (correct
+      // per-position, since an open interval has no defined duration —
+      // see profile.ts) but that means a match's actual final position,
+      // very often the finishing sequence, would go uncounted forever
+      // once the breakdown is marked complete and nobody's looking at the
+      // video anymore to close it by hand. Close it here, at whatever
+      // point the video is currently paused/ended at, only when a video
+      // is actually loaded this session — guessing a timestamp with no
+      // video open would just substitute one inaccuracy for another.
+      if (nextStatus === "complete" && openInterval && videoRef.current) {
+        const closeTs = Math.round(videoRef.current.currentTime * 10) / 10;
+        const closeRes = await fetch(
+          `/api/breakdowns/${breakdownId}/positions/${openInterval.id}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ end_ts: closeTs }),
+          },
+        );
+        if (closeRes.ok) {
+          refetchTags();
+        }
+        // A failure here (e.g. end_ts before start_ts if the video was
+        // rewound) isn't worth blocking "Mark as finished" over — the
+        // interval just stays open, same as before this fix existed.
+      }
+
       const res = await fetch(`/api/breakdowns/${breakdownId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },

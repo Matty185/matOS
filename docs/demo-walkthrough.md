@@ -2,7 +2,7 @@
 
 A practical script for presenting MatOS live — to a technical collaborator first, then the gym coach as
 first unpaid alpha tester. Demo gym: **Northside BJJ** (fictional, seeded via `scripts/seed.ts`).
-Target length: **12–15 minutes**, expandable if the audience wants to dig into a specific area.
+Target length: **14–17 minutes**, expandable if the audience wants to dig into a specific area.
 
 ---
 
@@ -39,9 +39,10 @@ App URL: `https://matos-pi.vercel.app`
 
 > "MatOS is a multi-tenant gym management platform for BJJ gyms, built around two things most gym
 > software doesn't do: a natural-language assistant a coach can actually delegate busywork to, and a
-> video-analysis feature that's honest about not storing your members' training footage. Everything
-> you'll see is real — real database, real auth, real Postgres row-level security — running against a
-> seeded demo gym."
+> Match Analysis module where a coach or athlete tags positions and events straight from a local video
+> file — the video itself never leaves the browser, never touches our server, ever — and that tagged
+> data drives real computed performance profiles. Everything you'll see is real — real database, real
+> auth, real Postgres row-level security — running against a seeded demo gym."
 
 ## 2. Coach dashboard (1–2 min)
 
@@ -75,7 +76,27 @@ This is the best "wow" moment in the demo — worth setting up in advance.
 
 > "No refresh, no polling — that's a live Postgres subscription."
 
-## 5. The agentic interface (4–5 min — the main event)
+## 5. Match Analysis (2–3 min)
+
+Still as coach. Click **Analysis** in the nav.
+
+- The breakdown list — 4 real seeded matches, spanning gi/no-gi, wins/losses, a gym member and an
+  external person (a visiting competitor). Point out the "External people" button — opponents or
+  anyone without a MatOS account get their own gym-scoped record here, never merged into a real member.
+- Open **Aoife Byrne**'s "Wednesday advanced sparring vs Conor" breakdown. Scroll the tagging screen
+  without loading a video — the position/event lists, timeline, and Finish toggle are all real, already-
+  tagged data, not a mockup. Click the athlete's name to jump to her **computed profile**: style card,
+  per-category success rates, every metric showing its sample size (n) — "these numbers are computed
+  live from the tagged data, never stored as a separate report."
+- Click **Compare**, pick **Niamh Kelly** — the side-by-side view, same metric rows for both. "Same
+  reasoning as the profile view — every number here traces back to an actual tagged position or event,
+  nothing inferred."
+
+> "If you wanted to tag a new match live: Log a match → pick a local video file → tap a position or
+> event on the video, it auto-pauses, you confirm any required detail, it resumes. Two taps for most
+> events. Skipping that live right now for time, but it's the same screen you're looking at."
+
+## 6. The agentic interface (4–5 min — the main event)
 
 Still as coach. Click the floating assistant button (bottom-right, any page).
 
@@ -93,34 +114,41 @@ deactivation flow to show the edge-case handling the plan specifically calls for
    destructive. Worth explicitly narrating: "this is enforced server-side too, not just a UI gate."
    (Cancel it, rather than actually deactivating — you'll want Darragh back for the next demo run,
    though a reseed fixes it either way.)
-5. **Something out of scope** — e.g. "What's the weather like?" — shows the graceful redirect rather than
+5. **"What's Aoife Byrne's takedown success rate?"** — the agent's match-analysis tools, same seeded
+   data from §5. It'll answer with the number and its sample size (n) — worth reading that part out
+   loud, since every match-analysis answer the agent gives always carries its n.
+6. **Something out of scope** — e.g. "What's the weather like?" — shows the graceful redirect rather than
    a confused answer, satisfying the plan's "edge cases and graceful error handling" success criterion.
 
-## 6. Switch to the athlete portal (3 min)
+## 7. Switch to the athlete portal (3 min)
 
 Log out, log in as the **demo athlete** (or use the incognito window already logged in from §4).
 
 - `/home` — attendance streak, belt display, upcoming classes.
 - `/progress` — the three tabs: attendance history, belt history, personal logs.
-- `/upload` — upload any small video file. Narrate explicitly: **"this is processed and immediately
-  discarded — no video is ever written to storage, anywhere, at any point."** Show the mock technique
-  report that comes back, and the past-analyses list (there are two pre-seeded ones to point to if you'd
-  rather not wait for a live upload).
+- **Analysis** (nav) — the same section shown from the coach side in §5, now from Aoife's own login: her
+  computed profile, her two self-authored breakdowns. "Same screen, same data — the only difference is
+  what RLS lets each role see."
 - `/account` — briefly show the data export link and the GDPR deletion-request flow (don't actually
   submit it unless you intend to walk through the owner-side execution too — it's a real, working flow,
-  not a mockup, and reseeding is the only way back).
+  not a mockup, and reseeding is the only way back). Mention the export now includes match breakdowns
+  too, not just attendance/payments/logs.
 
-## 7. Wrap-up talking points (1 min)
+## 8. Wrap-up talking points (1 min)
 
-- **What's real vs. stubbed:** everything except video analysis and payment processing is fully
-  functional — auth, RLS, realtime, the agent, GDPR. Video analysis and payments are the two explicitly
-  stubbed pieces, both by design (see CLAUDE.md's Out of Scope list), not because they didn't get built.
+- **What's real vs. stubbed:** everything except AI video analysis and payment processing is fully
+  functional — auth, RLS, realtime, the agent, GDPR, and the whole Match Analysis module (manual
+  tagging, computed profiles, comparison, agent tools). Payment processing is the one explicitly
+  stubbed piece; AI video analysis was deliberately never attempted at all in this phase — the Match
+  Analysis module's tagging is a coach or athlete's own manual work, not automated detection (see
+  CLAUDE.md's Out of Scope list — AI tagging is phase 2, "not now").
 - **Multi-tenant from day one:** Northside BJJ is one gym in a schema that already enforces tenant
   isolation at the database layer (Postgres RLS) — a second gym is a data-seeding exercise, not an
   architecture change.
-- **If asked "what's next":** per-session class instances (currently a recurring-template
-  simplification, flagged throughout the codebase for the eventual refactor), real video analysis, actual
-  payment processing, a staff/admin role, and the React Native app.
+- **If asked "what's next":** AI-assisted tagging on top of the same taxonomy (phase 2, deliberately
+  deferred — the `source` field on every event already exists for it), per-session class instances
+  (currently a recurring-template simplification, flagged throughout the codebase for the eventual
+  refactor), actual payment processing, a staff/admin role, and the React Native app.
 
 ---
 
