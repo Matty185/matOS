@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/withAuth";
 import { apiError } from "@/lib/api/response";
 import { createClient } from "@/lib/supabase/server";
+import { mapBreakdownTagError } from "@/lib/api/breakdown-tag-errors";
 import { createBreakdownEventSchema } from "@/lib/validation/breakdown-event";
 
 // POST /api/breakdowns/[id]/events — logs one timestamped event (the
@@ -9,7 +10,8 @@ import { createBreakdownEventSchema } from "@/lib/validation/breakdown-event";
 // §6). modifier/outcome are validated server-side against the referenced
 // event_type by the DB's own validate_breakdown_event trigger — this route
 // doesn't duplicate that logic, just passes the values through and maps
-// the trigger's rejection to a clean error. Author-only, via RLS
+// the trigger's rejection to a clean error via the shared
+// mapBreakdownTagError helper. Author-only, via RLS
 // (breakdown_events_all_author).
 export const POST = withAuth(
   async (_request, context, input, params) => {
@@ -34,16 +36,8 @@ export const POST = withAuth(
       .single();
 
     if (insertError || !created) {
-      if (insertError?.code === "42501") {
-        return apiError(403, "FORBIDDEN", "You can't log events on this breakdown.");
-      }
-      if (
-        insertError?.message?.includes("is required for event type") ||
-        insertError?.message?.includes("is not valid for event type") ||
-        insertError?.message?.includes("has no valid")
-      ) {
-        return apiError(400, "INVALID_EVENT_DATA", insertError.message);
-      }
+      const mapped = insertError ? mapBreakdownTagError(insertError) : null;
+      if (mapped) return apiError(mapped.status, mapped.code, mapped.message);
       console.error("[breakdown events] insert failed", insertError);
       return apiError(500, "CREATE_FAILED", "Something went wrong — the event wasn't saved.");
     }

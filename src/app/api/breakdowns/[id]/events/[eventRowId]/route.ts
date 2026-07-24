@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/withAuth";
 import { apiError } from "@/lib/api/response";
 import { createClient } from "@/lib/supabase/server";
+import { mapBreakdownTagError } from "@/lib/api/breakdown-tag-errors";
 import { updateBreakdownEventSchema } from "@/lib/validation/breakdown-event";
 import type { Database } from "@/types/database";
 
@@ -37,13 +38,8 @@ export const PATCH = withAuth(
       .single();
 
     if (updateError || !updated) {
-      if (
-        updateError?.message?.includes("is required for event type") ||
-        updateError?.message?.includes("is not valid for event type") ||
-        updateError?.message?.includes("has no valid")
-      ) {
-        return apiError(400, "INVALID_EVENT_DATA", updateError.message);
-      }
+      const mapped = updateError ? mapBreakdownTagError(updateError) : null;
+      if (mapped) return apiError(mapped.status, mapped.code, mapped.message);
       return apiError(404, "EVENT_NOT_FOUND", "No event found with that id.");
     }
 

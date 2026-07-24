@@ -986,6 +986,29 @@ export type Database = {
         Returns: number;
       };
       increment_invite_attempt: { Args: { invite_id: string }; Returns: number };
+      tag_position: {
+        Args: {
+          p_breakdown_id: string;
+          p_position_id: string;
+          p_role: string;
+          p_start_ts: number;
+        };
+        Returns: {
+          breakdown_id: string;
+          end_ts: number | null;
+          gym_id: string;
+          id: string;
+          position_id: string;
+          role: string | null;
+          start_ts: number;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "breakdown_positions";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
     };
     Enums: {
       analysis_status: "pending" | "complete" | "failed";

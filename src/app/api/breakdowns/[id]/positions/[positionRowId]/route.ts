@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/withAuth";
 import { apiError } from "@/lib/api/response";
 import { createClient } from "@/lib/supabase/server";
+import { mapBreakdownTagError } from "@/lib/api/breakdown-tag-errors";
 import { updateBreakdownPositionSchema } from "@/lib/validation/breakdown-position";
 import type { Database } from "@/types/database";
 
@@ -37,6 +38,15 @@ export const PATCH = withAuth(
       .single();
 
     if (updateError || !updated) {
+      // A CHECK/trigger rejection (e.g. end_ts before start_ts, an invalid
+      // role) is a real, live-reachable outcome here — tag-edit-dialog
+      // gives free-text start/end second inputs with no cross-field
+      // validation of its own. Found in the Stage A3 review gate
+      // (database-reviewer): without this check, that case fell through
+      // to a generic 404 "not found," which is actively misleading since
+      // the row does exist and was rejected for an unrelated reason.
+      const mapped = updateError ? mapBreakdownTagError(updateError) : null;
+      if (mapped) return apiError(mapped.status, mapped.code, mapped.message);
       return apiError(404, "POSITION_NOT_FOUND", "No position tag found with that id.");
     }
 

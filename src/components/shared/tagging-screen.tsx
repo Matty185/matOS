@@ -52,6 +52,46 @@ type EventRow = {
 
 const SPEEDS = [0.25, 0.5, 1, 1.5, 2];
 
+// Shared row shape for both tag lists (positions/events), both readOnly
+// and editable — extracted after the two lists' near-identical
+// button-vs-plain-li branches were flagged as duplicated JSX in Stage A3
+// code review. Renders a button (opens the edit dialog) when onClick is
+// supplied, a plain row otherwise.
+function TagListRow({
+  label,
+  timestamp,
+  onClick,
+}: {
+  label: string;
+  timestamp: string;
+  onClick?: () => void;
+}) {
+  const content = (
+    <>
+      <span>{label}</span>
+      <span className="font-mono text-xs text-muted-foreground">{timestamp}</span>
+    </>
+  );
+  if (!onClick) {
+    return (
+      <li className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm">
+        {content}
+      </li>
+    );
+  }
+  return (
+    <li>
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-3 rounded-md border p-3 text-left text-sm hover:bg-accent/50"
+        onClick={onClick}
+      >
+        {content}
+      </button>
+    </li>
+  );
+}
+
 // The core tagging UI (Stage A3): local-only video playback (Non-Negotiable
 // #1 — the file never leaves the browser, only structured tags get
 // POSTed), position intervals, event tagging with the tap -> auto-pause ->
@@ -379,7 +419,12 @@ export function TaggingScreen({
             <>
               <div className="flex flex-col gap-2 rounded-md border p-4">
                 <p className="text-sm font-medium">Position</p>
-                <div className="flex flex-wrap gap-2">
+                {/* items-start: default stretch would make every column on
+                    a flex-wrap row match the tallest one, leaving visible
+                    whitespace under shorter buttons whenever a sibling's
+                    role sub-picker is expanded. Found in Stage A3 code
+                    review. */}
+                <div className="flex flex-wrap items-start gap-2">
                   {(positions ?? []).map((position) => (
                     <div key={position.id} className="flex flex-col gap-2">
                       <Button
@@ -490,40 +535,14 @@ export function TaggingScreen({
             <p className="text-sm text-muted-foreground">No positions tagged yet.</p>
           ) : (
             <ul className="flex flex-col gap-2">
-              {breakdownPositions.map((p) =>
-                readOnly ? (
-                  <li
-                    key={p.id}
-                    className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm"
-                  >
-                    <span>
-                      {humanize(positionById.get(p.position_id)?.name ?? "")}
-                      {p.role ? ` — ${humanize(p.role)}` : ""}
-                    </span>
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {formatVideoTimestamp(p.start_ts)}
-                      {p.end_ts !== null ? ` – ${formatVideoTimestamp(p.end_ts)}` : " – ongoing"}
-                    </span>
-                  </li>
-                ) : (
-                  <li key={p.id}>
-                    <button
-                      type="button"
-                      className="flex w-full items-center justify-between gap-3 rounded-md border p-3 text-left text-sm hover:bg-accent/50"
-                      onClick={() => setEditingPosition(p)}
-                    >
-                      <span>
-                        {humanize(positionById.get(p.position_id)?.name ?? "")}
-                        {p.role ? ` — ${humanize(p.role)}` : ""}
-                      </span>
-                      <span className="font-mono text-xs text-muted-foreground">
-                        {formatVideoTimestamp(p.start_ts)}
-                        {p.end_ts !== null ? ` – ${formatVideoTimestamp(p.end_ts)}` : " – ongoing"}
-                      </span>
-                    </button>
-                  </li>
-                ),
-              )}
+              {breakdownPositions.map((p) => (
+                <TagListRow
+                  key={p.id}
+                  label={`${humanize(positionById.get(p.position_id)?.name ?? "")}${p.role ? ` — ${humanize(p.role)}` : ""}`}
+                  timestamp={`${formatVideoTimestamp(p.start_ts)}${p.end_ts !== null ? ` – ${formatVideoTimestamp(p.end_ts)}` : " – ongoing"}`}
+                  onClick={readOnly ? undefined : () => setEditingPosition(p)}
+                />
+              ))}
             </ul>
           )}
         </div>
@@ -534,40 +553,14 @@ export function TaggingScreen({
             <p className="text-sm text-muted-foreground">No events tagged yet.</p>
           ) : (
             <ul className="flex flex-col gap-2">
-              {breakdownEvents.map((ev) =>
-                readOnly ? (
-                  <li
-                    key={ev.id}
-                    className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm"
-                  >
-                    <span>
-                      {humanize(eventTypeById.get(ev.event_type_id)?.name ?? "")}
-                      {ev.modifier ? ` — ${humanize(ev.modifier)}` : ""}
-                      {ev.outcome ? ` (${humanize(ev.outcome)})` : ""}
-                    </span>
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {formatVideoTimestamp(ev.ts)}
-                    </span>
-                  </li>
-                ) : (
-                  <li key={ev.id}>
-                    <button
-                      type="button"
-                      className="flex w-full items-center justify-between gap-3 rounded-md border p-3 text-left text-sm hover:bg-accent/50"
-                      onClick={() => setEditingEvent(ev)}
-                    >
-                      <span>
-                        {humanize(eventTypeById.get(ev.event_type_id)?.name ?? "")}
-                        {ev.modifier ? ` — ${humanize(ev.modifier)}` : ""}
-                        {ev.outcome ? ` (${humanize(ev.outcome)})` : ""}
-                      </span>
-                      <span className="font-mono text-xs text-muted-foreground">
-                        {formatVideoTimestamp(ev.ts)}
-                      </span>
-                    </button>
-                  </li>
-                ),
-              )}
+              {breakdownEvents.map((ev) => (
+                <TagListRow
+                  key={ev.id}
+                  label={`${humanize(eventTypeById.get(ev.event_type_id)?.name ?? "")}${ev.modifier ? ` — ${humanize(ev.modifier)}` : ""}${ev.outcome ? ` (${humanize(ev.outcome)})` : ""}`}
+                  timestamp={formatVideoTimestamp(ev.ts)}
+                  onClick={readOnly ? undefined : () => setEditingEvent(ev)}
+                />
+              ))}
             </ul>
           )}
         </div>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/withAuth";
 import { apiError } from "@/lib/api/response";
 import { createClient } from "@/lib/supabase/server";
+import { mapBreakdownTagError } from "@/lib/api/breakdown-tag-errors";
 import { createBreakdownPositionSchema } from "@/lib/validation/breakdown-position";
 
 // POST /api/breakdowns/[id]/positions — tags a position, opening a new
@@ -9,49 +10,42 @@ import { createBreakdownPositionSchema } from "@/lib/validation/breakdown-positi
 // position tag closes previous interval") and the DB's own
 // breakdown_positions_one_open_interval_idx (a partial unique index on
 // breakdown_id WHERE end_ts IS NULL, added in the Stage A1 review fixes),
-// at most one interval can be open per breakdown at a time — so this
-// route closes any currently-open interval (end_ts = the new interval's
-// start_ts) before inserting the new one, keeping the client's job to
-// "tag a position" a single call rather than two the client has to
-// sequence itself. Author-only, enforced by RLS
-// (breakdown_positions_all_author), not a role check here.
+// at most one interval can be open per breakdown at a time.
+//
+// Closing the prior interval and inserting the new one happens inside a
+// single Postgres function (tag_position, SECURITY INVOKER — runs with
+// this caller's own RLS, not elevated) rather than as two separate
+// requests. Found in the Stage A3 review gate (security-reviewer +
+// database-reviewer, the latter live-reproducing it): two sequential
+// client calls meant a failure on the second (insert) left the first
+// (close) already committed with no rollback — the just-tapped position
+// was silently lost, no compensating undo, generic 500. A function body
+// is an implicit transaction, so any exception rolls back both
+// statements together.
 export const POST = withAuth(
   async (_request, context, input, params) => {
     const breakdownId = params.id;
     if (!breakdownId) return apiError(400, "MISSING_ID", "No breakdown id provided.");
     const supabase = createClient();
 
-    const { error: closeError } = await supabase
-      .from("breakdown_positions")
-      .update({ end_ts: input.start_ts })
-      .eq("breakdown_id", breakdownId)
-      .is("end_ts", null);
+    // tag_position returns a single breakdown_positions row (not SETOF),
+    // so PostgREST/Supabase JS return it as a plain object already —
+    // .single() isn't applicable here the way it is on a table .select().
+    // p_role is genuinely nullable at the SQL level (verified live); the
+    // generated RPC arg type just doesn't reflect that since the function
+    // signature has no `default null` — a codegen quirk, not a real
+    // constraint, hence the cast rather than a schema change.
+    const { data: created, error } = await supabase.rpc("tag_position", {
+      p_breakdown_id: breakdownId,
+      p_position_id: input.position_id,
+      p_role: (input.role ?? null) as string,
+      p_start_ts: input.start_ts,
+    });
 
-    if (closeError) {
-      console.error("[breakdown positions] failed to close open interval", closeError);
-      return apiError(500, "CREATE_FAILED", "Something went wrong — the position wasn't tagged.");
-    }
-
-    const { data: created, error: insertError } = await supabase
-      .from("breakdown_positions")
-      .insert({
-        breakdown_id: breakdownId,
-        // gym_id is trigger-derived (derive_gym_id_from_breakdown) — always
-        // overwritten before constraints/RLS are checked, required here
-        // only because the column has no default.
-        gym_id: context.gymId,
-        position_id: input.position_id,
-        role: input.role ?? null,
-        start_ts: input.start_ts,
-      })
-      .select("id, position_id, role, start_ts, end_ts")
-      .single();
-
-    if (insertError || !created) {
-      if (insertError?.code === "42501") {
-        return apiError(403, "FORBIDDEN", "You can't tag positions on this breakdown.");
-      }
-      console.error("[breakdown positions] insert failed", insertError);
+    if (error || !created) {
+      const mapped = error ? mapBreakdownTagError(error) : null;
+      if (mapped) return apiError(mapped.status, mapped.code, mapped.message);
+      console.error("[breakdown positions] tag_position failed", error);
       return apiError(500, "CREATE_FAILED", "Something went wrong — the position wasn't tagged.");
     }
 
