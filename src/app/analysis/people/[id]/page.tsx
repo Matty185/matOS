@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { ChevronLeft, Swords } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ProfileView } from "@/components/shared/profile-view";
 import { Badge } from "@/components/ui/badge";
 
 type PersonBreakdown = {
@@ -16,9 +17,7 @@ type PersonBreakdown = {
   status: "in_progress" | "complete";
 };
 
-// Their info + breakdown list only — the "computed profile" plan §6
-// describes for this screen is Stage A5's job (profile computation isn't
-// built yet). This is the honest A2-scoped subset, not a stand-in for it.
+// Info + computed profile (Stage A5) + breakdown list.
 export default function ExternalPersonDetailPage({ params }: { params: { id: string } }) {
   const {
     data: person,
@@ -81,6 +80,8 @@ export default function ExternalPersonDetailPage({ params }: { params: { id: str
         <h1 className="font-heading text-2xl tracking-wide">{person.display_name}</h1>
         {person.notes ? <p className="text-sm text-muted-foreground">{person.notes}</p> : null}
       </div>
+
+      <ProfileView subject={{ type: "external", id: person.id }} />
 
       <div className="flex flex-col gap-2">
         <h2 className="text-lg font-medium">Breakdowns</h2>

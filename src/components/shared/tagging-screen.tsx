@@ -295,15 +295,17 @@ export function TaggingScreen({
     }
     const fileName = fileInputRef.current?.files?.[0]?.name;
     if (!fileName) return;
-    // Best-effort — records what file this session used, so a future
-    // resume can compare against it. Not shown to the user, no toast
-    // either way.
+    // Best-effort — records what file this session used (for a future
+    // resume's mismatch check) and the match's actual duration (plan §3:
+    // "duration_seconds (auto from video)", read by the profile view's
+    // avg-match-time metric). Not shown to the user, no toast either way.
     await fetch(`/api/breakdowns/${breakdownId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         video_filename: fileName,
         video_duration_seconds: Math.round(video.duration),
+        duration_seconds: Math.round(video.duration),
       }),
     }).catch(() => {});
   }

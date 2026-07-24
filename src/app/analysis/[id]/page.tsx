@@ -28,6 +28,8 @@ type BreakdownDetail = {
   author_id: string | null;
   video_filename: string | null;
   video_duration_seconds: number | null;
+  member_id: string | null;
+  external_person_id: string | null;
   members: { first_name: string; last_name: string } | null;
   external_people: { display_name: string } | null;
 };
@@ -60,7 +62,7 @@ export default function BreakdownDetailPage({ params }: { params: { id: string }
       const { data, error } = await supabase
         .from("breakdowns")
         .select(
-          "id, name, match_date, gi, status, result, method, author_id, video_filename, video_duration_seconds, members(first_name, last_name), external_people(display_name)",
+          "id, name, match_date, gi, status, result, method, author_id, video_filename, video_duration_seconds, member_id, external_person_id, members(first_name, last_name), external_people(display_name)",
         )
         .eq("id", params.id)
         .single();
@@ -84,6 +86,11 @@ export default function BreakdownDetailPage({ params }: { params: { id: string }
   const focusName = breakdown.members
     ? `${breakdown.members.first_name} ${breakdown.members.last_name}`
     : (breakdown.external_people?.display_name ?? "Unknown");
+  const profileHref = breakdown.member_id
+    ? `/analysis/athlete/${breakdown.member_id}`
+    : breakdown.external_person_id
+      ? `/analysis/people/${breakdown.external_person_id}`
+      : null;
 
   // RLS grants staff SELECT on every breakdown in the gym but UPDATE only
   // on ones they authored (plan §7) — showing Edit unconditionally led a
@@ -105,7 +112,14 @@ export default function BreakdownDetailPage({ params }: { params: { id: string }
         <div>
           <h1 className="font-heading text-2xl tracking-wide">{breakdown.name}</h1>
           <p className="text-sm text-muted-foreground">
-            {focusName} · {format(new Date(breakdown.match_date), "MMM d, yyyy")}
+            {profileHref ? (
+              <Link href={profileHref} className="underline-offset-2 hover:underline">
+                {focusName}
+              </Link>
+            ) : (
+              focusName
+            )}{" "}
+            · {format(new Date(breakdown.match_date), "MMM d, yyyy")}
           </p>
         </div>
         {canEdit ? (

@@ -43,6 +43,12 @@ export type CreateBreakdownInput = z.infer<typeof createBreakdownSchema>;
 // mismatch when resuming (Stage A4). status is the Stage A4 Finish/Reopen
 // toggle — not tied to any write-permission change (an author can still
 // edit a "complete" breakdown; it's a milestone marker, not a lock).
+// duration_seconds is the match-metadata field plan §3/§5 describe as
+// "auto from video" — distinct from video_duration_seconds (which exists
+// solely for the resume-mismatch comparison and tracks whatever file is
+// loaded *this* session). Nothing wrote it before Stage A5; the tagging
+// screen now sets it alongside video_duration_seconds whenever a video's
+// metadata loads, since A5's avg-match-time profile metric reads it.
 export const updateBreakdownSchema = z.object({
   name: z.string().trim().min(1).max(200).optional(),
   match_date: z
@@ -54,6 +60,7 @@ export const updateBreakdownSchema = z.object({
   method: z.enum(["submission", "points", "decision", "dq"]).nullable().optional(),
   video_filename: z.string().max(500).nullable().optional(),
   video_duration_seconds: z.number().positive().nullable().optional(),
+  duration_seconds: z.number().positive().nullable().optional(),
   status: z.enum(["in_progress", "complete"]).optional(),
 });
 

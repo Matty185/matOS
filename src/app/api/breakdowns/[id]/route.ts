@@ -30,6 +30,7 @@ export const PATCH = withAuth(
     if (input.video_duration_seconds !== undefined) {
       update.video_duration_seconds = input.video_duration_seconds;
     }
+    if (input.duration_seconds !== undefined) update.duration_seconds = input.duration_seconds;
     if (input.status !== undefined) update.status = input.status;
 
     if (Object.keys(update).length === 0) {
