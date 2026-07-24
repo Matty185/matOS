@@ -7,8 +7,37 @@ import {
   getOverduePeriodsForMember,
   periodKey,
 } from "@/lib/payments/overdue";
+import { fetchAthleteProfileData, type ProfileSubject } from "@/lib/analysis/fetch-profile-data";
+import { METRIC_CATALOG } from "@/lib/analysis/metric-catalog";
 
 type Client = SupabaseClient<Database>;
+
+// Shared by get_athlete_profile/get_metric/compare_profiles — the model
+// supplies member_id XOR external_person_id (mirroring the breakdown
+// focus model, Non-Negotiable #2), and this resolves it into the shape
+// fetchAthleteProfileData expects. Returns null (not a throw) on a
+// missing/ambiguous subject so the tool can hand the model an informative
+// object to relay to the coach, matching how get_member/get_belt_history
+// handle a missing required param elsewhere in this file, rather than the
+// generic "that lookup failed" error the agent route falls back to on a
+// thrown error.
+function resolveSubject(
+  input: Record<string, unknown>,
+  suffix: "" | "_a" | "_b" = "",
+): ProfileSubject | null {
+  const memberId = input[`member_id${suffix}`];
+  const externalId = input[`external_person_id${suffix}`];
+  // member_id wins if the model somehow supplies both (schema-guided tool
+  // calling makes this practically unreachable in normal use) — silently
+  // ignoring the extra field rather than erroring is fine here since either
+  // resolved subject is still fully RLS-scoped, not a case where picking
+  // wrong could leak data across a boundary. Flagged in Stage A7 review as
+  // worth a comment since the rest of the data model treats focus as a
+  // strict XOR everywhere else (e.g. breakdowns_exactly_one_focus).
+  if (typeof memberId === "string" && memberId) return { type: "member", id: memberId };
+  if (typeof externalId === "string" && externalId) return { type: "external", id: externalId };
+  return null;
+}
 
 // Name search happens in-memory rather than as a `first_name.ilike / OR
 // last_name.ilike` DB filter: a coach asking about "Priya Overdue" (or the
@@ -189,13 +218,60 @@ export async function executeReadTool(
       return data;
     }
 
-    case "get_analysis_stubs": {
+    case "get_athlete_profile": {
+      const subject = resolveSubject(input);
+      if (!subject) {
+        return { error: "Provide either member_id or external_person_id." };
+      }
+      const { gi, noGi } = await fetchAthleteProfileData(supabase, subject);
+      if (typeof input.gi === "boolean") return input.gi ? gi : noGi;
+      return { gi, noGi };
+    }
+
+    case "get_metric": {
+      const subject = resolveSubject(input);
+      if (!subject) {
+        return { error: "Provide either member_id or external_person_id." };
+      }
+      const metricName = typeof input.metric_name === "string" ? input.metric_name : "";
+      const entry = METRIC_CATALOG[metricName];
+      if (!entry) {
+        return { error: `Unknown metric_name "${metricName}".` };
+      }
+      const { gi, noGi } = await fetchAthleteProfileData(supabase, subject);
+      const profile = input.gi === false ? noGi : gi;
+      return { metric: entry.label, ...entry.get(profile) };
+    }
+
+    case "compare_profiles": {
+      const subjectA = resolveSubject(input, "_a");
+      const subjectB = resolveSubject(input, "_b");
+      if (!subjectA || !subjectB) {
+        return {
+          error:
+            "Provide subject A (member_id_a or external_person_id_a) and subject B (member_id_b or external_person_id_b).",
+        };
+      }
+      const [dataA, dataB] = await Promise.all([
+        fetchAthleteProfileData(supabase, subjectA),
+        fetchAthleteProfileData(supabase, subjectB),
+      ]);
+      const useGi = input.gi !== false;
+      return { a: useGi ? dataA.gi : dataA.noGi, b: useGi ? dataB.gi : dataB.noGi };
+    }
+
+    case "get_breakdowns": {
       let query = supabase
-        .from("analyses")
-        .select("id, member_id, title, status, analysed_at, visible_to_athlete")
-        .order("created_at", { ascending: false })
+        .from("breakdowns")
+        .select("id, name, match_date, gi, status, result, method, member_id, external_person_id")
+        .order("match_date", { ascending: false })
         .limit(50);
       if (typeof input.member_id === "string") query = query.eq("member_id", input.member_id);
+      if (typeof input.external_person_id === "string") {
+        query = query.eq("external_person_id", input.external_person_id);
+      }
+      if (typeof input.date_from === "string") query = query.gte("match_date", input.date_from);
+      if (typeof input.date_to === "string") query = query.lte("match_date", input.date_to);
       const { data, error } = await query;
       if (error) throw error;
       return data;

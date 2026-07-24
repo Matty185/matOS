@@ -9,16 +9,22 @@ import { writeAuditLog } from "@/lib/audit/log";
 // owner-only per plan §7's "Gym settings (owner)"). Executes plan §7's GDPR
 // deletion flow: "member anonymised ('Deleted Member', email cleared,
 // user_id unlinked), attendance/logs/analyses deleted, payments retained
-// anonymised, audit retained with actor anonymised."
+// anonymised, audit retained with actor anonymised." — "analyses" here now
+// means Match Analysis Module breakdowns (Non-Negotiable #10), the alpha
+// stub `analyses` table this originally referred to was retired at Stage A7.
 //
 // Service-role for the anonymisation writes themselves — not a workaround,
 // the intended design per Stage 1's own comment on deletion_requests RLS:
 // "The anonymisation itself... is a Stage 2/8 service-role operation, not
-// modelled here." No RLS DELETE policy exists on attendance/athlete_logs/
-// analyses for authenticated users at all (CLAUDE.md Rule 6: "deletes are
-// mostly disabled"), so an owner genuinely cannot perform steps (b)-(d)
-// below through the RLS client even as the account owner — this flow is one
-// of the few deliberate, narrow exceptions to that rule, not a bypass of it.
+// modelled here." No RLS DELETE policy exists on attendance/athlete_logs for
+// authenticated users at all (CLAUDE.md Rule 6: "deletes are mostly
+// disabled"), so an owner genuinely cannot perform steps (b)-(d) below
+// through the RLS client even as the account owner — this flow is one of the
+// few deliberate, narrow exceptions to that rule, not a bypass of it.
+// (breakdowns DOES have an author-scoped delete policy, but that's the
+// AUTHOR's own delete right, not the owner's GDPR-erasure right over their
+// own data as FOCUS — a different actor and a different justification, so
+// this still goes through service-role rather than relying on it.)
 export const POST = withAuth(
   async (_request, context, _input, params) => {
     const requestId = params.id;
@@ -134,11 +140,23 @@ export const POST = withAuth(
       );
     }
 
-    const [attendanceResult, logsResult, analysesResult, paymentsResult, beltHistoryResult] =
+    // breakdowns: Non-Negotiable #10 ("member deletion also deletes their
+    // member-linked breakdowns") — hard-deletes every breakdown FOCUSED on
+    // this member (member_id = them), which cascades to that breakdown's
+    // positions/events automatically via the existing ON DELETE CASCADE FKs
+    // (Stage A1 schema). Breakdowns this member merely AUTHORED about
+    // someone else aren't touched here — those survive with author_id set
+    // to null, handled entirely by the auth-user deletion above via
+    // breakdowns.author_id's own ON DELETE SET NULL (Stage A1 review-fix),
+    // the same graceful-orphan pattern already used for belt_history.
+    // promoted_by. Deferred from Stage A1 itself (that migration's own
+    // design note flagged this as app-code work for "whichever stage first
+    // builds breakdown CRUD routes" — Stage A7).
+    const [attendanceResult, logsResult, breakdownsResult, paymentsResult, beltHistoryResult] =
       await Promise.all([
         serviceClient.from("attendance").delete().eq("member_id", member.id),
         serviceClient.from("athlete_logs").delete().eq("member_id", member.id),
-        serviceClient.from("analyses").delete().eq("member_id", member.id),
+        serviceClient.from("breakdowns").delete().eq("member_id", member.id),
         serviceClient.from("payments").update({ notes: null }).eq("member_id", member.id),
         serviceClient.from("belt_history").update({ notes: null }).eq("member_id", member.id),
       ]);
@@ -146,7 +164,7 @@ export const POST = withAuth(
     for (const [label, result] of [
       ["attendance", attendanceResult],
       ["athlete_logs", logsResult],
-      ["analyses", analysesResult],
+      ["breakdowns", breakdownsResult],
       ["payments", paymentsResult],
       ["belt_history", beltHistoryResult],
     ] as const) {

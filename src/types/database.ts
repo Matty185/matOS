@@ -62,60 +62,6 @@ export type Database = {
           },
         ];
       };
-      analyses: {
-        Row: {
-          analysed_at: string | null;
-          created_at: string;
-          created_by: string | null;
-          gym_id: string;
-          id: string;
-          member_id: string;
-          report: Json | null;
-          status: Database["public"]["Enums"]["analysis_status"];
-          title: string;
-          visible_to_athlete: boolean;
-        };
-        Insert: {
-          analysed_at?: string | null;
-          created_at?: string;
-          created_by?: string | null;
-          gym_id: string;
-          id?: string;
-          member_id: string;
-          report?: Json | null;
-          status?: Database["public"]["Enums"]["analysis_status"];
-          title: string;
-          visible_to_athlete?: boolean;
-        };
-        Update: {
-          analysed_at?: string | null;
-          created_at?: string;
-          created_by?: string | null;
-          gym_id?: string;
-          id?: string;
-          member_id?: string;
-          report?: Json | null;
-          status?: Database["public"]["Enums"]["analysis_status"];
-          title?: string;
-          visible_to_athlete?: boolean;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "analyses_gym_id_fkey";
-            columns: ["gym_id"];
-            isOneToOne: false;
-            referencedRelation: "gyms";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "analyses_member_id_fkey";
-            columns: ["member_id"];
-            isOneToOne: false;
-            referencedRelation: "members";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
       athlete_logs: {
         Row: {
           created_at: string;
@@ -1011,7 +957,6 @@ export type Database = {
       };
     };
     Enums: {
-      analysis_status: "pending" | "complete" | "failed";
       belt_color:
         | "white"
         | "grey_white"
@@ -1164,7 +1109,6 @@ export const Constants = {
   },
   public: {
     Enums: {
-      analysis_status: ["pending", "complete", "failed"],
       belt_color: [
         "white",
         "grey_white",

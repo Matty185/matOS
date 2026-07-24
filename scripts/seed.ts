@@ -479,38 +479,6 @@ const PLAN_AMOUNT: Record<AthleteDef["plan"], number> = {
   comp_team: 140,
 };
 
-const MOCK_TECHNIQUES = [
-  {
-    name: "Closed guard retention",
-    note: "Good hip movement, keep elbows tighter to the body on the recovery.",
-  },
-  {
-    name: "Armbar from mount",
-    note: "Solid isolation of the arm — work on controlling the far hip earlier.",
-  },
-  {
-    name: "Takedown entry",
-    note: "Level change looked strong; follow through faster on the finish.",
-  },
-  {
-    name: "Back escape",
-    note: "Nice hip bump — chain a second escape option if the first is stuffed.",
-  },
-];
-
-function mockReport(seed: number) {
-  const picked = [
-    at(MOCK_TECHNIQUES, seed % 4, "mock technique"),
-    at(MOCK_TECHNIQUES, (seed + 1) % 4, "mock technique"),
-  ];
-  return {
-    summary: "Automated placeholder analysis — no real video processing occurs in the alpha.",
-    detected_techniques: picked,
-    overall_notes:
-      "This is a mock report. Real video analysis (technique detection, form scoring) is a later phase — MatOS never stores uploaded video either way; it's processed and discarded.",
-  };
-}
-
 // ── main ─────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -570,7 +538,6 @@ async function main() {
     "gdpr_consents",
     "invites",
     "athlete_logs",
-    "analyses",
     "payments",
     "attendance",
     "belt_history",
@@ -882,33 +849,6 @@ async function main() {
   }
   const { error: logError } = await supabase.from("athlete_logs").insert(logRows);
   assertNoError(logError, "insert athlete_logs");
-
-  console.log("Inserting mock analyses...");
-  const demoAthleteMemberId = memberIdByKey.get("aoife")!;
-  const analysisRows = [
-    {
-      member_id: demoAthleteMemberId,
-      gym_id: gymId,
-      title: "Guard passing drills — July session.mp4",
-      status: "complete" as const,
-      analysed_at: dublinISO(addDaysUTC(today, -4), "20:15:00"),
-      report: mockReport(0),
-      created_by: athleteAuth.id,
-      visible_to_athlete: true,
-    },
-    {
-      member_id: demoAthleteMemberId,
-      gym_id: gymId,
-      title: "Sparring round vs blue belt.mp4",
-      status: "complete" as const,
-      analysed_at: dublinISO(addDaysUTC(today, -11), "20:45:00"),
-      report: mockReport(2),
-      created_by: athleteAuth.id,
-      visible_to_athlete: true,
-    },
-  ];
-  const { error: analysisError } = await supabase.from("analyses").insert(analysisRows);
-  assertNoError(analysisError, "insert analyses");
 
   console.log("\nDone.\n");
   console.log("Gym:", GYM_NAME, gymId);

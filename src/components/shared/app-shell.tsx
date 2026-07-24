@@ -14,7 +14,6 @@ import {
   Settings,
   Home,
   TrendingUp,
-  Upload,
   UserCog,
   Swords,
   type LucideIcon,
@@ -47,7 +46,6 @@ const ATHLETE_NAV: NavItem[] = [
   { label: "Home", href: "/home", icon: Home },
   { label: "Check In", href: "/check-in", icon: CalendarCheck },
   { label: "My Progress", href: "/progress", icon: TrendingUp },
-  { label: "Upload", href: "/upload", icon: Upload },
   { label: "Analysis", href: "/analysis", icon: Swords },
   { label: "Account", href: "/account", icon: UserCog },
 ];

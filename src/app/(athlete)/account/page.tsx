@@ -286,7 +286,7 @@ function DataPrivacyCard({ memberId }: { memberId: string }) {
                 <AlertDialogDescription>
                   Your coach will review and execute this. Once executed, your MatOS login is
                   permanently deleted (you won&apos;t be able to sign in again), your personal
-                  details are anonymised, and your attendance, logs, and video analyses are
+                  details are anonymised, and your attendance, logs, and match breakdowns are
                   permanently deleted. Payment and audit records are retained but anonymised.
                 </AlertDialogDescription>
               </AlertDialogHeader>

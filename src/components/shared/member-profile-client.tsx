@@ -6,13 +6,14 @@ import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format, differenceInCalendarWeeks } from "date-fns";
-import { CalendarCheck, CreditCard, Award, Video, NotebookText, ChevronLeft } from "lucide-react";
+import { CalendarCheck, CreditCard, Award, Swords, NotebookText, ChevronLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BeltDisplay } from "@/components/shared/belt-display";
 import { EmptyState } from "@/components/shared/empty-state";
 import { AttendanceCalendar } from "@/components/shared/attendance-calendar";
 import { PromoteBeltDialog } from "@/components/shared/promote-belt-dialog";
 import { PaymentCellDialog } from "@/components/shared/payment-cell-dialog";
+import { ProfileView } from "@/components/shared/profile-view";
 import { PLAN_LABELS } from "@/lib/constants/member-labels";
 import { isOverdue, type PaymentStatus } from "@/lib/payments/overdue";
 import { Button } from "@/components/ui/button";
@@ -540,41 +541,70 @@ function BeltHistoryTab({ memberId }: { memberId: string }) {
   );
 }
 
+// Stage A7: replaces the alpha's original mock prose-report stub
+// (member.analyses) with the real computed profile (Stage A5) plus this
+// member's actual logged breakdowns.
 function AnalysisTab({ memberId }: { memberId: string }) {
-  const { data, isLoading } = useQuery({
-    queryKey: ["member-analyses", memberId],
+  const {
+    data: breakdowns,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["member-breakdowns", memberId],
     queryFn: async () => {
       const supabase = createClient();
       const { data, error } = await supabase
-        .from("analyses")
-        .select("title, status, analysed_at")
+        .from("breakdowns")
+        .select("id, name, match_date, gi, status")
         .eq("member_id", memberId)
-        .order("created_at", { ascending: false });
+        .order("match_date", { ascending: false });
       if (error) throw error;
       return data;
     },
   });
 
-  if (isLoading) return <p className="text-sm text-muted-foreground">Loading...</p>;
-  if (!data || data.length === 0) {
-    return (
-      <EmptyState
-        icon={Video}
-        title="No analyses yet"
-        description="Video analysis reports this member uploads will show up here."
-      />
-    );
-  }
-
   return (
-    <ul className="flex flex-col gap-2">
-      {data.map((row, i) => (
-        <li key={i} className="flex justify-between rounded-md border p-3 text-sm">
-          <span>{row.title}</span>
-          <Badge variant="outline">{row.status}</Badge>
-        </li>
-      ))}
-    </ul>
+    <div className="flex flex-col gap-6">
+      <ProfileView subject={{ type: "member", id: memberId }} />
+
+      <div className="flex flex-col gap-2">
+        <h3 className="text-lg font-medium">Breakdowns</h3>
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        ) : error ? (
+          <p className="text-sm text-destructive">Couldn&apos;t load breakdowns. Try refreshing.</p>
+        ) : !breakdowns || breakdowns.length === 0 ? (
+          <EmptyState
+            icon={Swords}
+            title="No breakdowns yet"
+            description="Matches logged about this member will show up here."
+            actionLabel="Log a match"
+            actionHref="/analysis/new"
+          />
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {breakdowns.map((b) => (
+              <li key={b.id}>
+                <Link
+                  href={`/analysis/${b.id}`}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 text-sm hover:bg-accent/50"
+                >
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-medium">{b.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {format(new Date(b.match_date), "MMM d, yyyy")} · {b.gi ? "Gi" : "No-Gi"}
+                    </span>
+                  </div>
+                  <Badge variant={b.status === "complete" ? "default" : "outline"}>
+                    {b.status === "complete" ? "complete" : "in progress"}
+                  </Badge>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
   );
 }
 

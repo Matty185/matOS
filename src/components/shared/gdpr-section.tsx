@@ -107,7 +107,7 @@ export function GdprSection() {
                     <AlertDialogDescription>
                       This permanently deletes their MatOS login (they won&apos;t be able to sign in
                       again), anonymises their profile, permanently deletes their attendance, logs,
-                      and video analyses, and anonymises payment/audit records. This can&apos;t be
+                      and match breakdowns, and anonymises payment/audit records. This can&apos;t be
                       undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>

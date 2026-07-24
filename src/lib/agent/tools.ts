@@ -1,4 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
+import { METRIC_NAMES } from "@/lib/analysis/metric-catalog";
 
 const BELT_VALUES = [
   "white",
@@ -130,13 +131,85 @@ export const READ_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
-    name: "get_analysis_stubs",
+    name: "get_athlete_profile",
     description:
-      "List video analysis records (stub reports — no video is ever stored), optionally for one member.",
+      "Get a computed match-analysis profile for a gym member or external person: style card, wrestling/passing/guard/submission/escape success rates, all as factual numbers with their sample size (n). Never returns coaching advice — if asked what someone should work on, report the metrics with the smallest n or weakest values, factually, and stop there.",
+    input_schema: {
+      type: "object",
+      properties: {
+        member_id: {
+          type: "string",
+          description:
+            "UUID of a gym member. Exactly one of member_id/external_person_id is required.",
+        },
+        external_person_id: {
+          type: "string",
+          description: "UUID of an external person (opponent/analyst record).",
+        },
+        gi: {
+          type: "boolean",
+          description: "true for gi, false for no-gi. Omit to get both rulesets.",
+        },
+      },
+    },
+  },
+  {
+    name: "get_metric",
+    description:
+      "Get one specific named metric for a gym member or external person (e.g. takedown success rate). Use this instead of get_athlete_profile when the coach asks about a single number.",
+    input_schema: {
+      type: "object",
+      properties: {
+        member_id: {
+          type: "string",
+          description:
+            "UUID of a gym member. Exactly one of member_id/external_person_id is required.",
+        },
+        external_person_id: { type: "string", description: "UUID of an external person." },
+        metric_name: { type: "string", enum: METRIC_NAMES },
+        gi: { type: "boolean", description: "true for gi, false for no-gi. Defaults to gi." },
+      },
+      required: ["metric_name"],
+    },
+  },
+  {
+    name: "compare_profiles",
+    description:
+      "Compare two computed profiles (gym members and/or external people) side by side, same metrics for both. Factual numbers only — never recommend who is 'better,' just report both sets of numbers.",
+    input_schema: {
+      type: "object",
+      properties: {
+        member_id_a: { type: "string", description: "Subject A: UUID of a gym member." },
+        external_person_id_a: {
+          type: "string",
+          description: "Subject A: UUID of an external person.",
+        },
+        member_id_b: { type: "string", description: "Subject B: UUID of a gym member." },
+        external_person_id_b: {
+          type: "string",
+          description: "Subject B: UUID of an external person.",
+        },
+        gi: { type: "boolean", description: "true for gi, false for no-gi. Defaults to gi." },
+      },
+    },
+  },
+  {
+    name: "get_breakdowns",
+    description:
+      "List match breakdowns (name, date, gi, status, result), optionally filtered by member/external person and/or match date range.",
     input_schema: {
       type: "object",
       properties: {
         member_id: { type: "string" },
+        external_person_id: { type: "string" },
+        date_from: {
+          type: "string",
+          description: "ISO date (YYYY-MM-DD), inclusive, by match_date.",
+        },
+        date_to: {
+          type: "string",
+          description: "ISO date (YYYY-MM-DD), inclusive, by match_date.",
+        },
       },
     },
   },
