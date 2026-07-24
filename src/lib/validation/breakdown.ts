@@ -37,7 +37,10 @@ export type CreateBreakdownInput = z.infer<typeof createBreakdownSchema>;
 // Metadata-only edit — focus (member_id/external_person_id) never changes
 // after creation, matching Non-Negotiable #5 ("breakdowns are standalone
 // artifacts"); status is untouched here too (the Finish flow, Stage A4,
-// owns that transition).
+// owns that transition). video_filename/video_duration_seconds are written
+// by the tagging screen once a local file's metadata loads (Non-Negotiable
+// #1: only the filename/duration are ever stored, never the video itself)
+// — Stage A4 owns the resume-mismatch warning that reads these back.
 export const updateBreakdownSchema = z.object({
   name: z.string().trim().min(1).max(200).optional(),
   match_date: z
@@ -47,6 +50,8 @@ export const updateBreakdownSchema = z.object({
   gi: z.boolean().optional(),
   result: z.enum(["win", "loss", "draw"]).nullable().optional(),
   method: z.enum(["submission", "points", "decision", "dq"]).nullable().optional(),
+  video_filename: z.string().max(500).nullable().optional(),
+  video_duration_seconds: z.number().positive().nullable().optional(),
 });
 
 export type UpdateBreakdownInput = z.infer<typeof updateBreakdownSchema>;

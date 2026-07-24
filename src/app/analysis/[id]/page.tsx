@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { ChevronLeft, Video } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BreakdownEditDialog } from "@/components/shared/breakdown-edit-dialog";
+import { TaggingScreen } from "@/components/shared/tagging-screen";
 import { Badge } from "@/components/ui/badge";
 
 const RESULT_LABELS = { win: "Win", loss: "Loss", draw: "Draw" } as const;
@@ -42,10 +43,6 @@ function useCurrentUserId() {
   });
 }
 
-// Metadata display + edit only — the actual video-tagging screen is Stage
-// A3, not built yet. This page is the honest placeholder for it rather
-// than a broken/half-wired link, per CLAUDE.md's "proper... loading states
-// on every async action" standard extended to "no dead ends" in spirit.
 export default function BreakdownDetailPage({ params }: { params: { id: string } }) {
   const queryClient = useQueryClient();
   const { data: currentUserId } = useCurrentUserId();
@@ -137,10 +134,7 @@ export default function BreakdownDetailPage({ params }: { params: { id: string }
         ) : null}
       </div>
 
-      <div className="flex flex-col items-center gap-2 rounded-md border border-dashed p-8 text-center text-muted-foreground">
-        <Video className="h-8 w-8" />
-        <p className="text-sm">Video tagging is coming in a later stage.</p>
-      </div>
+      <TaggingScreen breakdownId={breakdown.id} readOnly={!canEdit} />
     </div>
   );
 }

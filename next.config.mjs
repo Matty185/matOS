@@ -41,6 +41,16 @@ const nextConfig = {
               scriptSrc,
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: *.supabase.co",
+              // media-src covers <video>/<source> — falls back to
+              // default-src ('self' only) without this, which silently
+              // blocks the Match Analysis Module's tagging screen (the
+              // video is deliberately never uploaded anywhere, loaded
+              // client-side only via URL.createObjectURL per Non-Negotiable
+              // #1). Re-added here — this directive existed once before
+              // (for the now-scrapped hard-metrics rework) and was reverted
+              // along with everything else in that scrap; it's genuinely
+              // needed again for Stage A3, not leftover cruft.
+              "media-src 'self' blob:",
               "font-src 'self' data:",
               "connect-src 'self' *.supabase.co wss://*.supabase.co api.anthropic.com",
               "frame-ancestors 'none'",

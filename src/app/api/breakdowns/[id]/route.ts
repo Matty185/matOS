@@ -26,6 +26,10 @@ export const PATCH = withAuth(
     if (input.gi !== undefined) update.gi = input.gi;
     if (input.result !== undefined) update.result = input.result;
     if (input.method !== undefined) update.method = input.method;
+    if (input.video_filename !== undefined) update.video_filename = input.video_filename;
+    if (input.video_duration_seconds !== undefined) {
+      update.video_duration_seconds = input.video_duration_seconds;
+    }
 
     if (Object.keys(update).length === 0) {
       return apiError(400, "NO_CHANGES", "No fields to update were provided.");
