@@ -4,25 +4,16 @@ import { useState } from "react";
 import { format } from "date-fns";
 import { Swords } from "lucide-react";
 import { useAthleteProfile, type ProfileSubject } from "@/lib/analysis/use-athlete-profile";
+import { formatPct, formatRate } from "@/lib/analysis/metric-format";
 import { humanize, formatVideoTimestamp } from "@/lib/format/humanize";
 import type { AthleteProfile, MetricValue } from "@/lib/analysis/profile";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ComparePickerDialog } from "@/components/shared/compare-picker-dialog";
+import { MetricGroup } from "@/components/shared/metric-group";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 const RESULT_LABELS = { win: "Win", loss: "Loss", draw: "Draw" } as const;
-
-function formatPct(value: number | null): string {
-  return value === null ? "—" : `${Math.round(value * 100)}%`;
-}
-
-// Rate metrics (e.g. "takedown attempts / match") are averages, not
-// fractions of a whole — formatting them with formatPct would turn a
-// perfectly normal "1.0 attempts/match" into a nonsensical "100%". Kept as
-// a distinct format rather than inferring from the label text.
-function formatRate(value: number | null): string {
-  return value === null ? "—" : value.toFixed(1);
-}
 
 // Every metric renders its n (Non-Negotiable #6) — right next to the value,
 // never hidden behind a tooltip, so a 100% built on n=1 always reads as
@@ -52,15 +43,6 @@ function MetricRow({
           {nUnit ?? ""})
         </span>
       </span>
-    </div>
-  );
-}
-
-function MetricGroup({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-md border p-4">
-      <p className="mb-2 text-sm font-medium">{title}</p>
-      <div className="flex flex-col">{children}</div>
     </div>
   );
 }
@@ -286,23 +268,26 @@ export function ProfileView({ subject }: { subject: ProfileSubject }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex gap-2">
-        <Button
-          type="button"
-          variant={gi ? "default" : "outline"}
-          className="h-11"
-          onClick={() => setGi(true)}
-        >
-          Gi
-        </Button>
-        <Button
-          type="button"
-          variant={!gi ? "default" : "outline"}
-          className="h-11"
-          onClick={() => setGi(false)}
-        >
-          No-Gi
-        </Button>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant={gi ? "default" : "outline"}
+            className="h-11"
+            onClick={() => setGi(true)}
+          >
+            Gi
+          </Button>
+          <Button
+            type="button"
+            variant={!gi ? "default" : "outline"}
+            className="h-11"
+            onClick={() => setGi(false)}
+          >
+            No-Gi
+          </Button>
+        </div>
+        <ComparePickerDialog subjectA={subject} />
       </div>
       <ProfileBody profile={gi ? data.gi : data.noGi} />
     </div>
