@@ -464,167 +464,182 @@ export function TaggingScreen({
             </div>
           ) : null}
 
-          <div className="rounded-md border p-4">
-            {videoUrl ? (
-              <div className="flex justify-center overflow-hidden rounded-md bg-black">
-                {/* eslint-disable-next-line jsx-a11y/media-has-caption -- local, ephemeral user footage, never transcoded/stored */}
-                <video
-                  ref={videoRef}
-                  src={videoUrl}
-                  controls
-                  className="max-h-[60vh] w-auto max-w-full"
-                  onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-                  onLoadedMetadata={handleLoadedMetadata}
-                />
-              </div>
-            ) : (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                Load your match video to start tagging. The video stays in your browser — it&apos;s
-                never uploaded anywhere.
-              </p>
-            )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="video/*"
-              className="hidden"
-              onChange={handleFileChange}
-            />
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Upload className="mr-2 h-4 w-4" />{" "}
-                {videoUrl ? "Choose a different file" : "Select video file"}
-              </Button>
+          {/* Stage U1 (matos_tagging_ux_plan.md §4): two columns at
+              >=900px — video left, tag panel right and sticky, so tagging
+              never needs a scroll to reach the buttons. Below 900px this
+              degrades to the original single stacked column (mobile
+              rail/overlay redesign is U2/U3's job, not this stage's — U1
+              is layout only, no interaction changes). `self-start` on the
+              right column is required for `sticky` to have any scrollable
+              room to stick within, since grid items stretch to the row's
+              full height by default. */}
+          <div
+            className={videoUrl ? "grid gap-6 tag:grid-cols-[minmax(0,1fr)_320px]" : "grid gap-6"}
+          >
+            <div className="rounded-md border p-4">
               {videoUrl ? (
-                <>
-                  <span className="font-mono text-sm">{formatVideoTimestamp(currentTime)}</span>
-                  <div className="flex gap-1">
-                    {SPEEDS.map((speed) => (
-                      <Button
-                        key={speed}
-                        type="button"
-                        size="sm"
-                        variant={playbackRate === speed ? "default" : "outline"}
-                        className="h-11 min-w-11"
-                        onClick={() => setSpeed(speed)}
-                      >
-                        {speed}×
-                      </Button>
-                    ))}
-                  </div>
-                </>
-              ) : null}
-            </div>
-          </div>
-
-          {videoUrl ? (
-            <>
-              <div className="flex flex-col gap-2 rounded-md border p-4">
-                <p className="text-sm font-medium">Position</p>
-                {/* items-start: default stretch would make every column on
-                    a flex-wrap row match the tallest one, leaving visible
-                    whitespace under shorter buttons whenever a sibling's
-                    role sub-picker is expanded. Found in Stage A3 code
-                    review. */}
-                <div className="flex flex-wrap items-start gap-2">
-                  {(positions ?? []).map((position) => (
-                    <div key={position.id} className="flex flex-col gap-2">
-                      <Button
-                        type="button"
-                        variant={openInterval?.position_id === position.id ? "default" : "outline"}
-                        className="h-11"
-                        onClick={() => handlePositionTap(position)}
-                      >
-                        {humanize(position.name)}
-                      </Button>
-                      {expandedPositionId === position.id && position.roles ? (
-                        <div className="flex flex-wrap gap-2 pl-2">
-                          {position.roles.map((role) => (
-                            <Button
-                              key={role}
-                              type="button"
-                              size="sm"
-                              variant="secondary"
-                              className="h-11"
-                              onClick={() => tagPosition(position.id, role)}
-                            >
-                              {humanize(role)}
-                            </Button>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  ))}
+                <div className="flex justify-center overflow-hidden rounded-md bg-black">
+                  {/* eslint-disable-next-line jsx-a11y/media-has-caption -- local, ephemeral user footage, never transcoded/stored */}
+                  <video
+                    ref={videoRef}
+                    src={videoUrl}
+                    controls
+                    className="max-h-[60vh] w-auto max-w-full"
+                    onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+                    onLoadedMetadata={handleLoadedMetadata}
+                  />
                 </div>
-                {openInterval ? (
-                  <p className="text-xs text-muted-foreground">
-                    Currently tagging:{" "}
-                    {humanize(positionById.get(openInterval.position_id)?.name ?? "")}
-                    {openInterval.role ? ` (${humanize(openInterval.role)})` : ""} — since{" "}
-                    {formatVideoTimestamp(openInterval.start_ts)}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="flex flex-col gap-4 rounded-md border p-4">
-                <p className="text-sm font-medium">Events</p>
-                {Array.from(eventsByCategory.entries()).map(([category, events]) => (
-                  <div key={category} className="flex flex-col gap-2">
-                    <p className="text-xs font-medium text-muted-foreground">
-                      {humanize(category)}
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                      {events.map((eventType) => (
+              ) : (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  Load your match video to start tagging. The video stays in your browser —
+                  it&apos;s never uploaded anywhere.
+                </p>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="mr-2 h-4 w-4" />{" "}
+                  {videoUrl ? "Choose a different file" : "Select video file"}
+                </Button>
+                {videoUrl ? (
+                  <>
+                    <span className="font-mono text-sm">{formatVideoTimestamp(currentTime)}</span>
+                    <div className="flex gap-1">
+                      {SPEEDS.map((speed) => (
                         <Button
-                          key={eventType.id}
+                          key={speed}
                           type="button"
-                          variant="outline"
-                          className="h-11"
-                          onClick={() => handleEventTap(eventType)}
+                          size="sm"
+                          variant={playbackRate === speed ? "default" : "outline"}
+                          className="h-11 min-w-11"
+                          onClick={() => setSpeed(speed)}
                         >
-                          {humanize(eventType.name)}
+                          {speed}×
                         </Button>
                       ))}
                     </div>
+                  </>
+                ) : null}
+              </div>
+            </div>
+
+            {videoUrl ? (
+              <div className="flex flex-col gap-6 tag:sticky tag:top-4 tag:self-start">
+                <div className="flex flex-col gap-2 rounded-md border p-4">
+                  <p className="text-sm font-medium">Position</p>
+                  {/* items-start: default stretch would make every column on
+                      a flex-wrap row match the tallest one, leaving visible
+                      whitespace under shorter buttons whenever a sibling's
+                      role sub-picker is expanded. Found in Stage A3 code
+                      review. */}
+                  <div className="flex flex-wrap items-start gap-2">
+                    {(positions ?? []).map((position) => (
+                      <div key={position.id} className="flex flex-col gap-2">
+                        <Button
+                          type="button"
+                          variant={
+                            openInterval?.position_id === position.id ? "default" : "outline"
+                          }
+                          className="h-auto min-h-11 whitespace-normal py-2 text-center leading-tight"
+                          onClick={() => handlePositionTap(position)}
+                        >
+                          {humanize(position.name)}
+                        </Button>
+                        {expandedPositionId === position.id && position.roles ? (
+                          <div className="flex flex-wrap gap-2 pl-2">
+                            {position.roles.map((role) => (
+                              <Button
+                                key={role}
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                className="h-auto min-h-11 whitespace-normal py-2 text-center leading-tight"
+                                onClick={() => tagPosition(position.id, role)}
+                              >
+                                {humanize(role)}
+                              </Button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
                   </div>
+                  {openInterval ? (
+                    <p className="text-xs text-muted-foreground">
+                      Currently tagging:{" "}
+                      {humanize(positionById.get(openInterval.position_id)?.name ?? "")}
+                      {openInterval.role ? ` (${humanize(openInterval.role)})` : ""} — since{" "}
+                      {formatVideoTimestamp(openInterval.start_ts)}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="flex flex-col gap-4 rounded-md border p-4">
+                  <p className="text-sm font-medium">Events</p>
+                  {Array.from(eventsByCategory.entries()).map(([category, events]) => (
+                    <div key={category} className="flex flex-col gap-2">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        {humanize(category)}
+                      </p>
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 tag:grid-cols-2">
+                        {events.map((eventType) => (
+                          <Button
+                            key={eventType.id}
+                            type="button"
+                            variant="outline"
+                            className="h-auto min-h-11 whitespace-normal py-2 text-center leading-tight"
+                            onClick={() => handleEventTap(eventType)}
+                          >
+                            {humanize(eventType.name)}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          {videoUrl && videoDuration ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-sm font-medium">Timeline</p>
+              <div className="relative h-8 w-full rounded-md bg-muted" aria-hidden="true">
+                {(breakdownPositions ?? []).map((p) => (
+                  <div
+                    key={p.id}
+                    className="absolute top-0 h-4 rounded bg-primary/40"
+                    style={{
+                      left: `${(p.start_ts / videoDuration) * 100}%`,
+                      width: `${(((p.end_ts ?? videoDuration) - p.start_ts) / videoDuration) * 100}%`,
+                    }}
+                    title={humanize(positionById.get(p.position_id)?.name ?? "")}
+                  />
+                ))}
+                {(breakdownEvents ?? []).map((ev) => (
+                  <div
+                    key={ev.id}
+                    className="absolute bottom-0 h-4 w-1 -translate-x-1/2 rounded bg-destructive"
+                    style={{ left: `${(ev.ts / videoDuration) * 100}%` }}
+                    title={humanize(eventTypeById.get(ev.event_type_id)?.name ?? "")}
+                  />
                 ))}
               </div>
-
-              {videoDuration ? (
-                <div className="flex flex-col gap-2">
-                  <p className="text-sm font-medium">Timeline</p>
-                  <div className="relative h-8 w-full rounded-md bg-muted" aria-hidden="true">
-                    {(breakdownPositions ?? []).map((p) => (
-                      <div
-                        key={p.id}
-                        className="absolute top-0 h-4 rounded bg-primary/40"
-                        style={{
-                          left: `${(p.start_ts / videoDuration) * 100}%`,
-                          width: `${(((p.end_ts ?? videoDuration) - p.start_ts) / videoDuration) * 100}%`,
-                        }}
-                        title={humanize(positionById.get(p.position_id)?.name ?? "")}
-                      />
-                    ))}
-                    {(breakdownEvents ?? []).map((ev) => (
-                      <div
-                        key={ev.id}
-                        className="absolute bottom-0 h-4 w-1 -translate-x-1/2 rounded bg-destructive"
-                        style={{ left: `${(ev.ts / videoDuration) * 100}%` }}
-                        title={humanize(eventTypeById.get(ev.event_type_id)?.name ?? "")}
-                      />
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Overview only — use the lists below to edit or delete a tag.
-                  </p>
-                </div>
-              ) : null}
-            </>
+              <p className="text-xs text-muted-foreground">
+                Overview only — use the lists below to edit or delete a tag.
+              </p>
+            </div>
           ) : null}
         </>
       ) : null}

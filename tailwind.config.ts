@@ -10,6 +10,14 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      screens: {
+        // Match Analysis Module tagging screen's two-column/rail collapse
+        // point (matos_tagging_ux_plan.md §4) — doesn't align with any
+        // default breakpoint, and is referenced across multiple stages
+        // (U1-U6), so it's named once here instead of repeating the
+        // arbitrary `min-[900px]:` value at every call site.
+        tag: "900px",
+      },
       fontFamily: {
         sans: ["var(--font-inter)"],
         heading: ["var(--font-bebas-neue)"],

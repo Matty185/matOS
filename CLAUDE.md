@@ -76,6 +76,12 @@ Real video analysis, payment processing, notification emails, React Native app, 
 
 Companion spec: `matos_analysis_module_plan.md` — where they conflict, the plan wins.
 
+**Tagging screen UX redesign** (2026-07-25, in progress): `matos_tagging_ux_plan.md` — a UX-layer-only
+redesign of the tagging screen (two-column desktop layout, fullscreen mode, a watching/tagging mode
+split with a category rail, undo toast, keyboard shortcuts). No schema/data-model/tagging-semantics
+changes — everything in this section and the module plan's §3/§5 stays authoritative. Own build sequence
+(U1–U6) and review gates, same staged-with-explicit-go-ahead discipline as the A0–A9 sequence above.
+
 ### What This Module Is
 
 Layer 1: manual match breakdown — client-side video player + tagging tool producing a timestamped record (positional intervals with roles + discrete events with modifiers/outcomes). Layer 2: computed athlete profiles from accumulated breakdowns, with side-by-side comparison. AI tagging is **phase 2, not now** — do not build it, but do not block it (the `source` field on events exists from day one).
