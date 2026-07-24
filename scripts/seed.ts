@@ -543,6 +543,14 @@ async function main() {
     "belt_history",
     "agent_rate_limits",
     "classes",
+    // breakdowns before external_people/members: both
+    // breakdowns.external_person_id and breakdowns.member_id are
+    // "on delete restrict" (Stage A1 schema) — deleting the parent first
+    // would fail while a breakdown still references it. breakdown_positions/
+    // breakdown_events cascade-delete with their parent breakdown, so
+    // neither needs its own entry here.
+    "breakdowns",
+    "external_people",
     "members",
   ] as const) {
     const { error } = await supabase.from(table).delete().eq("gym_id", gymId);
@@ -849,6 +857,229 @@ async function main() {
   }
   const { error: logError } = await supabase.from("athlete_logs").insert(logRows);
   assertNoError(logError, "insert athlete_logs");
+
+  // Stage A8: 2-3 realistic breakdowns on demo members + 1 external person,
+  // enough events for a credible profile demo (plan §10's own wording).
+  // Taxonomy ids looked up by name rather than hardcoded, same reasoning as
+  // everywhere else in this module — "taxonomy is data, not code" — this
+  // script is exactly the kind of caller that would silently break if the
+  // event_types/positions rows ever get renumbered.
+  console.log("Inserting match analysis breakdowns...");
+  const { data: positionRows, error: positionsFetchError } = await supabase
+    .from("positions")
+    .select("id, name");
+  assertNoError(positionsFetchError, "fetch positions taxonomy");
+  const positionIdByName = new Map((positionRows ?? []).map((p) => [p.name, p.id]));
+
+  const { data: eventTypeRows, error: eventTypesFetchError } = await supabase
+    .from("event_types")
+    .select("id, name");
+  assertNoError(eventTypesFetchError, "fetch event_types taxonomy");
+  const eventTypeIdByName = new Map((eventTypeRows ?? []).map((e) => [e.name, e.id]));
+
+  function positionId(name: string): string {
+    return must(positionIdByName.get(name), `position taxonomy row "${name}"`);
+  }
+  function eventTypeId(name: string): string {
+    return must(eventTypeIdByName.get(name), `event_type taxonomy row "${name}"`);
+  }
+
+  type SeedPosition = {
+    position: string;
+    role: string | null;
+    start_ts: number;
+    end_ts: number | null;
+  };
+  type SeedEvent = {
+    event: string;
+    modifier?: string;
+    outcome?: string;
+    ts: number;
+  };
+
+  async function seedBreakdown(input: {
+    authorId: string;
+    memberId?: string;
+    externalPersonId?: string;
+    name: string;
+    matchDate: string;
+    gi: boolean;
+    result: "win" | "loss" | "draw";
+    method: "submission" | "points" | "decision" | "dq";
+    durationSeconds: number;
+    positions: SeedPosition[];
+    events: SeedEvent[];
+  }) {
+    const { data: breakdown, error: breakdownError } = await supabase
+      .from("breakdowns")
+      .insert({
+        gym_id: gymId,
+        author_id: input.authorId,
+        member_id: input.memberId ?? null,
+        external_person_id: input.externalPersonId ?? null,
+        name: input.name,
+        match_date: input.matchDate,
+        gi: input.gi,
+        result: input.result,
+        method: input.method,
+        duration_seconds: input.durationSeconds,
+        status: "complete",
+      })
+      .select("id")
+      .single();
+    assertNoError(breakdownError, `insert breakdown "${input.name}"`);
+    const breakdownId = must(breakdown, `breakdown "${input.name}"`).id;
+
+    if (input.positions.length > 0) {
+      const { error } = await supabase.from("breakdown_positions").insert(
+        input.positions.map((p) => ({
+          breakdown_id: breakdownId,
+          gym_id: gymId,
+          position_id: positionId(p.position),
+          role: p.role,
+          start_ts: p.start_ts,
+          end_ts: p.end_ts,
+        })),
+      );
+      assertNoError(error, `insert breakdown_positions for "${input.name}"`);
+    }
+
+    if (input.events.length > 0) {
+      const { error } = await supabase.from("breakdown_events").insert(
+        input.events.map((e) => ({
+          breakdown_id: breakdownId,
+          gym_id: gymId,
+          event_type_id: eventTypeId(e.event),
+          modifier: e.modifier ?? null,
+          outcome: e.outcome ?? null,
+          ts: e.ts,
+          source: "manual" as const,
+        })),
+      );
+      assertNoError(error, `insert breakdown_events for "${input.name}"`);
+    }
+  }
+
+  const aoifeId = memberIdByKey.get("aoife")!;
+  const niamhId = memberIdByKey.get("niamh")!;
+
+  const { data: externalPerson, error: externalPersonError } = await supabase
+    .from("external_people")
+    .insert({
+      gym_id: gymId,
+      created_by: coachAuth.id,
+      display_name: "Jake Sullivan",
+      notes: "Visiting competitor, regional open — scouting footage.",
+    })
+    .select("id")
+    .single();
+  assertNoError(externalPersonError, "insert external_people");
+  const jakeId = must(externalPerson, "external person").id;
+
+  // Aoife (self-authored, gi) — won by submission via the back.
+  await seedBreakdown({
+    authorId: athleteAuth.id,
+    memberId: aoifeId,
+    name: "Wednesday advanced sparring vs Conor",
+    matchDate: addDaysUTC(today, -4),
+    gi: true,
+    result: "win",
+    method: "submission",
+    durationSeconds: 270,
+    positions: [
+      { position: "side_control", role: "top", start_ts: 0, end_ts: 45 },
+      { position: "mount", role: "top", start_ts: 45, end_ts: 95 },
+      { position: "back_control", role: "has_back", start_ts: 95, end_ts: 140 },
+      { position: "standing_neutral", role: null, start_ts: 140, end_ts: 140 },
+    ],
+    events: [
+      { event: "underhook_won", ts: 5 },
+      { event: "takedown_attempt", modifier: "double", outcome: "completed", ts: 12 },
+      { event: "guard_pass_attempt", modifier: "pressure", outcome: "completed", ts: 40 },
+      { event: "back_take", ts: 95 },
+      { event: "submission_attempt", modifier: "rnc", outcome: "finished", ts: 140 },
+    ],
+  });
+
+  // Aoife (self-authored, no-gi) — lost to an armbar from mount.
+  await seedBreakdown({
+    authorId: athleteAuth.id,
+    memberId: aoifeId,
+    name: "No-gi open mat roll",
+    matchDate: addDaysUTC(today, -10),
+    gi: false,
+    result: "loss",
+    method: "submission",
+    durationSeconds: 195,
+    positions: [
+      { position: "standing_neutral", role: null, start_ts: 0, end_ts: 20 },
+      { position: "closed_guard", role: "playing", start_ts: 20, end_ts: 70 },
+      { position: "half_guard", role: "bottom", start_ts: 70, end_ts: 120 },
+      { position: "side_control", role: "bottom", start_ts: 120, end_ts: 165 },
+      { position: "mount", role: "bottom", start_ts: 165, end_ts: 192 },
+    ],
+    events: [
+      { event: "guard_pull", outcome: "to_closed", ts: 20 },
+      { event: "sweep_attempt", modifier: "scissor", outcome: "defended", ts: 45 },
+      { event: "guard_retention", outcome: "passed", ts: 68 },
+      { event: "escape", outcome: "failed", ts: 115 },
+      { event: "escape", outcome: "failed", ts: 185 },
+      { event: "submission_defended", modifier: "armbar", outcome: "tapped", ts: 192 },
+    ],
+  });
+
+  // Niamh (coach-authored, gi) — comp-team prep round, won on points.
+  await seedBreakdown({
+    authorId: coachAuth.id,
+    memberId: niamhId,
+    name: "Competition prep round vs Aisling",
+    matchDate: addDaysUTC(today, -2),
+    gi: true,
+    result: "win",
+    method: "points",
+    durationSeconds: 300,
+    positions: [
+      { position: "standing_neutral", role: null, start_ts: 0, end_ts: 30 },
+      { position: "open_guard", role: "passing", start_ts: 30, end_ts: 90 },
+      { position: "side_control", role: "top", start_ts: 90, end_ts: 160 },
+      { position: "mount", role: "top", start_ts: 160, end_ts: 220 },
+      { position: "back_control", role: "has_back", start_ts: 220, end_ts: 280 },
+      { position: "standing_neutral", role: null, start_ts: 280, end_ts: 280 },
+    ],
+    events: [
+      { event: "takedown_attempt", modifier: "single", outcome: "completed", ts: 15 },
+      { event: "guard_pass_attempt", modifier: "leg_drag", outcome: "completed", ts: 85 },
+      { event: "guard_pass_attempt", modifier: "pressure", outcome: "completed", ts: 155 },
+      { event: "back_take", ts: 220 },
+      { event: "submission_attempt", modifier: "rnc", outcome: "defended", ts: 260 },
+    ],
+  });
+
+  // Jake Sullivan (external person, coach-authored, no-gi) — scouting
+  // footage from a regional open, won by decision.
+  await seedBreakdown({
+    authorId: coachAuth.id,
+    externalPersonId: jakeId,
+    name: "Scouting footage — regional open",
+    matchDate: addDaysUTC(today, -6),
+    gi: false,
+    result: "win",
+    method: "decision",
+    durationSeconds: 180,
+    positions: [
+      { position: "standing_neutral", role: null, start_ts: 0, end_ts: 15 },
+      { position: "closed_guard", role: "inside", start_ts: 15, end_ts: 70 },
+      { position: "side_control", role: "top", start_ts: 70, end_ts: 130 },
+      { position: "mount", role: "top", start_ts: 130, end_ts: 180 },
+    ],
+    events: [
+      { event: "takedown_attempt", modifier: "throw", outcome: "completed", ts: 10 },
+      { event: "guard_pass_attempt", modifier: "speed", outcome: "completed", ts: 65 },
+      { event: "submission_attempt", modifier: "kimura", outcome: "defended", ts: 100 },
+      { event: "guard_pass_attempt", modifier: "pressure", outcome: "completed", ts: 125 },
+      { event: "submission_attempt", modifier: "armbar", outcome: "lost_position", ts: 160 },
+    ],
+  });
 
   console.log("\nDone.\n");
   console.log("Gym:", GYM_NAME, gymId);
