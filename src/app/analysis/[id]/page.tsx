@@ -26,6 +26,8 @@ type BreakdownDetail = {
   result: keyof typeof RESULT_LABELS | null;
   method: keyof typeof METHOD_LABELS | null;
   author_id: string | null;
+  video_filename: string | null;
+  video_duration_seconds: number | null;
   members: { first_name: string; last_name: string } | null;
   external_people: { display_name: string } | null;
 };
@@ -58,7 +60,7 @@ export default function BreakdownDetailPage({ params }: { params: { id: string }
       const { data, error } = await supabase
         .from("breakdowns")
         .select(
-          "id, name, match_date, gi, status, result, method, author_id, members(first_name, last_name), external_people(display_name)",
+          "id, name, match_date, gi, status, result, method, author_id, video_filename, video_duration_seconds, members(first_name, last_name), external_people(display_name)",
         )
         .eq("id", params.id)
         .single();
@@ -134,7 +136,14 @@ export default function BreakdownDetailPage({ params }: { params: { id: string }
         ) : null}
       </div>
 
-      <TaggingScreen breakdownId={breakdown.id} readOnly={!canEdit} />
+      <TaggingScreen
+        breakdownId={breakdown.id}
+        readOnly={!canEdit}
+        status={breakdown.status}
+        storedVideoFilename={breakdown.video_filename}
+        storedVideoDurationSeconds={breakdown.video_duration_seconds}
+        onStatusChange={() => queryClient.invalidateQueries({ queryKey: ["breakdown", params.id] })}
+      />
     </div>
   );
 }

@@ -30,6 +30,7 @@ export const PATCH = withAuth(
     if (input.video_duration_seconds !== undefined) {
       update.video_duration_seconds = input.video_duration_seconds;
     }
+    if (input.status !== undefined) update.status = input.status;
 
     if (Object.keys(update).length === 0) {
       return apiError(400, "NO_CHANGES", "No fields to update were provided.");

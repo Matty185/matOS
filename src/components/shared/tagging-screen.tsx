@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Upload } from "lucide-react";
+import { Upload, TriangleAlert } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { humanize, formatVideoTimestamp } from "@/lib/format/humanize";
 import { TagEditDialog } from "@/components/shared/tag-edit-dialog";
@@ -92,23 +92,28 @@ function TagListRow({
   );
 }
 
-// The core tagging UI (Stage A3): local-only video playback (Non-Negotiable
-// #1 — the file never leaves the browser, only structured tags get
-// POSTed), position intervals, event tagging with the tap -> auto-pause ->
-// confirm -> resume flow (plan §6), a read-only timeline overview, and a
-// properly-sized (44px) list for the actual edit/delete interaction — the
-// timeline's markers are necessarily too small to reliably meet the touch-
-// target standard once a match has more than a handful of tags, so the
-// list is the accessible primary surface, not a fallback.
-//
-// Deliberately NOT built here (Stage A4's stated scope): local-draft
-// persistence across page reloads, and the filename/duration mismatch
-// warning on resume. Every tag here saves to the server immediately on
-// creation/edit/delete — each action IS the save, not a draft queued
-// behind a separate "Save" button.
+// The core tagging UI (Stage A3 + A4): local-only video playback
+// (Non-Negotiable #1 — the file never leaves the browser, only structured
+// tags get POSTed), position intervals, event tagging with the tap ->
+// auto-pause -> confirm -> resume flow (plan §6), a read-only timeline
+// overview, and a properly-sized (44px) list for the actual edit/delete
+// interaction — the timeline's markers are necessarily too small to
+// reliably meet the touch-target standard once a match has more than a
+// handful of tags, so the list is the accessible primary surface, not a
+// fallback. Every tag saves to the server immediately on creation/edit/
+// delete — each action IS the save, so there's no separate local-draft
+// layer to build: reloading the page just re-fetches the same tags from
+// the server (already unconditionally rendered below). The only thing a
+// page reload actually loses is the in-browser video Blob URL itself
+// (Blobs don't survive a reload) — hence "resume: re-select file" (plan
+// §6) and the filename/duration mismatch warning below (Stage A4).
 export function TaggingScreen({
   breakdownId,
   readOnly = false,
+  status,
+  storedVideoFilename,
+  storedVideoDurationSeconds,
+  onStatusChange,
 }: {
   breakdownId: string;
   // Staff can SELECT any breakdown in their gym but only author-write
@@ -116,6 +121,14 @@ export function TaggingScreen({
   // but no video player/tagging controls or edit access, rather than a
   // working-looking UI whose writes RLS would silently reject.
   readOnly?: boolean;
+  status: "in_progress" | "complete";
+  // Whatever filename/duration got saved the last time a video was loaded
+  // for this breakdown (possibly in an earlier session) — null for a
+  // breakdown that has never had a video loaded yet. Read-only inputs used
+  // solely for the resume-mismatch comparison below; never written here.
+  storedVideoFilename: string | null;
+  storedVideoDurationSeconds: number | null;
+  onStatusChange: () => void;
 }) {
   const queryClient = useQueryClient();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -137,6 +150,9 @@ export function TaggingScreen({
 
   const [editingPosition, setEditingPosition] = useState<PositionRow | null>(null);
   const [editingEvent, setEditingEvent] = useState<EventRow | null>(null);
+
+  const [mismatchWarning, setMismatchWarning] = useState<string | null>(null);
+  const [statusUpdating, setStatusUpdating] = useState(false);
 
   // Revoke only on genuine unmount, not keyed on the changing videoUrl —
   // React 18 Strict Mode double-invokes effects in dev, which would
@@ -248,16 +264,40 @@ export function TaggingScreen({
     const url = URL.createObjectURL(file);
     videoUrlRef.current = url;
     setVideoUrl(url);
+    // Filename check happens immediately; duration isn't known until the
+    // browser finishes reading the file's metadata, so that half of the
+    // check runs in handleLoadedMetadata below. Only warn when there's a
+    // prior filename to compare against — a breakdown that's never had a
+    // video loaded has nothing to mismatch.
+    setMismatchWarning(
+      storedVideoFilename && storedVideoFilename !== file.name
+        ? `This doesn't look like the same file used last time — expected "${storedVideoFilename}", got "${file.name}".`
+        : null,
+    );
   }
 
   async function handleLoadedMetadata() {
     const video = videoRef.current;
     if (!video) return;
     setVideoDuration(video.duration);
+    // A couple of seconds' tolerance — re-exports of the same footage can
+    // land a fraction of a second off without actually being a different
+    // file, and plan §6 only asks for a warning, not exact-match blocking.
+    if (
+      storedVideoDurationSeconds !== null &&
+      Math.abs(video.duration - storedVideoDurationSeconds) > 2
+    ) {
+      setMismatchWarning(
+        (current) =>
+          current ??
+          `This video's length (${formatVideoTimestamp(video.duration)}) doesn't match what was used last time (${formatVideoTimestamp(storedVideoDurationSeconds)}).`,
+      );
+    }
     const fileName = fileInputRef.current?.files?.[0]?.name;
     if (!fileName) return;
-    // Best-effort — recording what file this session used, for Stage A4's
-    // resume-mismatch check. Not shown to the user, no toast either way.
+    // Best-effort — records what file this session used, so a future
+    // resume can compare against it. Not shown to the user, no toast
+    // either way.
     await fetch(`/api/breakdowns/${breakdownId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -266,6 +306,27 @@ export function TaggingScreen({
         video_duration_seconds: Math.round(video.duration),
       }),
     }).catch(() => {});
+  }
+
+  async function toggleStatus() {
+    const nextStatus = status === "complete" ? "in_progress" : "complete";
+    setStatusUpdating(true);
+    try {
+      const res = await fetch(`/api/breakdowns/${breakdownId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      if (!res.ok) {
+        const body = await res.json();
+        toast.error(body.error ?? "Something went wrong.");
+        return;
+      }
+      onStatusChange();
+      toast.success(nextStatus === "complete" ? "Marked as finished." : "Reopened for editing.");
+    } finally {
+      setStatusUpdating(false);
+    }
   }
 
   function setSpeed(rate: number) {
@@ -357,6 +418,22 @@ export function TaggingScreen({
 
       {!readOnly ? (
         <>
+          {mismatchWarning ? (
+            <div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/5 p-3 text-sm">
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+              <p className="flex-1 text-destructive">{mismatchWarning}</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-11"
+                onClick={() => setMismatchWarning(null)}
+              >
+                Dismiss
+              </Button>
+            </div>
+          ) : null}
+
           <div className="rounded-md border p-4">
             {videoUrl ? (
               <div className="flex justify-center overflow-hidden rounded-md bg-black">
@@ -564,6 +641,25 @@ export function TaggingScreen({
             </ul>
           )}
         </div>
+
+        {!readOnly ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-4">
+            <p className="text-sm text-muted-foreground">
+              {status === "complete"
+                ? "This breakdown is marked finished."
+                : "Mark this breakdown as finished once you're done tagging."}
+            </p>
+            <Button
+              type="button"
+              variant={status === "complete" ? "outline" : "default"}
+              className="h-11"
+              disabled={statusUpdating}
+              onClick={toggleStatus}
+            >
+              {statusUpdating ? "Saving..." : status === "complete" ? "Reopen" : "Mark as finished"}
+            </Button>
+          </div>
+        ) : null}
       </>
 
       <Dialog open={pendingEvent !== null} onOpenChange={(open) => !open && cancelEvent()}>
