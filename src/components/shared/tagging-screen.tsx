@@ -235,13 +235,27 @@ export function TaggingScreen({
   // overlay) rather than columns."
   const showRailPattern = inFullscreen || !isWide;
 
+  // Which rail button opened Mode 2, and — critically — the timestamp
+  // captured at that tap (plan §2 step 2: "the single most important
+  // behavioural rule in this redesign"). Carried through to the eventual
+  // tagPosition/handleEventTap call instead of re-reading the video's
+  // current time then, so the pause-and-browse-the-grid delay never
+  // shifts a tag's timestamp late.
+  const [activeEntry, setActiveEntry] = useState<
+    { kind: "category"; category: string; ts: number } | { kind: "position"; ts: number } | null
+  >(null);
+
   // Without this, exiting fullscreen mid-tag (e.g. via the Minimize
   // button, not through Close/Cancel/Confirm) leaves `mode` stuck on
   // "tagging" — re-entering fullscreen (or narrowing the viewport) would
   // then reopen the tagging overlay unprompted, with no rail tap behind
   // it. Found in Stage U2 code review.
   useEffect(() => {
-    if (!inFullscreen) setMode("watching");
+    if (!inFullscreen) {
+      setMode("watching");
+      setActiveEntry(null);
+      setExpandedPositionId(null);
+    }
   }, [inFullscreen]);
 
   useEffect(() => {
@@ -318,19 +332,26 @@ export function TaggingScreen({
     };
   }, [mode]);
 
-  // Entering Mode 2 (tagging) always pauses immediately, regardless of
-  // which rail button was tapped — plan §2 step 3. U2 reuses the existing,
-  // already-correct position/event panel as Mode 2's body unfiltered; the
-  // category-filtered event grid + timestamp-capture-at-this-tap (rather
-  // than at the eventual event tap) is U3's job ("the core interaction"),
-  // not this stage's.
-  function openTaggingMode() {
+  // Entering Mode 2 (tagging) captures the timestamp and pauses
+  // immediately, at this first tap — plan §2 steps 2-3 — regardless of
+  // which specific event/role is eventually chosen inside the overlay.
+  function openTaggingMode(entry: { kind: "category"; category: string } | { kind: "position" }) {
+    const ts = Math.round((videoRef.current?.currentTime ?? currentTime) * 10) / 10;
     videoRef.current?.pause();
+    setActiveEntry({ ...entry, ts });
     setMode("tagging");
   }
 
   function closeTaggingMode() {
     setMode("watching");
+    setActiveEntry(null);
+    // Otherwise a position tapped-but-not-role-picked in this session
+    // (e.g. Guard, which has roles) stays expanded the next time Mode 2
+    // opens for Position — a fresh rail tap with no picker interaction
+    // yet would show a role list already open, and re-tapping that
+    // position would toggle it closed instead of open. Found in Stage U3
+    // code review.
+    setExpandedPositionId(null);
     videoRef.current?.play();
   }
 
@@ -544,9 +565,15 @@ export function TaggingScreen({
     if (videoRef.current) videoRef.current.playbackRate = rate;
   }
 
-  async function tagPosition(positionId: string, role: string | null) {
+  // tsOverride carries the timestamp captured back at the rail tap that
+  // opened Mode 2 (plan §2 step 2) — omitted by the two-column layout's
+  // own direct one-tap-per-position buttons, which have no earlier tap to
+  // inherit a timestamp from, so those keep reading currentTime live here
+  // exactly as before U3.
+  async function tagPosition(positionId: string, role: string | null, tsOverride?: number) {
     setExpandedPositionId(null);
-    const startTs = Math.round((videoRef.current?.currentTime ?? currentTime) * 10) / 10;
+    const startTs =
+      tsOverride ?? Math.round((videoRef.current?.currentTime ?? currentTime) * 10) / 10;
     const res = await fetch(`/api/breakdowns/${breakdownId}/positions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -564,17 +591,17 @@ export function TaggingScreen({
     if (mode === "tagging") closeTaggingMode();
   }
 
-  function handlePositionTap(position: PositionRef) {
+  function handlePositionTap(position: PositionRef, tsOverride?: number) {
     if (position.roles && position.roles.length > 0) {
       setExpandedPositionId((current) => (current === position.id ? null : position.id));
       return;
     }
-    tagPosition(position.id, null);
+    tagPosition(position.id, null, tsOverride);
   }
 
-  function handleEventTap(eventType: EventTypeRef) {
+  function handleEventTap(eventType: EventTypeRef, tsOverride?: number) {
     const video = videoRef.current;
-    const ts = Math.round((video?.currentTime ?? currentTime) * 10) / 10;
+    const ts = tsOverride ?? Math.round((video?.currentTime ?? currentTime) * 10) / 10;
     video?.pause();
     setConfirmModifier("");
     setConfirmOutcome("");
@@ -611,11 +638,11 @@ export function TaggingScreen({
       }
       setPendingEvent(null);
       refetchTags();
-      videoRef.current?.play();
       // Confirm dismisses the whole Mode 2 overlay too, not just the
       // modifier/outcome dialog (plan §2 step 5) — harmless when the rail
-      // pattern isn't in use, since `mode` is otherwise unread.
-      setMode("watching");
+      // pattern isn't in use, since mode/activeEntry are otherwise unread.
+      if (mode === "tagging") closeTaggingMode();
+      else videoRef.current?.play();
     } finally {
       setConfirmSubmitting(false);
     }
@@ -623,17 +650,17 @@ export function TaggingScreen({
 
   function cancelEvent() {
     setPendingEvent(null);
-    videoRef.current?.play();
-    setMode("watching");
+    if (mode === "tagging") closeTaggingMode();
+    else videoRef.current?.play();
   }
 
-  // Shared between U1's always-visible sticky column (wide, non-fullscreen)
-  // and Stage U2's Mode 2 overlay (fullscreen or narrow) — same Position +
-  // Events panels, same handlers, just parented differently depending on
-  // showRailPattern. See openTaggingMode's comment: U2 deliberately reuses
-  // this unfiltered, deferring the category-filtered drill-down to U3.
-  const tagPanel = (
-    <>
+  // tsOverride threading (see tagPosition/handleEventTap above) lets these
+  // two render helpers serve both the two-column layout's own direct
+  // one-tap buttons (no override, ts read live) and Stage U3's rail-driven
+  // Mode 2 overlay (override = the timestamp captured back at the rail
+  // tap that opened it).
+  function renderPositionPanel(tsOverride?: number) {
+    return (
       <div className="flex flex-col gap-2 rounded-md border p-4">
         <p className="text-sm font-medium">Position</p>
         {/* items-start: default stretch would make every column on
@@ -648,7 +675,7 @@ export function TaggingScreen({
                 type="button"
                 variant={openInterval?.position_id === position.id ? "default" : "outline"}
                 className="h-auto min-h-11 whitespace-normal py-2 text-center leading-tight"
-                onClick={() => handlePositionTap(position)}
+                onClick={() => handlePositionTap(position, tsOverride)}
               >
                 {humanize(position.name)}
               </Button>
@@ -661,7 +688,7 @@ export function TaggingScreen({
                       size="sm"
                       variant="secondary"
                       className="h-auto min-h-11 whitespace-normal py-2 text-center leading-tight"
-                      onClick={() => tagPosition(position.id, role)}
+                      onClick={() => tagPosition(position.id, role, tsOverride)}
                     >
                       {humanize(role)}
                     </Button>
@@ -679,27 +706,50 @@ export function TaggingScreen({
           </p>
         ) : null}
       </div>
+    );
+  }
 
+  function renderEventGrid(category: string, tsOverride?: number) {
+    const events = eventsByCategory.get(category) ?? [];
+    return (
+      // key is set here (rather than by the caller wrapping this in an
+      // extra <div>) so tagPanel's category list stays exactly the flat
+      // structure it was pre-U3 — a wrapping div per category would have
+      // been visually inert but wasn't byte-identical to before. Found in
+      // Stage U3 code review. Harmless when this is called standalone
+      // (Mode 2 overlay, not in a list) — key is simply unused there.
+      <div key={category} className="flex flex-col gap-2">
+        <p className="text-xs font-medium text-muted-foreground">{humanize(category)}</p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 tag:grid-cols-2">
+          {events.map((eventType) => (
+            <Button
+              key={eventType.id}
+              type="button"
+              variant="outline"
+              className="h-auto min-h-11 whitespace-normal py-2 text-center leading-tight"
+              onClick={() => handleEventTap(eventType, tsOverride)}
+            >
+              {humanize(eventType.name)}
+            </Button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // U1's always-visible sticky column (wide, non-fullscreen) — every
+  // category's events plus the full position grid, no ts override (each
+  // button is its own first tap, so the live-read timestamp is already
+  // correct — see the tsOverride comment above). Stage U3's rail-driven
+  // Mode 2 overlay renders `renderPositionPanel`/`renderEventGrid`
+  // directly instead, filtered to whichever single entry point was
+  // tapped, with the timestamp captured back at that tap.
+  const tagPanel = (
+    <>
+      {renderPositionPanel()}
       <div className="flex flex-col gap-4 rounded-md border p-4">
         <p className="text-sm font-medium">Events</p>
-        {Array.from(eventsByCategory.entries()).map(([category, events]) => (
-          <div key={category} className="flex flex-col gap-2">
-            <p className="text-xs font-medium text-muted-foreground">{humanize(category)}</p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 tag:grid-cols-2">
-              {events.map((eventType) => (
-                <Button
-                  key={eventType.id}
-                  type="button"
-                  variant="outline"
-                  className="h-auto min-h-11 whitespace-normal py-2 text-center leading-tight"
-                  onClick={() => handleEventTap(eventType)}
-                >
-                  {humanize(eventType.name)}
-                </Button>
-              ))}
-            </div>
-          </div>
-        ))}
+        {Array.from(eventsByCategory.keys()).map((category) => renderEventGrid(category))}
       </div>
     </>
   );
@@ -797,8 +847,8 @@ export function TaggingScreen({
                       categories={Array.from(eventsByCategory.keys())}
                       faded={railFaded}
                       onWake={wakeRail}
-                      onTapCategory={openTaggingMode}
-                      onTapPosition={openTaggingMode}
+                      onTapCategory={(category) => openTaggingMode({ kind: "category", category })}
+                      onTapPosition={() => openTaggingMode({ kind: "position" })}
                     />
                   ) : null}
                 </div>
@@ -817,10 +867,16 @@ export function TaggingScreen({
                   video box on purpose (see its own comment) — only this
                   overlay needs the extra room. Found in Stage U2 code
                   review. */}
-              {showRailPattern && videoUrl && mode === "tagging" ? (
+              {showRailPattern && videoUrl && mode === "tagging" && activeEntry ? (
                 <div className="bg-background/98 absolute inset-0 z-30 flex flex-col gap-4 overflow-y-auto p-4">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">Tag this moment</p>
+                    <p className="text-sm font-medium">
+                      {activeEntry.kind === "position"
+                        ? "Position"
+                        : humanize(activeEntry.category)}
+                      {" — "}
+                      {formatVideoTimestamp(activeEntry.ts)}
+                    </p>
                     <Button
                       type="button"
                       variant="ghost"
@@ -832,7 +888,14 @@ export function TaggingScreen({
                       <span className="sr-only">Close, no tag</span>
                     </Button>
                   </div>
-                  {tagPanel}
+                  {/* Category tap -> event grid for that category; Position
+                      tap -> position grid + role selector (plan §2 step 4)
+                      — filtered to whichever single entry point was
+                      tapped, not the full unfiltered panel U2 used as an
+                      interim. */}
+                  {activeEntry.kind === "position"
+                    ? renderPositionPanel(activeEntry.ts)
+                    : renderEventGrid(activeEntry.category, activeEntry.ts)}
                 </div>
               ) : null}
               <input
