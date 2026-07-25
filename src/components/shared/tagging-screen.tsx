@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Upload, TriangleAlert } from "lucide-react";
+import { Upload, TriangleAlert, Maximize, Minimize, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { humanize, formatVideoTimestamp } from "@/lib/format/humanize";
+import { cn } from "@/lib/utils";
 import { TagEditDialog } from "@/components/shared/tag-edit-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -92,6 +93,62 @@ function TagListRow({
   );
 }
 
+// Stage U2 (matos_tagging_ux_plan.md §2): the slim, auto-fading rail shown
+// in fullscreen and on narrow (<900px) viewports — replaces the always-
+// visible full tag panel with exactly 6 entry points (5 event categories +
+// Position), each opening the full tagging overlay (Mode 2). Category
+// labels come straight from the DB's free-text `category` column via the
+// shared humanize() convention, not a hardcoded per-category label map —
+// matching Non-Negotiable #3 ("taxonomy is data, not code"), same as every
+// other taxonomy-derived label in this file.
+function CategoryRail({
+  categories,
+  faded,
+  onWake,
+  onTapCategory,
+  onTapPosition,
+}: {
+  categories: string[];
+  faded: boolean;
+  onWake: () => void;
+  onTapCategory: (category: string) => void;
+  onTapPosition: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "absolute bottom-3 right-3 z-20 flex flex-wrap justify-end gap-2 transition-opacity duration-300 tag:bottom-auto tag:right-3 tag:top-1/2 tag:w-24 tag:-translate-y-1/2 tag:flex-col",
+        faded ? "opacity-20" : "opacity-100",
+      )}
+      onMouseEnter={onWake}
+      onTouchStart={onWake}
+      onClick={onWake}
+    >
+      {categories.map((category) => (
+        <Button
+          key={category}
+          type="button"
+          size="sm"
+          variant="secondary"
+          className="h-auto min-h-11 whitespace-normal bg-background/80 py-1 text-center text-xs leading-tight shadow-md backdrop-blur"
+          onClick={() => onTapCategory(category)}
+        >
+          {humanize(category)}
+        </Button>
+      ))}
+      <Button
+        type="button"
+        size="sm"
+        variant="secondary"
+        className="h-auto min-h-11 whitespace-normal bg-background/80 py-1 text-center text-xs leading-tight shadow-md backdrop-blur"
+        onClick={onTapPosition}
+      >
+        Position
+      </Button>
+    </div>
+  );
+}
+
 // The core tagging UI (Stage A3 + A4): local-only video playback
 // (Non-Negotiable #1 — the file never leaves the browser, only structured
 // tags get POSTed), position intervals, event tagging with the tap ->
@@ -153,6 +210,129 @@ export function TaggingScreen({
 
   const [mismatchWarning, setMismatchWarning] = useState<string | null>(null);
   const [statusUpdating, setStatusUpdating] = useState(false);
+
+  // Stage U2 (matos_tagging_ux_plan.md §3-4): fullscreen infra + the
+  // watching/tagging mode split. `isWide` mirrors the `tag` Tailwind
+  // breakpoint (900px, tailwind.config.ts) in JS, since which DOM
+  // structure renders (rail+overlay vs U1's always-visible sticky panel)
+  // is a structural branch CSS alone can't make — kept numerically in
+  // sync with that breakpoint deliberately, not an independent value.
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [isWide, setIsWide] = useState(() =>
+    typeof window === "undefined" ? true : window.matchMedia("(min-width: 900px)").matches,
+  );
+  const [isNativeFullscreen, setIsNativeFullscreen] = useState(false);
+  const [isFakeFullscreen, setIsFakeFullscreen] = useState(false);
+  const [mode, setMode] = useState<"watching" | "tagging">("watching");
+  const [railFaded, setRailFaded] = useState(false);
+  const railFadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const inFullscreen = isNativeFullscreen || isFakeFullscreen;
+  // Rail+overlay pattern replaces the always-visible full panel whenever
+  // there isn't room to show both side by side (narrow viewport) or when
+  // the video is taking the whole screen (fullscreen, any width) — plan
+  // §4: "Below ~900px width, collapse to the mobile pattern (rail +
+  // overlay) rather than columns."
+  const showRailPattern = inFullscreen || !isWide;
+
+  // Without this, exiting fullscreen mid-tag (e.g. via the Minimize
+  // button, not through Close/Cancel/Confirm) leaves `mode` stuck on
+  // "tagging" — re-entering fullscreen (or narrowing the viewport) would
+  // then reopen the tagging overlay unprompted, with no rail tap behind
+  // it. Found in Stage U2 code review.
+  useEffect(() => {
+    if (!inFullscreen) setMode("watching");
+  }, [inFullscreen]);
+
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 900px)");
+    const handler = (e: MediaQueryListEvent) => setIsWide(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, []);
+
+  // Real Fullscreen API state is derived from the browser's own event —
+  // this is also what fires when the user exits via Esc or a system
+  // gesture, so no separate Esc handler is needed for the native path.
+  useEffect(() => {
+    function handleFsChange() {
+      setIsNativeFullscreen(document.fullscreenElement === wrapperRef.current);
+    }
+    document.addEventListener("fullscreenchange", handleFsChange);
+    return () => document.removeEventListener("fullscreenchange", handleFsChange);
+  }, []);
+
+  // Fake fullscreen (plan §3.3, iOS Safari — no Fullscreen API on
+  // arbitrary elements there) has no browser-native exit gesture of its
+  // own, so Esc is wired by hand for that path only; the native path
+  // above already gets Esc for free from the browser.
+  useEffect(() => {
+    if (!isFakeFullscreen) return;
+    function handleKeydown(e: KeyboardEvent) {
+      if (e.key === "Escape") exitFullscreen();
+    }
+    window.addEventListener("keydown", handleKeydown);
+    return () => window.removeEventListener("keydown", handleKeydown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFakeFullscreen]);
+
+  async function enterFullscreen() {
+    const el = wrapperRef.current;
+    if (!el) return;
+    if (document.fullscreenEnabled && el.requestFullscreen) {
+      try {
+        await el.requestFullscreen();
+      } catch {
+        setIsFakeFullscreen(true);
+      }
+    } else {
+      setIsFakeFullscreen(true);
+    }
+    // Best-effort landscape request on mobile — feature-detected, not
+    // UA-sniffed (plan §3.5); iOS Safari simply has no `lock` method, and
+    // silently doing nothing there is the documented degrade path.
+    const orientation = screen.orientation as
+      (ScreenOrientation & { lock?: (orientation: string) => Promise<void> }) | undefined;
+    if (!isWide) orientation?.lock?.("landscape").catch(() => {});
+  }
+
+  function exitFullscreen() {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    setIsFakeFullscreen(false);
+    const orientation = screen.orientation as
+      (ScreenOrientation & { unlock?: () => void }) | undefined;
+    orientation?.unlock?.();
+  }
+
+  function wakeRail() {
+    setRailFaded(false);
+    if (railFadeTimer.current) clearTimeout(railFadeTimer.current);
+    railFadeTimer.current = setTimeout(() => setRailFaded(true), 3000);
+  }
+
+  useEffect(() => {
+    if (mode !== "watching") return undefined;
+    wakeRail();
+    return () => {
+      if (railFadeTimer.current) clearTimeout(railFadeTimer.current);
+    };
+  }, [mode]);
+
+  // Entering Mode 2 (tagging) always pauses immediately, regardless of
+  // which rail button was tapped — plan §2 step 3. U2 reuses the existing,
+  // already-correct position/event panel as Mode 2's body unfiltered; the
+  // category-filtered event grid + timestamp-capture-at-this-tap (rather
+  // than at the eventual event tap) is U3's job ("the core interaction"),
+  // not this stage's.
+  function openTaggingMode() {
+    videoRef.current?.pause();
+    setMode("tagging");
+  }
+
+  function closeTaggingMode() {
+    setMode("watching");
+    videoRef.current?.play();
+  }
 
   // Revoke only on genuine unmount, not keyed on the changing videoUrl —
   // React 18 Strict Mode double-invokes effects in dev, which would
@@ -378,6 +558,10 @@ export function TaggingScreen({
       return;
     }
     refetchTags();
+    // Only meaningful when opened via the rail (Mode 2 overlay open on a
+    // paused video); a no-op elsewhere since mode/play() are otherwise
+    // unused/idempotent (playing an already-playing video does nothing).
+    if (mode === "tagging") closeTaggingMode();
   }
 
   function handlePositionTap(position: PositionRef) {
@@ -428,6 +612,10 @@ export function TaggingScreen({
       setPendingEvent(null);
       refetchTags();
       videoRef.current?.play();
+      // Confirm dismisses the whole Mode 2 overlay too, not just the
+      // modifier/outcome dialog (plan §2 step 5) — harmless when the rail
+      // pattern isn't in use, since `mode` is otherwise unread.
+      setMode("watching");
     } finally {
       setConfirmSubmitting(false);
     }
@@ -436,7 +624,85 @@ export function TaggingScreen({
   function cancelEvent() {
     setPendingEvent(null);
     videoRef.current?.play();
+    setMode("watching");
   }
+
+  // Shared between U1's always-visible sticky column (wide, non-fullscreen)
+  // and Stage U2's Mode 2 overlay (fullscreen or narrow) — same Position +
+  // Events panels, same handlers, just parented differently depending on
+  // showRailPattern. See openTaggingMode's comment: U2 deliberately reuses
+  // this unfiltered, deferring the category-filtered drill-down to U3.
+  const tagPanel = (
+    <>
+      <div className="flex flex-col gap-2 rounded-md border p-4">
+        <p className="text-sm font-medium">Position</p>
+        {/* items-start: default stretch would make every column on
+            a flex-wrap row match the tallest one, leaving visible
+            whitespace under shorter buttons whenever a sibling's
+            role sub-picker is expanded. Found in Stage A3 code
+            review. */}
+        <div className="flex flex-wrap items-start gap-2">
+          {(positions ?? []).map((position) => (
+            <div key={position.id} className="flex flex-col gap-2">
+              <Button
+                type="button"
+                variant={openInterval?.position_id === position.id ? "default" : "outline"}
+                className="h-auto min-h-11 whitespace-normal py-2 text-center leading-tight"
+                onClick={() => handlePositionTap(position)}
+              >
+                {humanize(position.name)}
+              </Button>
+              {expandedPositionId === position.id && position.roles ? (
+                <div className="flex flex-wrap gap-2 pl-2">
+                  {position.roles.map((role) => (
+                    <Button
+                      key={role}
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      className="h-auto min-h-11 whitespace-normal py-2 text-center leading-tight"
+                      onClick={() => tagPosition(position.id, role)}
+                    >
+                      {humanize(role)}
+                    </Button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+        {openInterval ? (
+          <p className="text-xs text-muted-foreground">
+            Currently tagging: {humanize(positionById.get(openInterval.position_id)?.name ?? "")}
+            {openInterval.role ? ` (${humanize(openInterval.role)})` : ""} — since{" "}
+            {formatVideoTimestamp(openInterval.start_ts)}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="flex flex-col gap-4 rounded-md border p-4">
+        <p className="text-sm font-medium">Events</p>
+        {Array.from(eventsByCategory.entries()).map(([category, events]) => (
+          <div key={category} className="flex flex-col gap-2">
+            <p className="text-xs font-medium text-muted-foreground">{humanize(category)}</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 tag:grid-cols-2">
+              {events.map((eventType) => (
+                <Button
+                  key={eventType.id}
+                  type="button"
+                  variant="outline"
+                  className="h-auto min-h-11 whitespace-normal py-2 text-center leading-tight"
+                  onClick={() => handleEventTap(eventType)}
+                >
+                  {humanize(eventType.name)}
+                </Button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -464,30 +730,77 @@ export function TaggingScreen({
             </div>
           ) : null}
 
-          {/* Stage U1 (matos_tagging_ux_plan.md §4): two columns at
-              >=900px — video left, tag panel right and sticky, so tagging
-              never needs a scroll to reach the buttons. Below 900px this
-              degrades to the original single stacked column (mobile
-              rail/overlay redesign is U2/U3's job, not this stage's — U1
-              is layout only, no interaction changes). `self-start` on the
-              right column is required for `sticky` to have any scrollable
-              room to stick within, since grid items stretch to the row's
-              full height by default. */}
+          {/* Stage U1 (layout) + U2 (matos_tagging_ux_plan.md §3-4:
+              fullscreen infra + rail + mode switching). >=900px
+              non-fullscreen keeps U1's two-column sticky panel unchanged;
+              fullscreen (any width) or <900px switches to the rail +
+              Mode 2 overlay pattern instead. */}
           <div
-            className={videoUrl ? "grid gap-6 tag:grid-cols-[minmax(0,1fr)_320px]" : "grid gap-6"}
+            className={
+              !showRailPattern && videoUrl
+                ? "grid gap-6 tag:grid-cols-[minmax(0,1fr)_320px]"
+                : "grid gap-6"
+            }
           >
-            <div className="rounded-md border p-4">
+            <div
+              ref={wrapperRef}
+              className={cn(
+                "relative rounded-md border p-4",
+                inFullscreen &&
+                  "fixed inset-0 z-50 flex flex-col justify-center rounded-none border-none bg-black",
+              )}
+              // Plan §3.3: fake fullscreen (iOS Safari) must respect
+              // safe-area insets so the rail/controls don't sit under a
+              // notch or the home indicator; real fullscreen already gets
+              // this from the browser, but the max() floor keeps a
+              // sensible minimum padding either way.
+              style={
+                inFullscreen
+                  ? {
+                      paddingTop: "max(0.5rem, env(safe-area-inset-top))",
+                      paddingRight: "max(0.5rem, env(safe-area-inset-right))",
+                      paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))",
+                      paddingLeft: "max(0.5rem, env(safe-area-inset-left))",
+                    }
+                  : undefined
+              }
+            >
               {videoUrl ? (
-                <div className="flex justify-center overflow-hidden rounded-md bg-black">
+                <div
+                  className={cn(
+                    "relative flex justify-center overflow-hidden rounded-md bg-black",
+                    inFullscreen && "flex-1 items-center",
+                  )}
+                >
                   {/* eslint-disable-next-line jsx-a11y/media-has-caption -- local, ephemeral user footage, never transcoded/stored */}
                   <video
                     ref={videoRef}
                     src={videoUrl}
                     controls
-                    className="max-h-[60vh] w-auto max-w-full"
+                    playsInline
+                    className={cn(
+                      "w-auto max-w-full",
+                      inFullscreen ? "h-full max-h-full" : "max-h-[60vh]",
+                    )}
                     onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
                     onLoadedMetadata={handleLoadedMetadata}
                   />
+
+                  {/* Positioned relative to the video's own box, not the
+                      whole card — anchoring to the outer wrapper instead
+                      left the rail spilling below the video into the file/
+                      speed controls row on narrow viewports, overlapping
+                      the floating agent-chat button (found live-testing
+                      at 390px). */}
+                  {showRailPattern && mode === "watching" ? (
+                    <CategoryRail
+                      categories={Array.from(eventsByCategory.keys())}
+                      faded={railFaded}
+                      onWake={wakeRail}
+                      onTapCategory={openTaggingMode}
+                      onTapPosition={openTaggingMode}
+                    />
+                  ) : null}
                 </div>
               ) : (
                 <p className="py-8 text-center text-sm text-muted-foreground">
@@ -495,6 +808,33 @@ export function TaggingScreen({
                   it&apos;s never uploaded anywhere.
                 </p>
               )}
+
+              {/* Scoped to the whole card (wrapperRef), not the video's own
+                  box — the video's rendered height alone is too cramped to
+                  fit the full Position + Events panel on a narrow non-
+                  fullscreen viewport (plan §2 step 4: "may cover as much of
+                  the frame as needed"). The rail above stays scoped to the
+                  video box on purpose (see its own comment) — only this
+                  overlay needs the extra room. Found in Stage U2 code
+                  review. */}
+              {showRailPattern && videoUrl && mode === "tagging" ? (
+                <div className="bg-background/98 absolute inset-0 z-30 flex flex-col gap-4 overflow-y-auto p-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">Tag this moment</p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-11"
+                      onClick={closeTaggingMode}
+                    >
+                      <X className="h-4 w-4" />
+                      <span className="sr-only">Close, no tag</span>
+                    </Button>
+                  </div>
+                  {tagPanel}
+                </div>
+              ) : null}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -529,85 +869,30 @@ export function TaggingScreen({
                         </Button>
                       ))}
                     </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-11 min-w-11"
+                      onClick={inFullscreen ? exitFullscreen : enterFullscreen}
+                    >
+                      {inFullscreen ? (
+                        <Minimize className="h-4 w-4" />
+                      ) : (
+                        <Maximize className="h-4 w-4" />
+                      )}
+                      <span className="sr-only">
+                        {inFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                      </span>
+                    </Button>
                   </>
                 ) : null}
               </div>
             </div>
 
-            {videoUrl ? (
+            {!showRailPattern && videoUrl ? (
               <div className="flex flex-col gap-6 tag:sticky tag:top-4 tag:self-start">
-                <div className="flex flex-col gap-2 rounded-md border p-4">
-                  <p className="text-sm font-medium">Position</p>
-                  {/* items-start: default stretch would make every column on
-                      a flex-wrap row match the tallest one, leaving visible
-                      whitespace under shorter buttons whenever a sibling's
-                      role sub-picker is expanded. Found in Stage A3 code
-                      review. */}
-                  <div className="flex flex-wrap items-start gap-2">
-                    {(positions ?? []).map((position) => (
-                      <div key={position.id} className="flex flex-col gap-2">
-                        <Button
-                          type="button"
-                          variant={
-                            openInterval?.position_id === position.id ? "default" : "outline"
-                          }
-                          className="h-auto min-h-11 whitespace-normal py-2 text-center leading-tight"
-                          onClick={() => handlePositionTap(position)}
-                        >
-                          {humanize(position.name)}
-                        </Button>
-                        {expandedPositionId === position.id && position.roles ? (
-                          <div className="flex flex-wrap gap-2 pl-2">
-                            {position.roles.map((role) => (
-                              <Button
-                                key={role}
-                                type="button"
-                                size="sm"
-                                variant="secondary"
-                                className="h-auto min-h-11 whitespace-normal py-2 text-center leading-tight"
-                                onClick={() => tagPosition(position.id, role)}
-                              >
-                                {humanize(role)}
-                              </Button>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                  {openInterval ? (
-                    <p className="text-xs text-muted-foreground">
-                      Currently tagging:{" "}
-                      {humanize(positionById.get(openInterval.position_id)?.name ?? "")}
-                      {openInterval.role ? ` (${humanize(openInterval.role)})` : ""} — since{" "}
-                      {formatVideoTimestamp(openInterval.start_ts)}
-                    </p>
-                  ) : null}
-                </div>
-
-                <div className="flex flex-col gap-4 rounded-md border p-4">
-                  <p className="text-sm font-medium">Events</p>
-                  {Array.from(eventsByCategory.entries()).map(([category, events]) => (
-                    <div key={category} className="flex flex-col gap-2">
-                      <p className="text-xs font-medium text-muted-foreground">
-                        {humanize(category)}
-                      </p>
-                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 tag:grid-cols-2">
-                        {events.map((eventType) => (
-                          <Button
-                            key={eventType.id}
-                            type="button"
-                            variant="outline"
-                            className="h-auto min-h-11 whitespace-normal py-2 text-center leading-tight"
-                            onClick={() => handleEventTap(eventType)}
-                          >
-                            {humanize(eventType.name)}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                {tagPanel}
               </div>
             ) : null}
           </div>
