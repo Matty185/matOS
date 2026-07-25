@@ -259,6 +259,15 @@ export function TaggingScreen({
     label: string;
   } | null>(null);
   const undoBannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Backs the "Z" undo shortcut (Stage U5) — a ref rather than state since
+  // it's only ever read inside a keydown handler, never rendered.
+  const lastTagRef = useRef<{
+    kind: "position" | "event";
+    rowId: string;
+    expiresAt: number;
+    toastId?: string | number;
+  } | null>(null);
+  const [shortcutsHintOpen, setShortcutsHintOpen] = useState(false);
 
   // Without this, exiting fullscreen mid-tag (e.g. via the Minimize
   // button, not through Close/Cancel/Confirm) leaves `mode` stuck on
@@ -291,20 +300,10 @@ export function TaggingScreen({
     return () => document.removeEventListener("fullscreenchange", handleFsChange);
   }, []);
 
-  // Fake fullscreen (plan §3.3, iOS Safari — no Fullscreen API on
-  // arbitrary elements there) has no browser-native exit gesture of its
-  // own, so Esc is wired by hand for that path only; the native path
-  // above already gets Esc for free from the browser.
-  useEffect(() => {
-    if (!isFakeFullscreen) return;
-    function handleKeydown(e: KeyboardEvent) {
-      if (e.key === "Escape") exitFullscreen();
-    }
-    window.addEventListener("keydown", handleKeydown);
-    return () => window.removeEventListener("keydown", handleKeydown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFakeFullscreen]);
-
+  // Fake fullscreen's Esc handling (no browser-native exit gesture of its
+  // own, unlike real fullscreen) is folded into the consolidated Stage U5
+  // keyboard-shortcuts effect below, rather than kept as its own separate
+  // listener — see that effect's Escape branch for why.
   async function enterFullscreen() {
     const el = wrapperRef.current;
     if (!el) return;
@@ -602,8 +601,17 @@ export function TaggingScreen({
     const base = `/api/breakdowns/${breakdownId}/${kind === "position" ? "positions" : "events"}/${rowId}`;
     const res = await fetch(base, { method: "DELETE" });
     if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      toast.error(body.error ?? "Couldn't undo — the tag is still there.");
+      // A 404 here means the tag is already gone — most likely undone (or
+      // independently deleted via the edit dialog) through some other
+      // path already, e.g. clicking the toast's own Undo action and then
+      // also pressing Z within the same window. The row not existing is
+      // exactly the outcome undo wants, so surfacing it as an alarming
+      // error would be actively misleading. Found in Stage U5 code
+      // review.
+      if (res.status !== 404) {
+        const body = await res.json().catch(() => ({}));
+        toast.error(body.error ?? "Couldn't undo — the tag is still there.");
+      }
       return;
     }
     refetchTags();
@@ -631,12 +639,31 @@ export function TaggingScreen({
       if (undoBannerTimer.current) clearTimeout(undoBannerTimer.current);
       setUndoBanner({ kind, rowId, label });
       undoBannerTimer.current = setTimeout(() => setUndoBanner(null), 4000);
+      lastTagRef.current = { kind, rowId, expiresAt: Date.now() + 4000 };
       return;
     }
-    toast.success(`Tagged: ${label}`, {
+    const toastId = toast.success(`Tagged: ${label}`, {
       duration: 4000,
       action: { label: "Undo", onClick: () => undoTag(kind, rowId) },
     });
+    lastTagRef.current = { kind, rowId, expiresAt: Date.now() + 4000, toastId };
+  }
+
+  // Stage U5 (plan §5): "Z — undo last tag (same window as the toast;
+  // no-op after)." lastTagRef tracks whichever tag showUndoToast most
+  // recently fired for, independent of which UI (global toast vs. the
+  // in-fullscreen banner) is currently displaying it, so Z works
+  // regardless of path; the expiry check makes it a no-op once the same
+  // window the toast/banner itself uses has passed. Also dismisses
+  // whichever UI was showing it, so a stale "Undo" toast/banner for an
+  // already-undone tag doesn't linger for its remaining seconds.
+  function undoLastTagViaShortcut() {
+    const last = lastTagRef.current;
+    if (!last || Date.now() > last.expiresAt) return;
+    undoTag(last.kind, last.rowId);
+    if (last.toastId !== undefined) toast.dismiss(last.toastId);
+    setUndoBanner((current) => (current && current.rowId === last.rowId ? null : current));
+    lastTagRef.current = null;
   }
 
   // tsOverride carries the timestamp captured back at the rail tap that
@@ -737,6 +764,173 @@ export function TaggingScreen({
     if (mode === "tagging") closeTaggingMode();
     else videoRef.current?.play();
   }
+
+  // Stage U5 (plan §5): desktop-only keyboard shortcuts, gated on isWide
+  // — the same signal already used everywhere else in this file as this
+  // app's "desktop" proxy (there's no reliable has-a-physical-keyboard
+  // feature detection). One consolidated listener rather than one per
+  // key, specifically so Esc's layered "overlay first, then fullscreen"
+  // priority (plan §5: "standard order: overlay first") is a single
+  // if/else-if chain — an earlier draft kept fake-fullscreen's Esc-exit
+  // as its own separate effect, which would have fired on the *same*
+  // keypress as a new Mode-2-closes-on-Esc handler instead of requiring
+  // two separate presses. NOTE this "two separate presses" guarantee only
+  // holds for fake fullscreen (iOS) and the non-fullscreen case — in
+  // *real* Fullscreen API mode, the browser's own Escape-exits-fullscreen
+  // behavior isn't preventable via keydown.preventDefault() in any
+  // evergreen browser (confirmed against the Fullscreen API spec; this
+  // file's own earlier fullscreenchange-listener comment already notes
+  // Esc "fires... regardless of this component's JS"), so a single Esc
+  // press in real fullscreen with the overlay open both closes the
+  // overlay *and* exits fullscreen together — not fixable purely in JS.
+  // The existing inFullscreen-exit effect's mode/activeEntry reset still
+  // converges on the same correct end state either way, just via one
+  // press instead of two for that specific real-fullscreen case. Found in
+  // Stage U5 code review.
+  //
+  // Returns entirely while the confirm dialog (`pendingEvent`) or the
+  // shortcuts-hint dialog (`shortcutsHintOpen`) is open — both are Radix
+  // Dialogs that should own all keyboard interaction while showing, not
+  // compete with these shortcuts (missing the hint-dialog check was
+  // itself a Stage U5 review finding: without it, 1-5/P/Esc all stayed
+  // live underneath the open hint dialog). Also returns while focus is on
+  // any typing surface or any button — the latter because Space is a
+  // native button-activation key in every browser; without excluding
+  // buttons, a Tab-focused button anywhere on this screen (there are many
+  // — rail buttons, the fullscreen/speed/undo controls, etc.) would have
+  // its own Space-activates-click hijacked into a play/pause toggle
+  // instead. Digit/P/Z/arrow keys have no native button-activation
+  // behavior, so excluding buttons for them too is a broader-than-
+  // strictly-necessary but simpler and more predictable rule than a
+  // per-key carve-out. Also bails on any Ctrl/Cmd/Alt chord, so browser/
+  // OS shortcuts sharing these key values (Ctrl+P print, Ctrl+1..8 tab
+  // switch) aren't hijacked into pausing the video and opening an overlay
+  // as a side effect.
+  useEffect(() => {
+    if (!isWide) return undefined;
+
+    function isTypingTarget(target: EventTarget | null) {
+      if (!(target instanceof HTMLElement)) return false;
+      const tag = target.tagName;
+      return (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        target.isContentEditable ||
+        target.getAttribute("role") === "combobox"
+      );
+    }
+
+    // Space (and Enter, though nothing here binds Enter) is the only
+    // shortcut key with native "activate the focused button" browser
+    // behavior — Esc/digits/P/Z/arrows have no such collision, so
+    // treating a focused button as blocking is scoped to Space only,
+    // not folded into isTypingTarget above. An earlier version of this
+    // fix blocked every shortcut whenever any button had focus, which
+    // technically fixed Space but also made digit/P/Z/arrow shortcuts go
+    // dead after clicking any ordinary button on the screen (mouse clicks
+    // retain focus on the clicked button in Chromium/Windows) — found
+    // live-testing that broader version, not by the code review itself.
+    function isFocusedButton(target: EventTarget | null) {
+      if (!(target instanceof HTMLElement)) return false;
+      return target.tagName === "BUTTON" || target.getAttribute("role") === "button";
+    }
+
+    function handleKeydown(e: KeyboardEvent) {
+      if (
+        readOnly ||
+        pendingEvent ||
+        shortcutsHintOpen ||
+        e.ctrlKey ||
+        e.metaKey ||
+        e.altKey ||
+        isTypingTarget(e.target)
+      ) {
+        return;
+      }
+
+      if (e.key === "Escape") {
+        if (mode === "tagging") {
+          e.preventDefault();
+          closeTaggingMode();
+        } else if (inFullscreen) {
+          e.preventDefault();
+          exitFullscreen();
+        }
+        return;
+      }
+
+      if (e.key === " ") {
+        // Mirrors the digit/P guard below — Space resuming playback
+        // behind a still-open tagging overlay would contradict "tagging
+        // always pauses the video." Found in Stage U5 code review.
+        if (mode === "tagging" || isFocusedButton(e.target)) return;
+        const video = videoRef.current;
+        if (!video) return;
+        e.preventDefault();
+        if (video.paused) video.play();
+        else video.pause();
+        return;
+      }
+
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        const video = videoRef.current;
+        if (!video || !videoDuration) return;
+        e.preventDefault();
+        const delta = e.key === "ArrowLeft" ? -5 : 5;
+        video.currentTime = Math.min(Math.max(video.currentTime + delta, 0), videoDuration);
+        return;
+      }
+
+      if (e.key.toLowerCase() === "z") {
+        undoLastTagViaShortcut();
+        return;
+      }
+
+      // 1-5/P open Mode 2, identical to a rail tap (plan §5) — only when
+      // the rail+overlay pattern is actually in use. On the wide,
+      // non-fullscreen two-column layout (showRailPattern false) there is
+      // no overlay to open — every position/event button is already
+      // directly visible — so opening Mode 2 there paused the video and
+      // set state with no rendered feedback at all (a Stage U5 review
+      // finding: `showRailPattern` gates the overlay's own render, but
+      // this guard used to check only `videoUrl`/`mode`, not
+      // `showRailPattern`, so the shortcut silently did nothing visible).
+      if (!videoUrl || !showRailPattern || mode === "tagging") return;
+
+      if (e.key.toLowerCase() === "p") {
+        openTaggingMode({ kind: "position" });
+        return;
+      }
+
+      const categories = Array.from(eventsByCategory.keys());
+      const digit = Number(e.key);
+      const category = digit >= 1 && digit <= 5 ? categories[digit - 1] : undefined;
+      if (category) {
+        openTaggingMode({ kind: "category", category });
+      }
+    }
+
+    window.addEventListener("keydown", handleKeydown);
+    return () => window.removeEventListener("keydown", handleKeydown);
+    // Deliberately omits function deps (openTaggingMode, closeTaggingMode,
+    // exitFullscreen, undoLastTagViaShortcut) redefined every render —
+    // matching this file's existing convention (see the old fake-
+    // fullscreen Esc effect this replaced). The state values actually
+    // read inside the handler are all listed below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isWide,
+    readOnly,
+    pendingEvent,
+    shortcutsHintOpen,
+    mode,
+    inFullscreen,
+    showRailPattern,
+    videoUrl,
+    videoDuration,
+    eventsByCategory,
+  ]);
 
   // tsOverride threading (see tagPosition/handleEventTap above) lets these
   // two render helpers serve both the two-column layout's own direct
@@ -1051,6 +1245,20 @@ export function TaggingScreen({
                         {inFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
                       </span>
                     </Button>
+                    {/* Stage U5 (plan §5): "a small '?' hint listing them,
+                        visible in the control bar on desktop" — isWide-
+                        gated same as the shortcuts themselves. */}
+                    {isWide ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-11 min-w-11"
+                        onClick={() => setShortcutsHintOpen(true)}
+                      >
+                        ?<span className="sr-only">Keyboard shortcuts</span>
+                      </Button>
+                    ) : null}
                   </>
                 ) : null}
               </div>
@@ -1272,6 +1480,43 @@ export function TaggingScreen({
           onSaved={refetchTags}
         />
       ) : null}
+
+      <Dialog open={shortcutsHintOpen} onOpenChange={setShortcutsHintOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Keyboard shortcuts</DialogTitle>
+            <DialogDescription>Desktop only.</DialogDescription>
+          </DialogHeader>
+          <ul className="flex flex-col gap-2 text-sm">
+            <li className="flex items-center justify-between gap-3">
+              <span>Play / pause</span>
+              <kbd className="rounded border bg-muted px-2 py-1 font-mono text-xs">Space</kbd>
+            </li>
+            {Array.from(eventsByCategory.keys()).map((category, i) => (
+              <li key={category} className="flex items-center justify-between gap-3">
+                <span>{humanize(category)}</span>
+                <kbd className="rounded border bg-muted px-2 py-1 font-mono text-xs">{i + 1}</kbd>
+              </li>
+            ))}
+            <li className="flex items-center justify-between gap-3">
+              <span>Position</span>
+              <kbd className="rounded border bg-muted px-2 py-1 font-mono text-xs">P</kbd>
+            </li>
+            <li className="flex items-center justify-between gap-3">
+              <span>Cancel overlay / exit fullscreen</span>
+              <kbd className="rounded border bg-muted px-2 py-1 font-mono text-xs">Esc</kbd>
+            </li>
+            <li className="flex items-center justify-between gap-3">
+              <span>Seek −/+5s</span>
+              <kbd className="rounded border bg-muted px-2 py-1 font-mono text-xs">← / →</kbd>
+            </li>
+            <li className="flex items-center justify-between gap-3">
+              <span>Undo last tag</span>
+              <kbd className="rounded border bg-muted px-2 py-1 font-mono text-xs">Z</kbd>
+            </li>
+          </ul>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
