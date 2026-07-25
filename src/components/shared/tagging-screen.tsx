@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Upload, TriangleAlert, Maximize, Minimize, X } from "lucide-react";
+import { Upload, TriangleAlert, Maximize, Minimize, X, ChevronDown, ChevronUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { humanize, formatVideoTimestamp } from "@/lib/format/humanize";
 import { cn } from "@/lib/utils";
@@ -210,6 +210,11 @@ export function TaggingScreen({
 
   const [mismatchWarning, setMismatchWarning] = useState<string | null>(null);
   const [statusUpdating, setStatusUpdating] = useState(false);
+  // Stage U4 (plan §2 "Timeline strip"): demoted out of the primary
+  // tagging loop now that the undo toast handles the common mis-tap case
+  // — collapsed by default, a toggle reveals it for the edit/timestamp-
+  // adjust access the tag lists below don't cover as visually.
+  const [timelineExpanded, setTimelineExpanded] = useState(false);
 
   // Stage U2 (matos_tagging_ux_plan.md §3-4): fullscreen infra + the
   // watching/tagging mode split. `isWide` mirrors the `tag` Tailwind
@@ -244,6 +249,16 @@ export function TaggingScreen({
   const [activeEntry, setActiveEntry] = useState<
     { kind: "category"; category: string; ts: number } | { kind: "position"; ts: number } | null
   >(null);
+
+  // Stage U4's in-fullscreen undo banner (see showUndoToast below) —
+  // separate from the global sonner toast used everywhere else, since
+  // that toast is invisible while native fullscreen is active.
+  const [undoBanner, setUndoBanner] = useState<{
+    kind: "position" | "event";
+    rowId: string;
+    label: string;
+  } | null>(null);
+  const undoBannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Without this, exiting fullscreen mid-tag (e.g. via the Minimize
   // button, not through Close/Cancel/Confirm) leaves `mode` stuck on
@@ -331,6 +346,12 @@ export function TaggingScreen({
       if (railFadeTimer.current) clearTimeout(railFadeTimer.current);
     };
   }, [mode]);
+
+  useEffect(() => {
+    return () => {
+      if (undoBannerTimer.current) clearTimeout(undoBannerTimer.current);
+    };
+  }, []);
 
   // Entering Mode 2 (tagging) captures the timestamp and pauses
   // immediately, at this first tap — plan §2 steps 2-3 — regardless of
@@ -565,6 +586,59 @@ export function TaggingScreen({
     if (videoRef.current) videoRef.current.playbackRate = rate;
   }
 
+  // Stage U4 (plan §2 step 6): a 4s toast with a real Undo action,
+  // replacing a trip to the timeline strip for the common mis-tap case.
+  // Deletes through the exact same DELETE endpoint TagEditDialog's own
+  // handleDelete uses — same behavior as any other tag deletion, including
+  // for a position: it does not reopen whatever interval the deleted tag
+  // had just closed. That's not a gap specific to Undo — no delete path
+  // in this app (including the pre-existing edit-dialog one) reopens a
+  // closed interval; matching that existing behavior rather than inventing
+  // new interval-reopening logic keeps this stage UI-only, no tagging-
+  // semantics change. Never touches playback — plan: "does not pause the
+  // video," and this is a delete tied to the toast's own dismissal, not a
+  // draft still open on the paused video.
+  async function undoTag(kind: "position" | "event", rowId: string) {
+    const base = `/api/breakdowns/${breakdownId}/${kind === "position" ? "positions" : "events"}/${rowId}`;
+    const res = await fetch(base, { method: "DELETE" });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      toast.error(body.error ?? "Couldn't undo — the tag is still there.");
+      return;
+    }
+    refetchTags();
+  }
+
+  // sonner's <Toaster/> always portals to document.body (no container/
+  // portal prop exists to redirect it — checked the package's own type
+  // definitions), and the Fullscreen API's top layer only paints the
+  // fullscreened element's own subtree — everything else, including that
+  // global toast portal, simply doesn't render while native fullscreen is
+  // active (exactly the class of bug plan §3.1 warns about, just for the
+  // toast instead of the overlay). Found in Stage U4 code review: the
+  // undo toast — meant to be the primary mis-tap recovery path per plan
+  // §2 step 6 — was silently invisible for the "premium," fullscreen-
+  // native path. Rather than juggling two live <Toaster/> instances
+  // (sonner's toast() fans out to every mounted one, so a second instance
+  // scoped inside wrapperRef would double-render every toast app-wide),
+  // fullscreen gets its own small local banner scoped inside wrapperRef;
+  // outside fullscreen, the existing global toast (already correct there)
+  // is unchanged. Fake fullscreen (position: fixed, not the real
+  // Fullscreen API) doesn't have this problem — sonner's toast container
+  // z-index already clears it — so only isNativeFullscreen switches path.
+  function showUndoToast(kind: "position" | "event", rowId: string, label: string) {
+    if (isNativeFullscreen) {
+      if (undoBannerTimer.current) clearTimeout(undoBannerTimer.current);
+      setUndoBanner({ kind, rowId, label });
+      undoBannerTimer.current = setTimeout(() => setUndoBanner(null), 4000);
+      return;
+    }
+    toast.success(`Tagged: ${label}`, {
+      duration: 4000,
+      action: { label: "Undo", onClick: () => undoTag(kind, rowId) },
+    });
+  }
+
   // tsOverride carries the timestamp captured back at the rail tap that
   // opened Mode 2 (plan §2 step 2) — omitted by the two-column layout's
   // own direct one-tap-per-position buttons, which have no earlier tap to
@@ -585,6 +659,11 @@ export function TaggingScreen({
       return;
     }
     refetchTags();
+    showUndoToast(
+      "position",
+      body.position.id,
+      `${humanize(positionById.get(positionId)?.name ?? "")}${role ? ` (${humanize(role)})` : ""}`,
+    );
     // Only meaningful when opened via the rail (Mode 2 overlay open on a
     // paused video); a no-op elsewhere since mode/play() are otherwise
     // unused/idempotent (playing an already-playing video does nothing).
@@ -638,6 +717,11 @@ export function TaggingScreen({
       }
       setPendingEvent(null);
       refetchTags();
+      showUndoToast(
+        "event",
+        body.event.id,
+        `${humanize(eventType.name)}${confirmModifier ? ` — ${humanize(confirmModifier)}` : ""}${confirmOutcome ? ` (${humanize(confirmOutcome)})` : ""}`,
+      );
       // Confirm dismisses the whole Mode 2 overlay too, not just the
       // modifier/outcome dialog (plan §2 step 5) — harmless when the rail
       // pattern isn't in use, since mode/activeEntry are otherwise unread.
@@ -898,6 +982,25 @@ export function TaggingScreen({
                     : renderEventGrid(activeEntry.category, activeEntry.ts)}
                 </div>
               ) : null}
+
+              {undoBanner ? (
+                <div className="absolute bottom-3 left-3 z-40 flex items-center gap-3 rounded-md border bg-background/95 p-3 shadow-md backdrop-blur">
+                  <p className="text-sm">Tagged: {undoBanner.label}</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-11"
+                    onClick={() => {
+                      undoTag(undoBanner.kind, undoBanner.rowId);
+                      setUndoBanner(null);
+                      if (undoBannerTimer.current) clearTimeout(undoBannerTimer.current);
+                    }}
+                  >
+                    Undo
+                  </Button>
+                </div>
+              ) : null}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -962,31 +1065,47 @@ export function TaggingScreen({
 
           {videoUrl && videoDuration ? (
             <div className="flex flex-col gap-2">
-              <p className="text-sm font-medium">Timeline</p>
-              <div className="relative h-8 w-full rounded-md bg-muted" aria-hidden="true">
-                {(breakdownPositions ?? []).map((p) => (
-                  <div
-                    key={p.id}
-                    className="absolute top-0 h-4 rounded bg-primary/40"
-                    style={{
-                      left: `${(p.start_ts / videoDuration) * 100}%`,
-                      width: `${(((p.end_ts ?? videoDuration) - p.start_ts) / videoDuration) * 100}%`,
-                    }}
-                    title={humanize(positionById.get(p.position_id)?.name ?? "")}
-                  />
-                ))}
-                {(breakdownEvents ?? []).map((ev) => (
-                  <div
-                    key={ev.id}
-                    className="absolute bottom-0 h-4 w-1 -translate-x-1/2 rounded bg-destructive"
-                    style={{ left: `${(ev.ts / videoDuration) * 100}%` }}
-                    title={humanize(eventTypeById.get(ev.event_type_id)?.name ?? "")}
-                  />
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Overview only — use the lists below to edit or delete a tag.
-              </p>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 w-fit"
+                onClick={() => setTimelineExpanded((v) => !v)}
+              >
+                {timelineExpanded ? (
+                  <ChevronUp className="mr-2 h-4 w-4" />
+                ) : (
+                  <ChevronDown className="mr-2 h-4 w-4" />
+                )}
+                {timelineExpanded ? "Hide timeline" : "Show timeline"}
+              </Button>
+              {timelineExpanded ? (
+                <>
+                  <div className="relative h-8 w-full rounded-md bg-muted" aria-hidden="true">
+                    {(breakdownPositions ?? []).map((p) => (
+                      <div
+                        key={p.id}
+                        className="absolute top-0 h-4 rounded bg-primary/40"
+                        style={{
+                          left: `${(p.start_ts / videoDuration) * 100}%`,
+                          width: `${(((p.end_ts ?? videoDuration) - p.start_ts) / videoDuration) * 100}%`,
+                        }}
+                        title={humanize(positionById.get(p.position_id)?.name ?? "")}
+                      />
+                    ))}
+                    {(breakdownEvents ?? []).map((ev) => (
+                      <div
+                        key={ev.id}
+                        className="absolute bottom-0 h-4 w-1 -translate-x-1/2 rounded bg-destructive"
+                        style={{ left: `${(ev.ts / videoDuration) * 100}%` }}
+                        title={humanize(eventTypeById.get(ev.event_type_id)?.name ?? "")}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Overview only — use the lists below to edit or delete a tag.
+                  </p>
+                </>
+              ) : null}
             </div>
           ) : null}
         </>
