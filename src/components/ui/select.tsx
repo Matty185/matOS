@@ -62,9 +62,17 @@ SelectScrollDownButton.displayName = SelectPrimitive.ScrollDownButton.displayNam
 
 const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, position = "popper", ...props }, ref) => (
-  <SelectPrimitive.Portal>
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> & {
+    // Same reasoning as DialogContent's own `container` prop (see
+    // dialog.tsx) — Radix's Select.Portal independently defaults to
+    // document.body too, so fixing the outer Dialog alone still leaves
+    // this dropdown itself unreachable in real fullscreen. Optional,
+    // undefined by default — every other Select usage in the app is
+    // unaffected.
+    container?: Element | DocumentFragment | null;
+  }
+>(({ className, children, position = "popper", container, ...props }, ref) => (
+  <SelectPrimitive.Portal container={container}>
     <SelectPrimitive.Content
       ref={ref}
       className={cn(

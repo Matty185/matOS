@@ -31,9 +31,25 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
-  <DialogPortal>
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+    // Radix's Portal always appends to document.body by default. The
+    // Fullscreen API's rendering only paints descendants of the
+    // fullscreened element — a document.body-portaled dialog has real
+    // layout (Playwright's own isVisible() reports it as "visible") but
+    // is never actually composited to the screen while real (non-fake)
+    // fullscreen is active, so it's silently unreachable to the user.
+    // Callers rendering a Dialog inside a fullscreenable wrapper should
+    // pass that wrapper's current element here (conditionally, only
+    // while actually in fullscreen) to portal into it instead. Optional
+    // and undefined by default so every other Dialog usage in the app is
+    // completely unaffected. Found in the Match Analysis Module tagging
+    // screen's Stage U6 final-pass review — the same root cause Stage
+    // U4 had already found and fixed for sonner's toast, but which was
+    // never generalized to this shared Dialog primitive.
+    container?: Element | DocumentFragment | null;
+  }
+>(({ className, children, container, ...props }, ref) => (
+  <DialogPortal container={container}>
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}

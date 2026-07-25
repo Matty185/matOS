@@ -300,6 +300,23 @@ export function TaggingScreen({
     return () => document.removeEventListener("fullscreenchange", handleFsChange);
   }, []);
 
+  // Real fullscreen exits body scroll on its own (the fullscreened
+  // element's own top-layer/UA behavior); fake fullscreen (position:
+  // fixed, no browser-native fullscreen involved at all) doesn't get that
+  // for free — a touch drag on iOS Safari can still rubber-band/scroll
+  // the underlying page behind the fixed overlay. Found in Stage U6's
+  // final-pass UX review; not live-verified against real iOS Safari in
+  // this environment (WebKit unavailable here), but cheap and safe to
+  // apply regardless.
+  useEffect(() => {
+    if (!isFakeFullscreen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isFakeFullscreen]);
+
   // Fake fullscreen's Esc handling (no browser-native exit gesture of its
   // own, unlike real fullscreen) is folded into the consolidated Stage U5
   // keyboard-shortcuts effect below, rather than kept as its own separate
@@ -1383,7 +1400,16 @@ export function TaggingScreen({
       </>
 
       <Dialog open={pendingEvent !== null} onOpenChange={(open) => !open && cancelEvent()}>
-        <DialogContent>
+        {/* container: Radix's Dialog/Select portals default to
+            document.body, which the Fullscreen API never paints while
+            real (non-fake) fullscreen is active — this confirm sheet is
+            the only way to finish or cancel an event tag, so without this
+            it was silently unreachable for the whole primary tagging loop
+            whenever a coach was in native fullscreen. Same root cause
+            Stage U4 already found and fixed for the undo toast, just
+            never generalized to this Dialog/its Selects until Stage U6's
+            final-pass review caught it. */}
+        <DialogContent container={isNativeFullscreen ? wrapperRef.current : undefined}>
           {pendingEvent ? (
             <>
               <DialogHeader>
@@ -1401,7 +1427,9 @@ export function TaggingScreen({
                       <SelectTrigger className="h-11">
                         <SelectValue placeholder="Pick one" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent
+                        container={isNativeFullscreen ? wrapperRef.current : undefined}
+                      >
                         {pendingEvent.eventType.modifier_options.map((m) => (
                           <SelectItem key={m} value={m}>
                             {humanize(m)}
@@ -1421,7 +1449,9 @@ export function TaggingScreen({
                       <SelectTrigger className="h-11">
                         <SelectValue placeholder="Pick one" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent
+                        container={isNativeFullscreen ? wrapperRef.current : undefined}
+                      >
                         {pendingEvent.eventType.outcome_options.map((o) => (
                           <SelectItem key={o} value={o}>
                             {humanize(o)}
@@ -1482,7 +1512,7 @@ export function TaggingScreen({
       ) : null}
 
       <Dialog open={shortcutsHintOpen} onOpenChange={setShortcutsHintOpen}>
-        <DialogContent>
+        <DialogContent container={isNativeFullscreen ? wrapperRef.current : undefined}>
           <DialogHeader>
             <DialogTitle>Keyboard shortcuts</DialogTitle>
             <DialogDescription>Desktop only.</DialogDescription>
