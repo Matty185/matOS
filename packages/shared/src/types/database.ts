@@ -394,6 +394,7 @@ export type Database = {
           updated_at: string;
           video_duration_seconds: number | null;
           video_filename: string | null;
+          visibility: Database["public"]["Enums"]["breakdown_visibility"];
         };
         Insert: {
           author_id?: string | null;
@@ -412,6 +413,7 @@ export type Database = {
           updated_at?: string;
           video_duration_seconds?: number | null;
           video_filename?: string | null;
+          visibility?: Database["public"]["Enums"]["breakdown_visibility"];
         };
         Update: {
           author_id?: string | null;
@@ -430,6 +432,7 @@ export type Database = {
           updated_at?: string;
           video_duration_seconds?: number | null;
           video_filename?: string | null;
+          visibility?: Database["public"]["Enums"]["breakdown_visibility"];
         };
         Relationships: [
           {
@@ -540,6 +543,39 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      entitlements: {
+        Row: {
+          created_at: string;
+          current_period_end: string | null;
+          id: string;
+          plan: Database["public"]["Enums"]["entitlement_plan"];
+          source: Database["public"]["Enums"]["entitlement_source"];
+          status: Database["public"]["Enums"]["entitlement_status"];
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          current_period_end?: string | null;
+          id?: string;
+          plan: Database["public"]["Enums"]["entitlement_plan"];
+          source: Database["public"]["Enums"]["entitlement_source"];
+          status?: Database["public"]["Enums"]["entitlement_status"];
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          current_period_end?: string | null;
+          id?: string;
+          plan?: Database["public"]["Enums"]["entitlement_plan"];
+          source?: Database["public"]["Enums"]["entitlement_source"];
+          status?: Database["public"]["Enums"]["entitlement_status"];
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
       };
       event_types: {
         Row: {
@@ -655,6 +691,7 @@ export type Database = {
           contact_email: string | null;
           created_at: string;
           id: string;
+          kind: Database["public"]["Enums"]["gym_kind"];
           logo_url: string | null;
           name: string;
         };
@@ -664,6 +701,7 @@ export type Database = {
           contact_email?: string | null;
           created_at?: string;
           id?: string;
+          kind?: Database["public"]["Enums"]["gym_kind"];
           logo_url?: string | null;
           name: string;
         };
@@ -673,6 +711,7 @@ export type Database = {
           contact_email?: string | null;
           created_at?: string;
           id?: string;
+          kind?: Database["public"]["Enums"]["gym_kind"];
           logo_url?: string | null;
           name?: string;
         };
@@ -803,6 +842,47 @@ export type Database = {
           },
         ];
       };
+      memberships: {
+        Row: {
+          active: boolean;
+          created_at: string;
+          gym_id: string;
+          id: string;
+          is_current: boolean;
+          joined_at: string;
+          role: Database["public"]["Enums"]["member_role"];
+          user_id: string;
+        };
+        Insert: {
+          active?: boolean;
+          created_at?: string;
+          gym_id: string;
+          id?: string;
+          is_current?: boolean;
+          joined_at?: string;
+          role: Database["public"]["Enums"]["member_role"];
+          user_id: string;
+        };
+        Update: {
+          active?: boolean;
+          created_at?: string;
+          gym_id?: string;
+          id?: string;
+          is_current?: boolean;
+          joined_at?: string;
+          role?: Database["public"]["Enums"]["member_role"];
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "memberships_gym_id_fkey";
+            columns: ["gym_id"];
+            isOneToOne: false;
+            referencedRelation: "gyms";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       notifications: {
         Row: {
           created_at: string;
@@ -922,6 +1002,50 @@ export type Database = {
         };
         Relationships: [];
       };
+      share_links: {
+        Row: {
+          created_at: string;
+          created_by: string;
+          gym_id: string;
+          id: string;
+          redact_opponents: boolean;
+          revoked: boolean;
+          subject_id: string;
+          token_hash: string;
+          type: Database["public"]["Enums"]["share_link_type"];
+        };
+        Insert: {
+          created_at?: string;
+          created_by: string;
+          gym_id: string;
+          id?: string;
+          redact_opponents?: boolean;
+          revoked?: boolean;
+          subject_id: string;
+          token_hash: string;
+          type: Database["public"]["Enums"]["share_link_type"];
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string;
+          gym_id?: string;
+          id?: string;
+          redact_opponents?: boolean;
+          revoked?: boolean;
+          subject_id?: string;
+          token_hash?: string;
+          type?: Database["public"]["Enums"]["share_link_type"];
+        };
+        Relationships: [
+          {
+            foreignKeyName: "share_links_gym_id_fkey";
+            columns: ["gym_id"];
+            isOneToOne: false;
+            referencedRelation: "gyms";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -932,6 +1056,7 @@ export type Database = {
         Returns: number;
       };
       increment_invite_attempt: { Args: { invite_id: string }; Returns: number };
+      set_active_gym: { Args: { p_gym_id: string }; Returns: undefined };
       tag_position: {
         Args: {
           p_breakdown_id: string;
@@ -979,12 +1104,18 @@ export type Database = {
       breakdown_method: "submission" | "points" | "decision" | "dq";
       breakdown_result: "win" | "loss" | "draw";
       breakdown_status: "in_progress" | "complete";
+      breakdown_visibility: "private" | "gym";
       checked_in_by: "self" | "coach";
       class_type: "gi" | "no_gi" | "comp" | "open_mat";
+      entitlement_plan: "solo" | "gym";
+      entitlement_source: "iap_apple" | "iap_google" | "stripe" | "manual";
+      entitlement_status: "active" | "trialing" | "canceled" | "expired";
+      gym_kind: "gym" | "personal";
       initiated_by: "coach_manual" | "agent" | "self_service";
       member_role: "gym_owner" | "coach" | "athlete";
       membership_plan: "monthly" | "casual" | "comp_team";
       payment_status: "paid" | "unpaid" | "waived";
+      share_link_type: "profile" | "breakdown";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -1132,12 +1263,18 @@ export const Constants = {
       breakdown_method: ["submission", "points", "decision", "dq"],
       breakdown_result: ["win", "loss", "draw"],
       breakdown_status: ["in_progress", "complete"],
+      breakdown_visibility: ["private", "gym"],
       checked_in_by: ["self", "coach"],
       class_type: ["gi", "no_gi", "comp", "open_mat"],
+      entitlement_plan: ["solo", "gym"],
+      entitlement_source: ["iap_apple", "iap_google", "stripe", "manual"],
+      entitlement_status: ["active", "trialing", "canceled", "expired"],
+      gym_kind: ["gym", "personal"],
       initiated_by: ["coach_manual", "agent", "self_service"],
       member_role: ["gym_owner", "coach", "athlete"],
       membership_plan: ["monthly", "casual", "comp_team"],
       payment_status: ["paid", "unpaid", "waived"],
+      share_link_type: ["profile", "breakdown"],
     },
   },
 } as const;
