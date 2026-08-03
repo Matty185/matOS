@@ -30,7 +30,7 @@ import { createClient } from "@supabase/supabase-js";
 import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { Database } from "../src/types/database";
+import type { Database } from "@matos/shared";
 
 // ── env ──────────────────────────────────────────────────────────────────
 

@@ -1,20 +1,26 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
-/.pnp
+# Stage S0 (npm workspaces monorepo): unanchored, not just /node_modules —
+# a workspace package can end up with its own nested node_modules, and the
+# old root-anchored pattern silently stopped matching apps/web/node_modules
+# etc. entirely once the app moved out of the repo root.
+node_modules
+.pnp
 .pnp.js
 .yarn/install-state.gz
 
 # testing
-/coverage
+coverage
 
 # next.js
-/.next/
-/out/
+# Same anchoring fix as above — this now needs to match apps/web/.next/,
+# not just a repo-root .next/ that no longer exists.
+.next/
+out/
 
 # production
-/build
+build
 
 # misc
 .DS_Store
@@ -36,13 +42,17 @@ yarn-error.log*
 next-env.d.ts
 
 # next-pwa generated files
-public/sw.js
-public/workbox-*.js
-public/worker-*.js
-public/sw.js.map
-public/workbox-*.js.map
-public/worker-*.js.map
-public/fallback-*.js
+# **/ prefix: these patterns have an internal slash (public/x), which git
+# treats as anchored to the .gitignore's own directory unless explicitly
+# told otherwise — needs to match apps/web/public/sw.js now, not a
+# repo-root public/ that no longer holds the Next app's static files.
+**/public/sw.js
+**/public/workbox-*.js
+**/public/worker-*.js
+**/public/sw.js.map
+**/public/workbox-*.js.map
+**/public/worker-*.js.map
+**/public/fallback-*.js
 
 # editor / OS
 .vscode/*
