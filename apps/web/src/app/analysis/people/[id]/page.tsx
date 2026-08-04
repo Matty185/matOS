@@ -7,6 +7,7 @@ import { ChevronLeft, Swords } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ProfileView } from "@/components/shared/profile-view";
+import { ShareDialog } from "@/components/shared/share-dialog";
 import { Badge } from "@/components/ui/badge";
 
 type PersonBreakdown = {
@@ -76,9 +77,12 @@ export default function ExternalPersonDetailPage({ params }: { params: { id: str
         <ChevronLeft className="h-4 w-4" /> Back to external people
       </Link>
 
-      <div>
-        <h1 className="font-heading text-2xl tracking-wide">{person.display_name}</h1>
-        {person.notes ? <p className="text-sm text-muted-foreground">{person.notes}</p> : null}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-heading text-2xl tracking-wide">{person.display_name}</h1>
+          {person.notes ? <p className="text-sm text-muted-foreground">{person.notes}</p> : null}
+        </div>
+        <ShareDialog type="profile" subjectId={person.id} />
       </div>
 
       <ProfileView subject={{ type: "external", id: person.id }} />

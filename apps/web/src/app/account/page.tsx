@@ -106,11 +106,109 @@ export default function AccountPage() {
             isSolo={isSolo}
             hasRealGymMembership={member.hasRealGymMembership}
           />
+          <ShareLinksCard />
         </>
       ) : (
         <p className="text-sm text-destructive">Couldn&apos;t load your account. Try refreshing.</p>
       )}
     </div>
+  );
+}
+
+type ShareLink = {
+  id: string;
+  type: "profile" | "breakdown";
+  redact_opponents: boolean;
+  revoked: boolean;
+  created_at: string;
+};
+
+// Stage S3: minimal management surface for links created via ShareDialog
+// elsewhere in the app — see them, revoke them. Not itself where links
+// are created (that stays contextual, on the profile/breakdown being
+// shared) — this is just "what have I shared" visibility.
+function ShareLinksCard() {
+  const {
+    data: shareLinks,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery<ShareLink[]>({
+    queryKey: ["share-links"],
+    queryFn: async () => {
+      const res = await fetch("/api/share-links");
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? "Failed to load share links");
+      return body.shareLinks;
+    },
+  });
+
+  const active = shareLinks?.filter((s) => !s.revoked) ?? [];
+
+  async function handleRevoke(id: string) {
+    const res = await fetch(`/api/share-links/${id}/revoke`, { method: "POST" });
+    if (res.ok) {
+      toast.success("Share link revoked.");
+      refetch();
+    } else {
+      const body = await res.json().catch(() => ({}));
+      toast.error(body.error ?? "Something went wrong.");
+    }
+  }
+
+  // Distinct from "no links yet" (silently render nothing — there's no
+  // create action on this card to anchor an empty state around, creation
+  // is intentionally contextual on the profile/breakdown being shared):
+  // a fetch failure needs to say so, not look identical to "you haven't
+  // shared anything," which a user with real active links could
+  // otherwise mistake for their links having quietly disappeared.
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Share links</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-destructive">
+            Couldn&apos;t load your share links. Try refreshing.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isLoading || active.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Share links</CardTitle>
+        <CardDescription>
+          Links you&apos;ve generated to share your profile or matches.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-2">
+        {active.map((link) => (
+          <div
+            key={link.id}
+            className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm"
+          >
+            <div className="flex flex-col gap-0.5">
+              <span className="font-medium">
+                {link.type === "profile" ? "Profile" : "Breakdown"}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Created {format(new Date(link.created_at), "MMM d, yyyy")}
+                {link.redact_opponents ? " · names hidden" : ""}
+              </span>
+            </div>
+            <Button variant="outline" className="h-11" onClick={() => handleRevoke(link.id)}>
+              Revoke
+            </Button>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
 

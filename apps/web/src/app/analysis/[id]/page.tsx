@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { ChevronLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BreakdownEditDialog } from "@/components/shared/breakdown-edit-dialog";
+import { ShareDialog } from "@/components/shared/share-dialog";
 import { TaggingScreen } from "@/components/shared/tagging-screen";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -163,6 +164,7 @@ export default function BreakdownDetailPage({ params }: { params: { id: string }
         </div>
         {canEdit ? (
           <div className="flex gap-2">
+            <ShareDialog type="breakdown" subjectId={breakdown.id} />
             <BreakdownEditDialog
               breakdownId={breakdown.id}
               defaultValues={{

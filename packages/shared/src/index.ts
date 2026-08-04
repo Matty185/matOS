@@ -19,6 +19,7 @@ export * from "./validation/external-person";
 export * from "./validation/invite";
 export * from "./validation/member";
 export * from "./validation/payment";
+export * from "./validation/share-link";
 
 export * from "./analysis/profile";
 export * from "./analysis/metric-catalog";

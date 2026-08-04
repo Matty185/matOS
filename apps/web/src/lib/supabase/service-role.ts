@@ -16,7 +16,12 @@ import type { Database } from "@matos/shared";
  * row before any session/RLS context exists — mirroring the invite-claim
  * step above) and the solo self-serve deletion route (hard-deleting rows no
  * authenticated policy grants DELETE on, same justification as GDPR
- * deletion-execute). Never used by the agent (it uses the RLS-respecting
+ * deletion-execute). Stage S3 adds `lib/share/resolve-share-link.ts`
+ * (`/share/[token]`) — the app's first genuinely public page, no session
+ * ever exists, and `share_links` deliberately has no public SELECT policy
+ * at all (per its own S1 design note: resolution must go through a
+ * controlled path, never a blanket RLS policy on the underlying tables).
+ * Never used by the agent (it uses the RLS-respecting
  * client exclusively), and never for anything an ordinary authenticated
  * request could do via the RLS-respecting client instead.
  *

@@ -7,7 +7,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // "/" was public through Stage 2 (a static placeholder); Stage 3 gave it a
 // real job (role-based redirect to /dashboard or /home) that itself needs
 // a session, so it moved off this list.
-const PUBLIC_PATHS = ["/login", "/signup", "/invite"];
+const PUBLIC_PATHS = ["/login", "/signup", "/invite", "/share"];
 
 function isPublicPath(pathname: string): boolean {
   // Boundary-based, not a bare startsWith: a future route literally named

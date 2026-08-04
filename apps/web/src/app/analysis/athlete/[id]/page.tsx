@@ -6,6 +6,7 @@ import { ChevronLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ProfileView } from "@/components/shared/profile-view";
 import { BeltDisplay } from "@/components/shared/belt-display";
+import { ShareDialog } from "@/components/shared/share-dialog";
 
 function useCurrentMember() {
   return useQuery({
@@ -92,11 +93,14 @@ export default function AthleteProfilePage({ params }: { params: { id: string } 
         <ChevronLeft className="h-4 w-4" /> Back to breakdowns
       </Link>
 
-      <div className="flex items-center gap-3">
-        <h1 className="font-heading text-2xl tracking-wide">
-          {member.first_name} {member.last_name}
-        </h1>
-        <BeltDisplay belt={member.belt} stripes={member.stripes} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <h1 className="font-heading text-2xl tracking-wide">
+            {member.first_name} {member.last_name}
+          </h1>
+          <BeltDisplay belt={member.belt} stripes={member.stripes} />
+        </div>
+        <ShareDialog type="profile" subjectId={member.id} />
       </div>
 
       <ProfileView subject={{ type: "member", id: member.id }} />
