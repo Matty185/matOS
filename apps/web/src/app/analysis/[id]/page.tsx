@@ -40,6 +40,7 @@ type BreakdownDetail = {
   status: "in_progress" | "complete";
   result: keyof typeof RESULT_LABELS | null;
   method: keyof typeof METHOD_LABELS | null;
+  visibility: "private" | "gym";
   author_id: string | null;
   video_filename: string | null;
   video_duration_seconds: number | null;
@@ -79,7 +80,7 @@ export default function BreakdownDetailPage({ params }: { params: { id: string }
       const { data, error } = await supabase
         .from("breakdowns")
         .select(
-          "id, name, match_date, gi, status, result, method, author_id, video_filename, video_duration_seconds, member_id, external_person_id, members(first_name, last_name), external_people(display_name)",
+          "id, name, match_date, gi, status, result, method, visibility, author_id, video_filename, video_duration_seconds, member_id, external_person_id, members(first_name, last_name), external_people(display_name)",
         )
         .eq("id", params.id)
         .single();
@@ -170,6 +171,7 @@ export default function BreakdownDetailPage({ params }: { params: { id: string }
                 gi: breakdown.gi,
                 result: breakdown.result ?? undefined,
                 method: breakdown.method ?? undefined,
+                visibility: breakdown.visibility,
               }}
               onSaved={() => queryClient.invalidateQueries({ queryKey: ["breakdown", params.id] })}
             />
@@ -210,6 +212,7 @@ export default function BreakdownDetailPage({ params }: { params: { id: string }
         {breakdown.method ? (
           <Badge variant="outline">{METHOD_LABELS[breakdown.method]}</Badge>
         ) : null}
+        {breakdown.visibility === "private" ? <Badge variant="outline">Private</Badge> : null}
       </div>
 
       <TaggingScreen

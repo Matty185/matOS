@@ -39,12 +39,11 @@ function useCurrentMember() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return null;
-      const { data } = await supabase
-        .from("members")
-        .select("id, role, first_name, last_name")
-        .eq("user_id", user.id)
-        .single();
-      return data;
+      // public.current_member() RPC, not a direct .eq("user_id", user.id)
+      // query — the latter throws once this account has more than one
+      // members row (Stage S2: a personal workspace plus a real gym).
+      const { data: current } = await supabase.rpc("current_member");
+      return current?.[0] ?? null;
     },
   });
 }
@@ -116,6 +115,19 @@ export default function NewBreakdownPage() {
   const [newPersonName, setNewPersonName] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // Stage S2: defaults to what the server would pick anyway (private in a
+  // personal workspace, gym in a real gym) once currentMember resolves —
+  // same reactive-default pattern as focusMode above, for the same reason
+  // (currentMember is undefined on first render of a cold load).
+  const [visibility, setVisibility] = useState<"private" | "gym" | "">("");
+  const [visibilityTouched, setVisibilityTouched] = useState(false);
+
+  useEffect(() => {
+    if (visibilityTouched || !currentMember) return;
+    setVisibility(currentMember.gym_kind === "personal" ? "private" : "gym");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentMember, visibilityTouched]);
+
   const { data: gymMembers } = useGymMembers(focusMode === "member");
   const { data: externalPeople } = useExternalPeople();
 
@@ -176,6 +188,7 @@ export default function NewBreakdownPage() {
           match_date: data.match_date,
           gi: data.gi,
           result: data.result || null,
+          visibility: visibility || undefined,
         }),
       });
       const body = await res.json();
@@ -307,6 +320,25 @@ export default function NewBreakdownPage() {
           />
           Gi
         </label>
+
+        <div className="flex flex-col gap-1.5">
+          <Label>Visibility</Label>
+          <Select
+            value={visibility || undefined}
+            onValueChange={(v) => {
+              setVisibilityTouched(true);
+              setVisibility(v as "private" | "gym");
+            }}
+          >
+            <SelectTrigger className="h-11">
+              <SelectValue placeholder="Choose visibility" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="private">Private (only you)</SelectItem>
+              <SelectItem value="gym">Shared with gym (coach can see it)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
         <div className="flex flex-col gap-1.5">
           <Label>Result (optional)</Label>

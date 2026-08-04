@@ -16,12 +16,11 @@ function useCurrentMember() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return null;
-      const { data } = await supabase
-        .from("members")
-        .select("id, role")
-        .eq("user_id", user.id)
-        .single();
-      return data;
+      // public.current_member() RPC, not a direct .eq("user_id", user.id)
+      // query — the latter throws once this account has more than one
+      // members row (Stage S2: a personal workspace plus a real gym).
+      const { data: current } = await supabase.rpc("current_member");
+      return current?.[0] ?? null;
     },
   });
 }

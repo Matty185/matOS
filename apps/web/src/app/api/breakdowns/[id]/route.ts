@@ -31,6 +31,7 @@ export const PATCH = withAuth(
     }
     if (input.duration_seconds !== undefined) update.duration_seconds = input.duration_seconds;
     if (input.status !== undefined) update.status = input.status;
+    if (input.visibility !== undefined) update.visibility = input.visibility;
 
     if (Object.keys(update).length === 0) {
       return apiError(400, "NO_CHANGES", "No fields to update were provided.");

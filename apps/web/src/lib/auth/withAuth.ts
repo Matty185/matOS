@@ -6,6 +6,7 @@ import { apiError } from "@/lib/api/response";
 import type { Database } from "@matos/shared";
 
 type Role = Database["public"]["Enums"]["member_role"];
+type GymKind = Database["public"]["Enums"]["gym_kind"];
 
 // gym_owner > coach > athlete per CLAUDE.md Rule 3 — a requiredRole of
 // 'coach' also admits 'gym_owner'.
@@ -19,6 +20,7 @@ export type AuthContext = {
   userId: string;
   memberId: string;
   gymId: string;
+  gymKind: GymKind;
   role: Role;
 };
 
@@ -57,6 +59,13 @@ type WithAuthOptions<TInput> = {
  * the "gym_id injected server-side, never trusted from input" posture used
  * throughout this project (see the agentic interface rules for the same
  * principle applied to the agent's tool calls).
+ *
+ * The member lookup below resolves via the `public.current_member()` RPC
+ * (Stage S2 migration 20260803120000), not a direct `.eq("user_id",
+ * user.id).single()` query — see current-member.ts's own comment for why
+ * that direct-query shape became ambiguous once Stage S1 let one account
+ * hold more than one `members` row. Every API route's gymId now agrees
+ * with what RLS itself resolves for the same request.
  */
 export function withAuth<TInput = undefined>(
   handler: Handler<TInput>,
@@ -77,18 +86,11 @@ export function withAuth<TInput = undefined>(
       return apiError(401, "UNAUTHENTICATED", "You must be signed in.");
     }
 
-    const { data: member, error: memberError } = await supabase
-      .from("members")
-      .select("id, gym_id, role, active")
-      .eq("user_id", user.id)
-      .single();
+    const { data: members, error: memberError } = await supabase.rpc("current_member");
+    const member = members?.[0];
 
     if (memberError || !member) {
       return apiError(403, "NO_MEMBER_RECORD", "No member record for this account.");
-    }
-
-    if (!member.active) {
-      return apiError(403, "MEMBER_INACTIVE", "This account has been deactivated.");
     }
 
     if (options.requiredRole && ROLE_RANK[member.role] < ROLE_RANK[options.requiredRole]) {
@@ -115,6 +117,7 @@ export function withAuth<TInput = undefined>(
       userId: user.id,
       memberId: member.id,
       gymId: member.gym_id,
+      gymKind: member.gym_kind,
       role: member.role,
     };
 

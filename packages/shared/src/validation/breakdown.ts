@@ -8,6 +8,11 @@ import { z } from "zod";
 // Found via live testing: calling .omit() on the refined export throws
 // "`.omit()` cannot be used on object schemas containing refinements" at
 // runtime, not caught by typecheck/lint.
+// Stage S2 (matos_mobile_plan.md §2.2): optional here, not required — the
+// API route sets a context-aware default (private in a personal
+// workspace, gym in a real gym) when omitted, rather than relying on the
+// DB column's own flat 'gym' default, which doesn't know which kind of
+// gym it's inserting into.
 export const createBreakdownBaseSchema = z.object({
   member_id: z.string().uuid().optional(),
   external_person_id: z.string().uuid().optional(),
@@ -16,6 +21,7 @@ export const createBreakdownBaseSchema = z.object({
   gi: z.boolean(),
   result: z.enum(["win", "loss", "draw"]).nullable().optional(),
   method: z.enum(["submission", "points", "decision", "dq"]).nullable().optional(),
+  visibility: z.enum(["private", "gym"]).optional(),
 });
 
 // Focus is exactly one of member_id/external_person_id — mirrors the DB's
@@ -62,6 +68,7 @@ export const updateBreakdownSchema = z.object({
   video_duration_seconds: z.number().positive().nullable().optional(),
   duration_seconds: z.number().positive().nullable().optional(),
   status: z.enum(["in_progress", "complete"]).optional(),
+  visibility: z.enum(["private", "gym"]).optional(),
 });
 
 export type UpdateBreakdownInput = z.infer<typeof updateBreakdownSchema>;

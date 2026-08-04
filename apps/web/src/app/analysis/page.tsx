@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { Plus, Swords, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/shared/empty-state";
+import { GymTeaser } from "@/components/shared/gym-teaser";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -15,6 +16,7 @@ type BreakdownRow = {
   match_date: string;
   gi: boolean;
   status: "in_progress" | "complete";
+  visibility: "private" | "gym";
   author_id: string | null;
   member_id: string | null;
   external_person_id: string | null;
@@ -36,11 +38,11 @@ function useCurrentMember() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return null;
-      const { data } = await supabase
-        .from("members")
-        .select("id, role, first_name, last_name")
-        .eq("user_id", user.id)
-        .single();
+      // public.current_member() RPC, not a direct .eq("user_id", user.id)
+      // query — the latter throws once this account has more than one
+      // members row (Stage S2: a personal workspace plus a real gym).
+      const { data: current } = await supabase.rpc("current_member");
+      const data = current?.[0] ?? null;
       // author_id on breakdowns references auth.users(id) — keep the auth
       // uid alongside the member row so callers can compare against it,
       // not the member row's own id (a different uuid).
@@ -57,7 +59,7 @@ function useBreakdowns() {
       const { data, error } = await supabase
         .from("breakdowns")
         .select(
-          "id, name, match_date, gi, status, author_id, member_id, external_person_id, members(first_name, last_name), external_people(display_name), breakdown_events(count)",
+          "id, name, match_date, gi, status, visibility, author_id, member_id, external_person_id, members(first_name, last_name), external_people(display_name), breakdown_events(count)",
         )
         .order("match_date", { ascending: false });
       if (error) throw error;
@@ -70,6 +72,7 @@ export default function AnalysisPage() {
   const { data: currentMember } = useCurrentMember();
   const { data: breakdowns, isLoading, error } = useBreakdowns();
   const isStaff = currentMember?.role === "coach" || currentMember?.role === "gym_owner";
+  const isSolo = currentMember?.gym_kind === "personal";
 
   return (
     <div className="flex flex-col gap-6">
@@ -123,6 +126,7 @@ export default function AnalysisPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium">{b.name}</span>
                       <Badge variant="outline">{b.gi ? "Gi" : "No-Gi"}</Badge>
+                      {b.visibility === "private" ? <Badge variant="outline">Private</Badge> : null}
                     </div>
                     <span className="text-xs text-muted-foreground">
                       {focusName} · {format(new Date(b.match_date), "MMM d, yyyy")} · {eventCount}{" "}
@@ -141,6 +145,8 @@ export default function AnalysisPage() {
           })}
         </ul>
       )}
+
+      {isSolo ? <GymTeaser /> : null}
     </div>
   );
 }

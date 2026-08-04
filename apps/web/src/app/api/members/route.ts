@@ -13,6 +13,19 @@ import { createMemberSchema } from "@matos/shared";
 // plan §7 ("on add, invite email sent automatically").
 export const POST = withAuth(
   async (_request, context, input) => {
+    // Stage S2: a personal workspace's role is gym_owner, which satisfies
+    // `requiredRole: "coach"` below — without this check, a solo user
+    // could add extra member rows to their own personal gym via this
+    // route directly (no UI path leads here, but the API itself didn't
+    // block it). Several parts of the S2 design assume a personal
+    // workspace stays single-member (most concretely, api/account/
+    // delete-solo only ever targets the caller's own member row) — a
+    // database-reviewer finding surfaced during S2's gate, not a
+    // hypothetical.
+    if (context.gymKind === "personal") {
+      return apiError(403, "FORBIDDEN", "You can't add members to a personal workspace.");
+    }
+
     const supabase = createClient();
 
     const { data: member, error: insertError } = await supabase

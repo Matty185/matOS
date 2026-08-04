@@ -38,6 +38,7 @@ type FormValues = {
   // "not set," never "".
   result?: "win" | "loss" | "draw";
   method?: "submission" | "points" | "decision" | "dq";
+  visibility: "private" | "gym";
 };
 
 export function BreakdownEditDialog({
@@ -70,6 +71,7 @@ export function BreakdownEditDialog({
     defaultValues.gi,
     defaultValues.result,
     defaultValues.method,
+    defaultValues.visibility,
   ]);
 
   async function onSubmit(data: FormValues) {
@@ -82,6 +84,7 @@ export function BreakdownEditDialog({
         gi: data.gi,
         result: data.result || null,
         method: data.method || null,
+        visibility: data.visibility,
       }),
     });
     const body = await res.json();
@@ -172,6 +175,25 @@ export function BreakdownEditDialog({
                     <SelectItem value="points">Points</SelectItem>
                     <SelectItem value="decision">Decision</SelectItem>
                     <SelectItem value="dq">DQ</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>Visibility</Label>
+            <Controller
+              name="visibility"
+              control={control}
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger className="h-11">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="private">Private (only you)</SelectItem>
+                    <SelectItem value="gym">Shared with gym (coach can see it)</SelectItem>
                   </SelectContent>
                 </Select>
               )}

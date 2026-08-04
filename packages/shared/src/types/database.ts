@@ -1051,6 +1051,18 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      current_member: {
+        Args: never;
+        Returns: {
+          first_name: string;
+          gym_id: string;
+          gym_kind: Database["public"]["Enums"]["gym_kind"];
+          id: string;
+          last_name: string;
+          role: Database["public"]["Enums"]["member_role"];
+          user_id: string;
+        }[];
+      };
       increment_agent_query_count: {
         Args: { p_date: string; p_gym_id: string };
         Returns: number;

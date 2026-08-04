@@ -33,6 +33,15 @@ export const POST = withAuth(
         gi: input.gi,
         result: input.result ?? null,
         method: input.method ?? null,
+        // Stage S2: context-aware default, not the DB column's flat 'gym'
+        // default (matos_mobile_plan.md §2.2 — private by default in a
+        // personal workspace, gym by default in a real gym). Safe to key
+        // off context.gymKind here specifically because RLS already
+        // constrains member_id/external_person_id to the caller's own
+        // current gym (breakdowns_all_own), so the trigger-derived gym_id
+        // this row actually lands in always matches context.gymId/gymKind
+        // for every request that reaches this far.
+        visibility: input.visibility ?? (context.gymKind === "personal" ? "private" : "gym"),
       })
       .select("id, name, match_date, status")
       .single();

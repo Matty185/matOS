@@ -22,6 +22,8 @@ import { cn } from "@matos/shared";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { SignOutButton } from "@/components/shared/sign-out-button";
+import { GymSwitcher } from "@/components/shared/gym-switcher";
+import type { GymMembership } from "@/lib/auth/current-member";
 
 type NavItem = { label: string; href: string; icon: LucideIcon };
 
@@ -50,11 +52,21 @@ const ATHLETE_NAV: NavItem[] = [
   { label: "Account", href: "/account", icon: UserCog },
 ];
 
+// Personal-workspace users (matos_mobile_plan.md §3.2: "Coach experience
+// stays on web for v1" — mobile is the primary solo product; web stays
+// minimal). No Home/Check-In/Attendance/Progress — none of those apply
+// without a real gym to check into or a class schedule to attend.
+const SOLO_NAV: NavItem[] = [
+  { label: "Analysis", href: "/analysis", icon: Swords },
+  { label: "Account", href: "/account", icon: UserCog },
+];
+
 type AppShellProps = {
-  variant: "coach" | "athlete";
+  variant: "coach" | "athlete" | "solo";
   isOwner?: boolean;
   memberName: string;
   roleLabel: string;
+  memberships?: GymMembership[];
   children: React.ReactNode;
 };
 
@@ -64,12 +76,25 @@ type AppShellProps = {
  * per CLAUDE.md UI Standards: works at 390px, no horizontal scroll, every
  * interactive target here is at least 44px.
  */
-export function AppShell({ variant, isOwner, memberName, roleLabel, children }: AppShellProps) {
+export function AppShell({
+  variant,
+  isOwner,
+  memberName,
+  roleLabel,
+  memberships,
+  children,
+}: AppShellProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
   const navItems =
-    variant === "coach" ? (isOwner ? [...COACH_NAV, OWNER_NAV_ITEM] : COACH_NAV) : ATHLETE_NAV;
+    variant === "coach"
+      ? isOwner
+        ? [...COACH_NAV, OWNER_NAV_ITEM]
+        : COACH_NAV
+      : variant === "solo"
+        ? SOLO_NAV
+        : ATHLETE_NAV;
 
   function isActive(href: string) {
     return pathname === href || pathname.startsWith(`${href}/`);
@@ -101,6 +126,11 @@ export function AppShell({ variant, isOwner, memberName, roleLabel, children }: 
   function MemberFooter() {
     return (
       <div className="mt-auto flex flex-col gap-2 border-t pt-4">
+        {memberships && memberships.length > 1 ? (
+          <div className="px-3">
+            <GymSwitcher memberships={memberships} />
+          </div>
+        ) : null}
         <div className="px-3">
           <p className="text-sm font-medium">{memberName}</p>
           <p className="text-xs text-muted-foreground">{roleLabel}</p>

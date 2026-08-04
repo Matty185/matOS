@@ -76,11 +76,11 @@ export default function CheckInPage() {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Not signed in");
 
-      const { data: member } = await supabase
-        .from("members")
-        .select("id")
-        .eq("user_id", user.id)
-        .single();
+      // public.current_member() RPC, not a direct .eq("user_id", user.id)
+      // query — the latter throws once this account has more than one
+      // members row (Stage S2: a personal workspace plus a real gym).
+      const { data: current } = await supabase.rpc("current_member");
+      const member = current?.[0];
       if (!member) throw new Error("No member record");
 
       const [classesRes, attendanceRes] = await Promise.all([

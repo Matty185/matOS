@@ -28,3 +28,16 @@ export const claimInviteSchema = z
   });
 
 export type ClaimInviteInput = z.infer<typeof claimInviteSchema>;
+
+// Stage S2 (matos_mobile_plan.md §2.3): "attach flow" — the invited email
+// already has an auth.users account (most commonly, a solo signup from
+// Stage S2's own signup route). Verifies the *existing* password rather
+// than setting a new one — no confirmPassword, since nothing is being set.
+export const attachInviteSchema = z.object({
+  password: z.string().min(1, "Password is required."),
+  consent: z.literal(true, {
+    message: "You must accept the data storage consent to continue.",
+  }),
+});
+
+export type AttachInviteInput = z.infer<typeof attachInviteSchema>;
