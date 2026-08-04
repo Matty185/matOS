@@ -80,7 +80,11 @@ export default function AnalysisPage() {
         <div>
           <h1 className="font-heading text-3xl tracking-wide">Analysis</h1>
           <p className="text-sm text-muted-foreground">
-            {isStaff ? "Match breakdowns across your gym." : "Your logged match breakdowns."}
+            {isSolo
+              ? "Your logged match breakdowns."
+              : isStaff
+                ? "Match breakdowns across your gym."
+                : "Your logged match breakdowns."}
           </p>
         </div>
         <div className="flex gap-2">
