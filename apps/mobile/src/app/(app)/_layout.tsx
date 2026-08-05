@@ -4,11 +4,9 @@ import { useAuth } from "@/lib/auth-context";
 import { useCurrentMember } from "@/lib/use-current-member";
 import { usePushTokenRegistration } from "@/lib/push-registration";
 
-// Real tab shell for Stage M1, replacing M0's single-screen placeholder.
-// Mirrors apps/web's ATHLETE_NAV (Home, Check In, My Progress, Account) —
-// Analysis is Stage M2 scope, not added yet. Tab icons are plain emoji
-// glyphs rather than pulling in @expo/vector-icons (not currently a
-// dependency) for four icons.
+// Real tab shell, mirroring apps/web's ATHLETE_NAV (Home, Check In, My
+// Progress, Analysis, Account). Tab icons are plain emoji glyphs rather
+// than pulling in @expo/vector-icons for five icons.
 export default function AppLayout() {
   const { session, isLoading } = useAuth();
   const { data: member } = useCurrentMember();
@@ -43,6 +41,14 @@ export default function AppLayout() {
         options={{
           title: "Progress",
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>📈</Text>,
+        }}
+      />
+      <Tabs.Screen
+        name="analysis"
+        options={{
+          title: "Analysis",
+          headerShown: false,
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🎥</Text>,
         }}
       />
       <Tabs.Screen

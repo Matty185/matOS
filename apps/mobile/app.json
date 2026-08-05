@@ -40,6 +40,14 @@
         {
           "color": "#1B4F72"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "MatOS needs access to your videos to select match footage to analyze. Video is never uploaded — it stays on your device.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
       ]
     ],
     "experiments": {
