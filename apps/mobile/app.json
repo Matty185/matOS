@@ -49,6 +49,13 @@
           "microphonePermission": false
         }
       ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "MatOS needs access to your camera to record BJJ rolls for tagging. Video is never uploaded — it stays on your device.",
+          "microphonePermission": "MatOS needs access to your microphone to record audio with your rolls. Video is never uploaded — it stays on your device."
+        }
+      ],
       "expo-video"
     ],
     "experiments": {

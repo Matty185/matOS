@@ -19,6 +19,14 @@ export default function AnalysisLayout() {
           animation: "slide_from_bottom",
         }}
       />
+      <Stack.Screen
+        name="[id]/record"
+        options={{
+          headerShown: false,
+          presentation: "fullScreenModal",
+          animation: "slide_from_bottom",
+        }}
+      />
       <Stack.Screen name="people/index" options={{ title: "External People" }} />
       <Stack.Screen name="people/[id]" options={{ title: "Person" }} />
     </Stack>

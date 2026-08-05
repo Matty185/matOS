@@ -45,6 +45,13 @@ type BreakdownDetail = {
 // entering the player; it's never persisted (matching web's own
 // Blob-URL-doesn't-survive-reload precedent — a fresh app session always
 // needs a fresh pick, same "resume: re-select file" contract as web).
+//
+// "Record a roll" (Stage M4) is a separate entry point into
+// analysis/[id]/record.tsx rather than another branch of handlePickVideo —
+// it produces its own local file URI the same shape as a gallery pick,
+// but PATCHes the breakdown and navigates into the tagging player itself
+// (router.replace, not back through here), so this screen's own
+// pickedVideoUri state is never set by the recording path.
 export default function BreakdownDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -263,16 +270,26 @@ export default function BreakdownDetailScreen() {
             <Text className="font-sans text-sm text-amber-700">{mismatchWarning}</Text>
           ) : null}
           {canEdit ? (
-            <Pressable
-              onPress={handlePickVideo}
-              className="h-11 items-center justify-center self-start rounded-md border border-neutral-300 px-4"
-            >
-              <Text className="font-sans-bold text-sm text-neutral-900">
-                {breakdown.video_filename || pickedFileName
-                  ? "Choose a different file"
-                  : "Select video"}
-              </Text>
-            </Pressable>
+            <View className="flex-row gap-2">
+              <Pressable
+                onPress={handlePickVideo}
+                className="h-11 items-center justify-center rounded-md border border-neutral-300 px-4"
+              >
+                <Text className="font-sans-bold text-sm text-neutral-900">
+                  {breakdown.video_filename || pickedFileName
+                    ? "Choose a different file"
+                    : "Select video"}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() =>
+                  router.push({ pathname: "/analysis/[id]/record", params: { id: breakdown.id } })
+                }
+                className="h-11 items-center justify-center rounded-md border border-neutral-300 px-4"
+              >
+                <Text className="font-sans-bold text-sm text-neutral-900">Record a roll</Text>
+              </Pressable>
+            </View>
           ) : null}
           <Text className="font-sans text-xs text-neutral-500">
             Video stays on your device — it&apos;s never uploaded anywhere.
@@ -306,7 +323,7 @@ export default function BreakdownDetailScreen() {
               <Text className="text-center font-sans text-sm text-neutral-600">
                 {breakdown.video_filename
                   ? "Pick the same video file again to resume — MatOS doesn't keep it between sessions."
-                  : "Choose a video above, then tagging opens automatically."}
+                  : "Choose a video or record a roll above, then tagging opens automatically."}
               </Text>
             </View>
           )
