@@ -10,7 +10,15 @@ export default function AnalysisLayout() {
     <Stack screenOptions={{ headerShown: true, headerTintColor: "#1B4F72" }}>
       <Stack.Screen name="index" options={{ title: "Analysis", headerShown: false }} />
       <Stack.Screen name="new" options={{ title: "Log a match" }} />
-      <Stack.Screen name="[id]" options={{ title: "Breakdown" }} />
+      <Stack.Screen name="[id]/index" options={{ title: "Breakdown" }} />
+      <Stack.Screen
+        name="[id]/tag"
+        options={{
+          headerShown: false,
+          presentation: "fullScreenModal",
+          animation: "slide_from_bottom",
+        }}
+      />
       <Stack.Screen name="people/index" options={{ title: "External People" }} />
       <Stack.Screen name="people/[id]" options={{ title: "Person" }} />
     </Stack>

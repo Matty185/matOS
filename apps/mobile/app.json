@@ -3,7 +3,7 @@
     "name": "MatOS",
     "slug": "matos",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "matos",
     "userInterfaceStyle": "automatic",
@@ -48,7 +48,8 @@
           "cameraPermission": false,
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true,

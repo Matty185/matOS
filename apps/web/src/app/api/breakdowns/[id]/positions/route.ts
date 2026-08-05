@@ -40,6 +40,9 @@ export const POST = withAuth(
       p_position_id: input.position_id,
       p_role: (input.role ?? null) as string,
       p_start_ts: input.start_ts,
+      // Idempotency key (Stage M3 gate fix) — see tag_position's own
+      // migration comment for why a retried create must be a safe no-op.
+      ...(input.client_id ? { p_client_id: input.client_id } : {}),
     });
 
     if (error || !created) {

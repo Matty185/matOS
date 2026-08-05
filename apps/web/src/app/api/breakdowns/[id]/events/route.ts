@@ -19,6 +19,25 @@ export const POST = withAuth(
     if (!breakdownId) return apiError(400, "MISSING_ID", "No breakdown id provided.");
     const supabase = createClient();
 
+    // Idempotency key (Stage M3 gate fix): unlike positions, event
+    // creates have no server-side RPC to hold this check, so it's done
+    // here — before insert, not relied on solely via the unique index —
+    // so a retried create (mobile's sync engine resending a POST whose
+    // response was lost) returns the original row instead of a duplicate.
+    // breakdown_events_client_id_unique still catches the residual
+    // check-then-insert race (mapped to a clean 409 by mapBreakdownTagError).
+    if (input.client_id) {
+      const { data: existing } = await supabase
+        .from("breakdown_events")
+        .select("id, event_type_id, modifier, outcome, ts")
+        .eq("breakdown_id", breakdownId)
+        .eq("client_id", input.client_id)
+        .maybeSingle();
+      if (existing) {
+        return NextResponse.json({ success: true, event: existing }, { status: 200 });
+      }
+    }
+
     const { data: created, error: insertError } = await supabase
       .from("breakdown_events")
       .insert({
@@ -30,6 +49,7 @@ export const POST = withAuth(
         modifier: input.modifier ?? null,
         outcome: input.outcome ?? null,
         ts: input.ts,
+        client_id: input.client_id ?? null,
         source: "manual",
       })
       .select("id, event_type_id, modifier, outcome, ts")

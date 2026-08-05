@@ -8,6 +8,8 @@ export const createBreakdownEventSchema = z.object({
   modifier: z.string().max(50).nullable().optional(),
   outcome: z.string().max(50).nullable().optional(),
   ts: z.number().min(0),
+  // See breakdown-position.ts's client_id for why this exists.
+  client_id: z.string().uuid().nullable().optional(),
 });
 
 export type CreateBreakdownEventInput = z.infer<typeof createBreakdownEventSchema>;

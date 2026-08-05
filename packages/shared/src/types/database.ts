@@ -269,6 +269,7 @@ export type Database = {
       breakdown_events: {
         Row: {
           breakdown_id: string;
+          client_id: string | null;
           created_at: string;
           event_type_id: string;
           gym_id: string;
@@ -280,6 +281,7 @@ export type Database = {
         };
         Insert: {
           breakdown_id: string;
+          client_id?: string | null;
           created_at?: string;
           event_type_id: string;
           gym_id: string;
@@ -291,6 +293,7 @@ export type Database = {
         };
         Update: {
           breakdown_id?: string;
+          client_id?: string | null;
           created_at?: string;
           event_type_id?: string;
           gym_id?: string;
@@ -327,6 +330,7 @@ export type Database = {
       breakdown_positions: {
         Row: {
           breakdown_id: string;
+          client_id: string | null;
           end_ts: number | null;
           gym_id: string;
           id: string;
@@ -336,6 +340,7 @@ export type Database = {
         };
         Insert: {
           breakdown_id: string;
+          client_id?: string | null;
           end_ts?: number | null;
           gym_id: string;
           id?: string;
@@ -345,6 +350,7 @@ export type Database = {
         };
         Update: {
           breakdown_id?: string;
+          client_id?: string | null;
           end_ts?: number | null;
           gym_id?: string;
           id?: string;
@@ -1117,12 +1123,14 @@ export type Database = {
       tag_position: {
         Args: {
           p_breakdown_id: string;
+          p_client_id?: string;
           p_position_id: string;
           p_role: string;
           p_start_ts: number;
         };
         Returns: {
           breakdown_id: string;
+          client_id: string | null;
           end_ts: number | null;
           gym_id: string;
           id: string;

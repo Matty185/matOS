@@ -35,12 +35,16 @@ type BreakdownDetail = {
   external_people: { display_name: string } | null;
 };
 
-// Mirrors apps/web's analysis/[id]/page.tsx minus the actual tagging
-// player (Stage M3 — not built yet, this screen ends at "video selected,
-// ready to tag"). Video selection uses expo-image-picker's gallery mode:
-// the picked asset's local URI is never sent anywhere (Non-Negotiable #1
-// — video never touches the server); only its filename + rounded duration
-// get PATCHed, same two fields web's handleLoadedMetadata writes.
+// Mirrors apps/web's analysis/[id]/page.tsx, now handing off to Stage
+// M3's real tagging player once a video is selected. Video selection uses
+// expo-image-picker's gallery mode: the picked asset's local URI is
+// never sent anywhere itself (Non-Negotiable #1 — video never touches the
+// server) — only its filename + rounded duration get PATCHed, same two
+// fields web's handleLoadedMetadata writes. The URI stays in this
+// screen's own state and is handed forward as a route param when
+// entering the player; it's never persisted (matching web's own
+// Blob-URL-doesn't-survive-reload precedent — a fresh app session always
+// needs a fresh pick, same "resume: re-select file" contract as web).
 export default function BreakdownDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -49,6 +53,7 @@ export default function BreakdownDetailScreen() {
   const [deleting, setDeleting] = useState(false);
   const [mismatchWarning, setMismatchWarning] = useState<string | null>(null);
   const [pickedFileName, setPickedFileName] = useState<string | null>(null);
+  const [pickedVideoUri, setPickedVideoUri] = useState<string | null>(null);
 
   const {
     data: breakdown,
@@ -90,6 +95,7 @@ export default function BreakdownDetailScreen() {
     const durationSeconds = asset.duration ? Math.round(asset.duration / 1000) : null;
 
     setPickedFileName(fileName);
+    setPickedVideoUri(asset.uri);
     setMismatchWarning(
       breakdown?.video_filename && breakdown.video_filename !== fileName
         ? `This doesn't look like the same file used last time — expected "${breakdown.video_filename}", got "${fileName}".`
@@ -256,28 +262,55 @@ export default function BreakdownDetailScreen() {
           {mismatchWarning ? (
             <Text className="font-sans text-sm text-amber-700">{mismatchWarning}</Text>
           ) : null}
-          <Pressable
-            onPress={handlePickVideo}
-            className="h-11 items-center justify-center self-start rounded-md border border-neutral-300 px-4"
-          >
-            <Text className="font-sans-bold text-sm text-neutral-900">
-              {breakdown.video_filename || pickedFileName
-                ? "Choose a different file"
-                : "Select video"}
-            </Text>
-          </Pressable>
+          {canEdit ? (
+            <Pressable
+              onPress={handlePickVideo}
+              className="h-11 items-center justify-center self-start rounded-md border border-neutral-300 px-4"
+            >
+              <Text className="font-sans-bold text-sm text-neutral-900">
+                {breakdown.video_filename || pickedFileName
+                  ? "Choose a different file"
+                  : "Select video"}
+              </Text>
+            </Pressable>
+          ) : null}
           <Text className="font-sans text-xs text-neutral-500">
             Video stays on your device — it&apos;s never uploaded anywhere.
           </Text>
         </View>
 
-        <View className="items-center gap-2 rounded-md border border-dashed border-neutral-300 p-6">
-          <Text className="font-sans-bold text-sm text-neutral-900">Tagging coming soon</Text>
-          <Text className="text-center font-sans text-sm text-neutral-600">
-            The full tagging player lands in a future update. Your video and metadata are saved and
-            ready for it.
-          </Text>
-        </View>
+        {/* Tagging writes locally then syncs to the server through routes
+            RLS already scopes to the author (breakdown_positions_all_author/
+            breakdown_events_all_author) — but gating entry here too avoids
+            a non-author opening the real player and generating local tags
+            that would only ever fail to sync, silently stuck in that
+            device's draft file (Stage M3 gate fix, security-reviewer). */}
+        {canEdit ? (
+          pickedVideoUri ? (
+            <Pressable
+              onPress={() =>
+                router.push({
+                  pathname: "/analysis/[id]/tag",
+                  params: { id: breakdown.id, videoUri: pickedVideoUri },
+                })
+              }
+              className="h-11 items-center justify-center rounded-md bg-primary"
+            >
+              <Text className="font-sans-bold text-sm text-white">▶ Start tagging</Text>
+            </Pressable>
+          ) : (
+            <View className="items-center gap-2 rounded-md border border-dashed border-neutral-300 p-6">
+              <Text className="font-sans-bold text-sm text-neutral-900">
+                Select a video to start tagging
+              </Text>
+              <Text className="text-center font-sans text-sm text-neutral-600">
+                {breakdown.video_filename
+                  ? "Pick the same video file again to resume — MatOS doesn't keep it between sessions."
+                  : "Choose a video above, then tagging opens automatically."}
+              </Text>
+            </View>
+          )
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
