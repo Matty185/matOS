@@ -152,14 +152,27 @@ export const POST = withAuth(
     // promoted_by. Deferred from Stage A1 itself (that migration's own
     // design note flagged this as app-code work for "whichever stage first
     // builds breakdown CRUD routes" — Stage A7).
-    const [attendanceResult, logsResult, breakdownsResult, paymentsResult, beltHistoryResult] =
-      await Promise.all([
-        serviceClient.from("attendance").delete().eq("member_id", member.id),
-        serviceClient.from("athlete_logs").delete().eq("member_id", member.id),
-        serviceClient.from("breakdowns").delete().eq("member_id", member.id),
-        serviceClient.from("payments").update({ notes: null }).eq("member_id", member.id),
-        serviceClient.from("belt_history").update({ notes: null }).eq("member_id", member.id),
-      ]);
+    const [
+      attendanceResult,
+      logsResult,
+      breakdownsResult,
+      paymentsResult,
+      beltHistoryResult,
+      pushTokensResult,
+    ] = await Promise.all([
+      serviceClient.from("attendance").delete().eq("member_id", member.id),
+      serviceClient.from("athlete_logs").delete().eq("member_id", member.id),
+      serviceClient.from("breakdowns").delete().eq("member_id", member.id),
+      serviceClient.from("payments").update({ notes: null }).eq("member_id", member.id),
+      serviceClient.from("belt_history").update({ notes: null }).eq("member_id", member.id),
+      // push_tokens (Stage M1) has an `on delete cascade` FK to members, but
+      // this route anonymises the members row rather than deleting it (Rule
+      // 6) — that FK never fires here, unlike delete-solo's hard-delete
+      // path. Found by this stage's own review gate: without this, a
+      // member's live device push token would silently survive a GDPR
+      // erasure request untouched while everything else was cleaned up.
+      serviceClient.from("push_tokens").delete().eq("member_id", member.id),
+    ]);
 
     for (const [label, result] of [
       ["attendance", attendanceResult],
@@ -167,6 +180,7 @@ export const POST = withAuth(
       ["breakdowns", breakdownsResult],
       ["payments", paymentsResult],
       ["belt_history", beltHistoryResult],
+      ["push_tokens", pushTokensResult],
     ] as const) {
       if (result.error) {
         console.error(`[gdpr] failed to clean up ${label}`, result.error);

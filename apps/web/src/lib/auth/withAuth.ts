@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import type { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { apiError } from "@/lib/api/response";
+import { getBearerToken } from "@/lib/auth/bearer-token";
 import type { Database } from "@matos/shared";
 
 type Role = Database["public"]["Enums"]["member_role"];
@@ -77,10 +78,18 @@ export function withAuth<TInput = undefined>(
   ): Promise<Response> => {
     const supabase = createClient();
 
+    // A bearer token (mobile) has no session state on this stateless
+    // per-request client (createClient() set persistSession: false for
+    // this path) — getUser() must be handed the token explicitly rather
+    // than reading it from client-side session storage, which is what it
+    // falls back to when called with no argument at all. Cookie-based web
+    // callers are unaffected: no header, same no-argument call as before.
+    const bearerToken = getBearerToken();
+
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser();
+    } = bearerToken ? await supabase.auth.getUser(bearerToken) : await supabase.auth.getUser();
 
     if (authError || !user) {
       return apiError(401, "UNAUTHENTICATED", "You must be signed in.");

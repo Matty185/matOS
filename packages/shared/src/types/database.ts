@@ -1002,6 +1002,51 @@ export type Database = {
         };
         Relationships: [];
       };
+      push_tokens: {
+        Row: {
+          created_at: string;
+          expo_push_token: string;
+          gym_id: string;
+          id: string;
+          member_id: string;
+          platform: Database["public"]["Enums"]["push_platform"];
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          expo_push_token: string;
+          gym_id: string;
+          id?: string;
+          member_id: string;
+          platform: Database["public"]["Enums"]["push_platform"];
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          expo_push_token?: string;
+          gym_id?: string;
+          id?: string;
+          member_id?: string;
+          platform?: Database["public"]["Enums"]["push_platform"];
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "push_tokens_gym_id_fkey";
+            columns: ["gym_id"];
+            isOneToOne: false;
+            referencedRelation: "gyms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "push_tokens_member_id_fkey";
+            columns: ["member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       share_links: {
         Row: {
           created_at: string;
@@ -1127,6 +1172,7 @@ export type Database = {
       member_role: "gym_owner" | "coach" | "athlete";
       membership_plan: "monthly" | "casual" | "comp_team";
       payment_status: "paid" | "unpaid" | "waived";
+      push_platform: "ios" | "android";
       share_link_type: "profile" | "breakdown";
     };
     CompositeTypes: {
@@ -1286,6 +1332,7 @@ export const Constants = {
       member_role: ["gym_owner", "coach", "athlete"],
       membership_plan: ["monthly", "casual", "comp_team"],
       payment_status: ["paid", "unpaid", "waived"],
+      push_platform: ["ios", "android"],
       share_link_type: ["profile", "breakdown"],
     },
   },

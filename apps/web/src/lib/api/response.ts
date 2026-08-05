@@ -7,5 +7,8 @@ import { NextResponse } from "next/server";
  * console.error call at the call site, not in the response body.
  */
 export function apiError(status: number, code: string, message: string) {
-  return NextResponse.json({ error: message, code, status }, { status });
+  return NextResponse.json(
+    { error: message, code, status },
+    { status, headers: { "Cache-Control": "private, no-store" } },
+  );
 }

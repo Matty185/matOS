@@ -1,9 +1,10 @@
 import { CalendarDays, Flame } from "lucide-react";
-import { format, startOfWeek, subWeeks, addDays } from "date-fns";
+import { format } from "date-fns";
 import { getCurrentMember } from "@/lib/auth/current-member";
 import { createClient } from "@/lib/supabase/server";
 import { BeltDisplay } from "@/components/shared/belt-display";
 import { EmptyState } from "@/components/shared/empty-state";
+import { computeAttendanceStreak, computeUpcomingClasses } from "@matos/shared";
 import type { Database } from "@matos/shared";
 
 type ClassRow = Database["public"]["Tables"]["classes"]["Row"];
@@ -24,30 +25,6 @@ function formatTime(time: string) {
   return `${h12}:${m} ${period}`;
 }
 
-// "Streak" = consecutive Mon-Sun weeks with at least one check-in, walking
-// backward from the most recent week that has one. The current week doesn't
-// break the streak just because it's not over yet — if it has no check-in
-// so far, counting starts from last week instead so a Tuesday-morning visit
-// doesn't reset a streak that's still very much alive.
-function computeStreak(checkInDates: string[]): number {
-  if (checkInDates.length === 0) return 0;
-  const weeksWithCheckin = new Set(
-    checkInDates.map((d) =>
-      format(startOfWeek(new Date(`${d}T00:00:00`), { weekStartsOn: 1 }), "yyyy-MM-dd"),
-    ),
-  );
-  let cursor = startOfWeek(new Date(), { weekStartsOn: 1 });
-  if (!weeksWithCheckin.has(format(cursor, "yyyy-MM-dd"))) {
-    cursor = subWeeks(cursor, 1);
-  }
-  let streak = 0;
-  while (weeksWithCheckin.has(format(cursor, "yyyy-MM-dd"))) {
-    streak++;
-    cursor = subWeeks(cursor, 1);
-  }
-  return streak;
-}
-
 export default async function AthleteHomePage() {
   const member = await getCurrentMember();
   if (!member) return null;
@@ -60,20 +37,8 @@ export default async function AthleteHomePage() {
     supabase.from("classes").select("*").eq("active", true),
   ]);
 
-  const streak = computeStreak((attendanceRows ?? []).map((a) => a.checked_in_date));
-
-  const upcoming: { date: Date; classRow: ClassRow }[] = [];
-  for (let offset = 0; offset < 7 && upcoming.length < 5; offset++) {
-    const date = addDays(new Date(), offset);
-    const dayOfWeek = date.getDay();
-    const dayClasses = (classRows ?? [])
-      .filter((c) => c.day_of_week === dayOfWeek)
-      .sort((a, b) => a.start_time.localeCompare(b.start_time));
-    for (const c of dayClasses) {
-      if (upcoming.length >= 5) break;
-      upcoming.push({ date, classRow: c });
-    }
-  }
+  const streak = computeAttendanceStreak((attendanceRows ?? []).map((a) => a.checked_in_date));
+  const upcoming = computeUpcomingClasses(classRows ?? []);
 
   return (
     <div className="flex flex-col gap-6">

@@ -36,15 +36,19 @@ export const GET = withAuth(async (_request, context) => {
   const supabase = createClient();
   const serviceClient = createServiceRoleClient();
 
-  const [member, attendance, payments, beltHistory, logs, breakdowns, consent] = await Promise.all([
-    supabase.from("members").select("*").eq("id", context.memberId).single(),
-    supabase.from("attendance").select("*").eq("member_id", context.memberId),
-    supabase.from("payments").select("*").eq("member_id", context.memberId),
-    supabase.from("belt_history").select("*").eq("member_id", context.memberId),
-    supabase.from("athlete_logs").select("*").eq("member_id", context.memberId),
-    serviceClient.from("breakdowns").select("*").eq("member_id", context.memberId),
-    supabase.from("gdpr_consents").select("*").eq("member_id", context.memberId).maybeSingle(),
-  ]);
+  const [member, attendance, payments, beltHistory, logs, breakdowns, consent, pushTokens] =
+    await Promise.all([
+      supabase.from("members").select("*").eq("id", context.memberId).single(),
+      supabase.from("attendance").select("*").eq("member_id", context.memberId),
+      supabase.from("payments").select("*").eq("member_id", context.memberId),
+      supabase.from("belt_history").select("*").eq("member_id", context.memberId),
+      supabase.from("athlete_logs").select("*").eq("member_id", context.memberId),
+      serviceClient.from("breakdowns").select("*").eq("member_id", context.memberId),
+      supabase.from("gdpr_consents").select("*").eq("member_id", context.memberId).maybeSingle(),
+      // push_tokens (Stage M1) — RLS client is sufficient (push_tokens_all_self
+      // already scopes to self, no authorship-style restriction like breakdowns has).
+      supabase.from("push_tokens").select("*").eq("member_id", context.memberId),
+    ]);
 
   const breakdownIds = (breakdowns.data ?? []).map((b) => b.id);
   const [breakdownPositions, breakdownEvents] =
@@ -66,6 +70,7 @@ export const GET = withAuth(async (_request, context) => {
     breakdown_positions: breakdownPositions.data ?? [],
     breakdown_events: breakdownEvents.data ?? [],
     gdpr_consent: consent.data ?? null,
+    push_tokens: pushTokens.data ?? [],
   };
 
   await writeAuditLog({
