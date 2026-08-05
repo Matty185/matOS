@@ -29,6 +29,8 @@ export default function AnalysisLayout() {
       />
       <Stack.Screen name="people/index" options={{ title: "External People" }} />
       <Stack.Screen name="people/[id]" options={{ title: "Person" }} />
+      <Stack.Screen name="athlete/[id]" options={{ title: "Profile" }} />
+      <Stack.Screen name="compare" options={{ title: "Compare" }} />
     </Stack>
   );
 }

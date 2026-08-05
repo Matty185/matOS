@@ -9,6 +9,7 @@ import {
   formatRate,
   humanize,
   formatVideoTimestamp,
+  RESULT_LABELS,
   type AthleteProfile,
   type MetricValue,
 } from "@matos/shared";
@@ -17,8 +18,6 @@ import { ComparePickerDialog } from "@/components/shared/compare-picker-dialog";
 import { MetricGroup } from "@/components/shared/metric-group";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-
-const RESULT_LABELS = { win: "Win", loss: "Loss", draw: "Draw" } as const;
 
 // Every metric renders its n (Non-Negotiable #6) — right next to the value,
 // never hidden behind a tooltip, so a 100% built on n=1 always reads as

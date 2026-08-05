@@ -5,19 +5,12 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import * as ImagePicker from "expo-image-picker";
-import { formatVideoTimestamp } from "@matos/shared";
+import { formatVideoTimestamp, RESULT_LABELS, METHOD_LABELS } from "@matos/shared";
 import { supabase } from "@/lib/supabase";
 import { apiDelete, apiPatch, type ApiErrorBody } from "@/lib/api";
 import { useCurrentMember } from "@/lib/use-current-member";
 import { BreakdownEditModal } from "@/components/breakdown-edit-modal";
-
-const RESULT_LABELS = { win: "Win", loss: "Loss", draw: "Draw" } as const;
-const METHOD_LABELS = {
-  submission: "Submission",
-  points: "Points",
-  decision: "Decision",
-  dq: "DQ",
-} as const;
+import { ShareSheetModal } from "@/components/share/share-sheet-modal";
 
 type BreakdownDetail = {
   id: string;
@@ -31,6 +24,8 @@ type BreakdownDetail = {
   author_id: string | null;
   video_filename: string | null;
   video_duration_seconds: number | null;
+  member_id: string | null;
+  external_person_id: string | null;
   members: { first_name: string; last_name: string } | null;
   external_people: { display_name: string } | null;
 };
@@ -72,7 +67,7 @@ export default function BreakdownDetailScreen() {
       const { data, error } = await supabase
         .from("breakdowns")
         .select(
-          "id, name, match_date, gi, status, result, method, visibility, author_id, video_filename, video_duration_seconds, members(first_name, last_name), external_people(display_name)",
+          "id, name, match_date, gi, status, result, method, visibility, author_id, video_filename, video_duration_seconds, member_id, external_person_id, members(first_name, last_name), external_people(display_name)",
         )
         .eq("id", id)
         .single();
@@ -193,6 +188,21 @@ export default function BreakdownDetailScreen() {
     ? `${breakdown.members.first_name} ${breakdown.members.last_name}`
     : (breakdown.external_people?.display_name ?? "Unknown");
 
+  // Mirrors apps/web's breakdown detail page (analysis/[id]/page.tsx),
+  // which links the focus name to /analysis/athlete/[id] or
+  // /analysis/people/[id] — the main entry point into a profile screen on
+  // both platforms.
+  const memberId = breakdown.member_id;
+  const externalPersonId = breakdown.external_person_id;
+  function goToFocusProfile() {
+    if (memberId) {
+      router.push({ pathname: "/analysis/athlete/[id]", params: { id: memberId } });
+    } else if (externalPersonId) {
+      router.push({ pathname: "/analysis/people/[id]", params: { id: externalPersonId } });
+    }
+  }
+  const hasProfileLink = !!memberId || !!externalPersonId;
+
   // RLS grants staff SELECT on every breakdown in the gym but write access
   // only on ones they authored — showing Edit/Delete unconditionally would
   // lead into controls whose save silently fails (RLS blocks it). Same
@@ -205,7 +215,14 @@ export default function BreakdownDetailScreen() {
         <View className="gap-1">
           <Text className="font-heading text-2xl tracking-wide text-primary">{breakdown.name}</Text>
           <Text className="font-sans text-sm text-neutral-600">
-            {focusName} · {format(new Date(breakdown.match_date), "MMM d, yyyy")}
+            {hasProfileLink ? (
+              <Text onPress={goToFocusProfile} className="text-primary underline">
+                {focusName}
+              </Text>
+            ) : (
+              focusName
+            )}{" "}
+            · {format(new Date(breakdown.match_date), "MMM d, yyyy")}
           </Text>
         </View>
 
@@ -222,6 +239,25 @@ export default function BreakdownDetailScreen() {
 
         {canEdit ? (
           <View className="flex-row gap-2">
+            <ShareSheetModal
+              type="breakdown"
+              subjectId={breakdown.id}
+              name={breakdown.name}
+              matchDate={breakdown.match_date}
+              gi={breakdown.gi}
+              result={breakdown.result}
+              method={breakdown.method}
+              focusDisplayName={focusName}
+              isExternalFocus={!!externalPersonId}
+              trigger={(open) => (
+                <Pressable
+                  onPress={open}
+                  className="h-11 flex-1 items-center justify-center rounded-md border border-neutral-300"
+                >
+                  <Text className="font-sans-bold text-sm text-neutral-900">Share</Text>
+                </Pressable>
+              )}
+            />
             <BreakdownEditModal
               breakdownId={breakdown.id}
               defaultValues={{

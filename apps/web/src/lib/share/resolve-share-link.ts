@@ -2,7 +2,12 @@ import "server-only";
 import { unstable_noStore as noStore } from "next/cache";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { hashShareToken } from "@/lib/auth/share-token";
-import { fetchAthleteProfileData, type AthleteProfile, type Database } from "@matos/shared";
+import {
+  fetchAthleteProfileData,
+  pickPrimaryStyle as pickPrimaryStyleFromProfiles,
+  type AthleteProfile,
+  type Database,
+} from "@matos/shared";
 
 type BeltColor = Database["public"]["Enums"]["belt_color"];
 
@@ -169,18 +174,16 @@ export async function resolveShareLink(rawToken: string): Promise<ResolvedShare 
 
 // Stage S3 (code-review finding): a public "card" only has room for one
 // style's stats, not a full gi/no-gi split like the authenticated
-// ProfileView — this picks whichever has more logged matches. Extracted
-// here (not left as an inline ternary at each of the three places that
-// used to repeat it, in both page.tsx and opengraph-image.tsx) so the
-// tie-break rule only exists once. A tie (including 0 vs 0, someone with
-// no logged matches in either style) defaults to gi — arbitrary, but
-// deterministic, and the resulting empty card is the same regardless of
-// which label it's under.
+// ProfileView — this picks whichever has more logged matches. A tie
+// (including 0 vs 0, someone with no logged matches in either style)
+// defaults to gi. Generalized to `packages/shared` at Stage M5 so
+// apps/mobile's own share-card generation (from its own authenticated
+// fetch, not a public share resolution) can apply the identical rule —
+// re-exported here so this file's existing callers (page.tsx,
+// opengraph-image.tsx) don't need to change their import.
 export function pickPrimaryStyle(share: ResolvedProfileShare): {
   profile: AthleteProfile;
   label: "Gi" | "No-Gi";
 } {
-  return share.gi.matchCount >= share.noGi.matchCount
-    ? { profile: share.gi, label: "Gi" }
-    : { profile: share.noGi, label: "No-Gi" };
+  return pickPrimaryStyleFromProfiles({ gi: share.gi, noGi: share.noGi });
 }

@@ -148,6 +148,23 @@ function classifyFirstAction(name: string): "pull" | "shoot" | "pulledOn" | null
   return null;
 }
 
+// Stage M5: generalized out of apps/web's resolve-share-link.ts (which
+// picked a primary gi/no-gi style for a *publicly resolved* share) so
+// apps/mobile can apply the identical tie-break rule to its own
+// authenticated profile fetch — a share card image only has room for one
+// ruleset, same as a public share page does. Takes the two computed
+// profiles directly rather than a share-resolution-specific type, since
+// both callers already have exactly this shape on hand. A tie (including
+// 0 vs 0) defaults to gi — arbitrary but deterministic.
+export function pickPrimaryStyle(profiles: { gi: AthleteProfile; noGi: AthleteProfile }): {
+  profile: AthleteProfile;
+  label: "Gi" | "No-Gi";
+} {
+  return profiles.gi.matchCount >= profiles.noGi.matchCount
+    ? { profile: profiles.gi, label: "Gi" }
+    : { profile: profiles.noGi, label: "No-Gi" };
+}
+
 export function computeAthleteProfile(
   breakdowns: BreakdownForProfile[],
   positions: PositionForProfile[],

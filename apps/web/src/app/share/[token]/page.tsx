@@ -1,5 +1,12 @@
 import type { Metadata } from "next";
-import { formatPct, formatRate, humanize, type MetricValue } from "@matos/shared";
+import {
+  formatPct,
+  formatRate,
+  humanize,
+  RESULT_LABELS,
+  METHOD_LABELS,
+  type MetricValue,
+} from "@matos/shared";
 import {
   resolveShareLink,
   pickPrimaryStyle,
@@ -42,14 +49,6 @@ export async function generateMetadata({
       }
     : { title: `${share.name} — MatOS`, description: `A BJJ match breakdown, shared via MatOS.` };
 }
-
-const RESULT_LABELS = { win: "Win", loss: "Loss", draw: "Draw" } as const;
-const METHOD_LABELS = {
-  submission: "Submission",
-  points: "Points",
-  decision: "Decision",
-  dq: "DQ",
-} as const;
 
 function Unavailable() {
   return (

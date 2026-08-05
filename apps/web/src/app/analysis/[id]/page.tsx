@@ -24,14 +24,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-
-const RESULT_LABELS = { win: "Win", loss: "Loss", draw: "Draw" } as const;
-const METHOD_LABELS = {
-  submission: "Submission",
-  points: "Points",
-  decision: "Decision",
-  dq: "DQ",
-} as const;
+import { RESULT_LABELS, METHOD_LABELS } from "@matos/shared";
 
 type BreakdownDetail = {
   id: string;

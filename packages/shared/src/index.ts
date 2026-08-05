@@ -28,6 +28,8 @@ export * from "./analysis/profile";
 export * from "./analysis/metric-catalog";
 export * from "./analysis/metric-format";
 export * from "./analysis/fetch-profile-data";
+export * from "./analysis/compare";
+export * from "./analysis/labels";
 
 export * from "./format/humanize";
 export * from "./utils";
