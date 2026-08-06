@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { apiPost, type ApiErrorBody } from "@/lib/api";
 import { useCurrentMember } from "@/lib/use-current-member";
+import { useCheckInQueue } from "@/lib/checkin-queue";
 import { GymTeaser } from "@/components/gym-teaser";
 import type { Database } from "@matos/shared";
 
@@ -59,6 +60,13 @@ function getWindowState(classRow: ClassRow, now: Date): "too_early" | "open" | "
 // that route does server-side window validation and writes the audit_log
 // row neither RLS nor a raw insert would give us. Solo users have no
 // classes to check into at all — the gym teaser replaces the whole screen.
+//
+// Stage M7: a check-in attempted with no network reaches the same
+// handler but queues locally (checkin-queue.ts) instead of surfacing an
+// error — the queue auto-flushes on reconnect, sending the *original*
+// attempt time so the server's own window check reconciles against when
+// the athlete actually tapped Check In, not whenever the device happened
+// to regain signal.
 export default function CheckInScreen() {
   const { data: member, isPending: isMemberPending } = useCurrentMember();
   const isSolo = member?.gymKind === "personal";
@@ -66,6 +74,7 @@ export default function CheckInScreen() {
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
   const [checkInError, setCheckInError] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const { queue: checkInQueue, enqueue: enqueueCheckIn } = useCheckInQueue();
   const today = todayIsoDate();
   const dayOfWeek = new Date(`${today}T00:00:00`).getDay();
 
@@ -73,6 +82,14 @@ export default function CheckInScreen() {
     const interval = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // The queue changes both the moment something is queued (so the row
+  // shows "Queued" immediately) and the moment a flush removes an entry
+  // (so it flips to "✓ Checked in") — invalidating on every change covers
+  // both without the screen needing to know which one just happened.
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ["check-in"] });
+  }, [checkInQueue, queryClient]);
 
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ["check-in", "today", dayOfWeek, member?.memberId],
@@ -103,12 +120,24 @@ export default function CheckInScreen() {
     enabled: !!member && !isSolo,
   });
 
+  // Stage M7: a network failure (apiPost's own "network_error" code — the
+  // request never reached the server at all, distinct from the server
+  // actively rejecting it) queues the attempt locally instead of just
+  // showing an error. Any other failure (TOO_LATE, ALREADY_CHECKED_IN,
+  // etc.) is a real, immediate rejection the server has already evaluated
+  // against the live window — retrying it offline-style wouldn't change
+  // the outcome, so it's shown directly instead of queued.
   async function handleCheckIn(classId: string) {
     setCheckingInId(classId);
     setCheckInError(null);
     const result = await apiPost("/api/attendance/check-in", { class_id: classId });
     if (!result.ok) {
-      setCheckInError((result.error as ApiErrorBody).error ?? "Couldn't check in.");
+      const error = result.error as ApiErrorBody;
+      if (error.code === "network_error") {
+        await enqueueCheckIn(classId);
+      } else {
+        setCheckInError(error.error ?? "Couldn't check in.");
+      }
     } else {
       queryClient.invalidateQueries({ queryKey: ["check-in"] });
     }
@@ -170,6 +199,7 @@ export default function CheckInScreen() {
           <View className="gap-3">
             {data.classes.map((c) => {
               const alreadyCheckedIn = data.checkedInClassIds.has(c.id);
+              const queuedEntry = checkInQueue.find((q) => q.classId === c.id);
               const windowState = getWindowState(c, now);
 
               return (
@@ -194,6 +224,33 @@ export default function CheckInScreen() {
                   {alreadyCheckedIn ? (
                     <View className="h-11 items-center justify-center rounded-md bg-primary px-3">
                       <Text className="font-sans-bold text-sm text-white">✓ Checked in</Text>
+                    </View>
+                  ) : queuedEntry ? (
+                    <View className="max-w-36 items-end gap-1">
+                      <View
+                        className={`h-11 items-center justify-center rounded-md border px-3 ${
+                          queuedEntry.syncStatus === "error"
+                            ? "border-red-400 bg-red-50"
+                            : "border-amber-400 bg-amber-50"
+                        }`}
+                      >
+                        <Text
+                          className={`font-sans-bold text-sm ${
+                            queuedEntry.syncStatus === "error" ? "text-red-700" : "text-amber-700"
+                          }`}
+                        >
+                          {queuedEntry.syncStatus === "error" ? "Sync failed" : "Queued"}
+                        </Text>
+                      </View>
+                      {/* Stage M7 gate fix (code-reviewer): syncError was
+                          captured on the queued entry but never rendered
+                          anywhere — the same gap Stage M3's gate already
+                          caught once for tagging drafts. */}
+                      {queuedEntry.syncStatus === "error" && queuedEntry.syncError ? (
+                        <Text className="text-right font-sans text-xs text-red-600">
+                          {queuedEntry.syncError}
+                        </Text>
+                      ) : null}
                     </View>
                   ) : windowState === "too_early" ? (
                     <Text className="max-w-32 text-right font-sans text-xs text-neutral-600">

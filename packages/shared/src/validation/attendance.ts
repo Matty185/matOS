@@ -19,8 +19,16 @@ export type MarkAttendanceInput = z.infer<typeof markAttendanceSchema>;
 
 // Athlete self-check-in — always "now," always themselves (context.memberId
 // server-side, never trusted from input).
+//
+// attempted_at (Stage M7): set only when a check-in was queued offline
+// (apps/mobile/src/lib/checkin-queue.ts) and is being submitted after
+// reconnecting — the moment the athlete actually tapped "Check In," not
+// whenever connectivity happened to return. Never trusted unbounded: the
+// route re-validates it's neither in the future nor older than a maximum
+// queue-tolerance window before using it for anything.
 export const checkInSchema = z.object({
   class_id: z.string().uuid(),
+  attempted_at: z.string().datetime().optional(),
 });
 
 export type CheckInInput = z.infer<typeof checkInSchema>;

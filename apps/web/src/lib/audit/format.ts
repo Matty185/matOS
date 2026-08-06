@@ -157,7 +157,13 @@ export function describeAuditEntry(row: AuditLogRow, ctx: AuditNameContext): str
     case "attendance.marked":
       return `${actor} marked ${subjectNameFor(row, ctx)} present at a class.`;
     case "attendance.self_checked_in":
-      return `${actor} checked in.`;
+      // Stage M7 gate fix (security-reviewer): offline_queued was being
+      // written on every insert but had no read path anywhere — the
+      // audit trail's own raw afterState carried it, but the rendered
+      // description (what a coach actually reads) never surfaced it.
+      return after.offline_queued
+        ? `${actor} checked in (reconciled from an offline attempt).`
+        : `${actor} checked in.`;
     case "class.created":
       return `${actor} added a new class: ${className(row, ctx)}.`;
     case "class.updated":

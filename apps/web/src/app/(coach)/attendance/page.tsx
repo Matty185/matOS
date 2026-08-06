@@ -125,7 +125,7 @@ function ClassAttendanceCard({ classRow, date }: { classRow: ClassRow; date: str
         supabase.from("members").select("*").eq("active", true).order("last_name"),
         supabase
           .from("attendance")
-          .select("member_id, checked_in_at, checked_in_by")
+          .select("member_id, checked_in_at, checked_in_by, offline_queued")
           .eq("class_id", classRow.id)
           .eq("checked_in_date", date),
       ]);
@@ -208,6 +208,10 @@ function ClassAttendanceCard({ classRow, date }: { classRow: ClassRow; date: str
                           </span>
                           <span className="text-xs text-muted-foreground">
                             {record?.checked_in_by === "self" ? "Self check-in" : "Marked by coach"}
+                            {/* Stage M7 gate fix (security-reviewer): offline_queued was
+                                written on every insert but had no read path anywhere in the
+                                app — this is that path. */}
+                            {record?.offline_queued ? " (reconciled offline)" : ""}
                           </span>
                         </li>
                       );

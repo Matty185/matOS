@@ -1,0 +1,14 @@
+-- Stage M7 ("Offline hardening: queued check-in, reconnect reconciliation,
+-- airplane-mode test pass"). Mobile can now queue a check-in locally when
+-- offline and submit it once connectivity returns — see
+-- apps/mobile/src/lib/checkin-queue.ts and the corresponding
+-- reconciliation logic in apps/web/src/app/api/attendance/check-in/route.ts.
+--
+-- offline_queued is informational only (no RLS/business-logic dependency
+-- on it) — lets a coach reviewing attendance tell "checked in live" from
+-- "reconciled from a queued offline attempt" apart, the same way
+-- checked_in_by already distinguishes self from coach-marked. Defaults
+-- false so every existing row (and every non-mobile insert path —
+-- markAttendanceSchema's coach-manual route never sets this) is
+-- unaffected.
+alter table public.attendance add column offline_queued boolean not null default false;

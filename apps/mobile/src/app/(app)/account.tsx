@@ -31,11 +31,21 @@ export default function AccountScreen() {
         <Pressable
           onPress={async () => {
             // Best-effort: local tagging drafts are namespaced per-user
-            // (Stage M3 gate fix) specifically so they don't leak into a
-            // different account's session on a shared device — this has
-            // to run before signOut() while the session is still valid.
-            // A failure here (e.g. no drafts directory ever created) must
-            // never block sign-out itself.
+            // (Stage M3 gate fix) so they don't leak into a different
+            // account's session on a shared device — this has to run
+            // before signOut() while the session is still valid. A
+            // failure here (e.g. nothing was ever drafted) must never
+            // block sign-out itself.
+            //
+            // The offline check-in queue (Stage M7) is deliberately NOT
+            // cleared here — per-user namespacing alone is what prevents
+            // it leaking to a different account, not clearing it, and a
+            // not-yet-synced entry represents a real completed action
+            // (the athlete already tapped Check In) that unconditional
+            // sign-out cleanup would otherwise silently discard (Stage M7
+            // gate fix, security-reviewer). It sits dormant under this
+            // account's own key until they sign back in and it flushes
+            // normally.
             await clearCurrentUserDrafts().catch(() => {});
             await supabase.auth.signOut();
           }}

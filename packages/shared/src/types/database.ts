@@ -125,6 +125,7 @@ export type Database = {
           gym_id: string;
           id: string;
           member_id: string;
+          offline_queued: boolean;
         };
         Insert: {
           checked_in_at?: string;
@@ -134,6 +135,7 @@ export type Database = {
           gym_id: string;
           id?: string;
           member_id: string;
+          offline_queued?: boolean;
         };
         Update: {
           checked_in_at?: string;
@@ -143,6 +145,7 @@ export type Database = {
           gym_id?: string;
           id?: string;
           member_id?: string;
+          offline_queued?: boolean;
         };
         Relationships: [
           {
