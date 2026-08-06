@@ -3,7 +3,8 @@ import { withAuth } from "@/lib/auth/withAuth";
 import { apiError } from "@/lib/api/response";
 import { createClient } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/audit/log";
-import { promoteBeltSchema } from "@matos/shared";
+import { sendPushToMember } from "@/lib/push/send-push";
+import { promoteBeltSchema, BELT_LABELS } from "@matos/shared";
 
 // POST /api/members/[id]/promote — coach/owner only. Updates the member's
 // current belt/stripes AND inserts a belt_history row in the same request,
@@ -63,6 +64,14 @@ export const POST = withAuth(
       afterState: { belt: input.belt, stripes: input.stripes },
       initiatedBy: input.agent_query ? "agent" : "coach_manual",
       agentQuery: input.agent_query ?? null,
+    });
+
+    const stripeLabel =
+      input.stripes > 0 ? `, ${input.stripes} stripe${input.stripes === 1 ? "" : "s"}` : "";
+    await sendPushToMember(id, {
+      title: "Belt promotion!",
+      body: `You've been promoted to ${BELT_LABELS[input.belt]} belt${stripeLabel}.`,
+      data: { type: "belt_promotion", memberId: id },
     });
 
     return NextResponse.json({ success: true });

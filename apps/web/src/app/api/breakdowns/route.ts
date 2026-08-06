@@ -3,6 +3,7 @@ import { withAuth } from "@/lib/auth/withAuth";
 import { apiError } from "@/lib/api/response";
 import { createClient } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/audit/log";
+import { sendPushToMember } from "@/lib/push/send-push";
 import { createBreakdownSchema } from "@matos/shared";
 
 // POST /api/breakdowns — any authenticated member, self or staff-on-behalf.
@@ -43,7 +44,7 @@ export const POST = withAuth(
         // for every request that reaches this far.
         visibility: input.visibility ?? (context.gymKind === "personal" ? "private" : "gym"),
       })
-      .select("id, name, match_date, status")
+      .select("id, name, match_date, status, visibility")
       .single();
 
     if (insertError || !created) {
@@ -67,6 +68,29 @@ export const POST = withAuth(
       afterState: { name: created.name, match_date: created.match_date },
       initiatedBy: context.role === "athlete" ? "self_service" : "coach_manual",
     });
+
+    // "Breakdown shared with you" (matos_mobile_plan.md §3.2's push
+    // trigger trio) — a coach/owner created this breakdown with a
+    // *different* member as its focus. RLS (breakdowns_all_own, see this
+    // route's own top comment) already means an athlete can never reach
+    // this branch with someone else's member_id, so this condition alone
+    // correctly identifies "staff created this about another member" with
+    // no extra role check needed.
+    //
+    // Also requires visibility === "gym": a 'private' breakdown stays
+    // exactly that — the author's own analysis notes, invisible to its
+    // subject by design (breakdowns_select_focus_self, this stage's other
+    // migration, only grants the focus member SELECT when gym-visible).
+    // Sending "ready to view" for something the recipient's own RLS still
+    // refuses to show them would just move the dead link from "always" to
+    // "only when marked private" (Stage M6 gate fix, security-reviewer).
+    if (input.member_id && input.member_id !== context.memberId && created.visibility === "gym") {
+      await sendPushToMember(input.member_id, {
+        title: "New breakdown shared with you",
+        body: `"${created.name}" is ready to view.`,
+        data: { type: "breakdown_shared", breakdownId: created.id },
+      });
+    }
 
     return NextResponse.json({ success: true, breakdown: created }, { status: 201 });
   },

@@ -1,24 +1,33 @@
 import { useEffect } from "react";
 import { Platform } from "react-native";
+import { useRouter } from "expo-router";
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import Constants from "expo-constants";
 import { supabase } from "@/lib/supabase";
 import type { CurrentMember } from "@/lib/use-current-member";
 
-// Stage M1: token registration only — nothing sends a push notification
-// until Stage M6 wires that up. Requesting permission in a genuinely
-// contextual moment (M3.4's store-compliance checklist: "after first
-// relevant event, not at launch") is also M6/M9's concern, not this one;
-// registering on every authenticated app open is a reasonable interim
-// default while nothing is actually sent yet.
+// Stage M1 built token registration only; Stage M6 wires the actual sends
+// (apps/web/src/lib/push/send-push.ts, called from the belt-promotion and
+// breakdown-create routes) plus the two client-side pieces every push
+// needs regardless of who triggers it: how it displays while the app is
+// foregrounded, and what happens when it's tapped. Requesting permission
+// in a genuinely contextual moment (M3.4's store-compliance checklist:
+// "after first relevant event, not at launch") is M9's concern, not this
+// one; registering on every authenticated app open remains the interim
+// default.
 //
 // No real EAS projectId exists yet (Stage M0's own known gap —
 // eas.json has no real project linked; `eas login`/`eas init` is an
 // interactive step needing the developer's own Expo account). Without
 // one, getExpoPushTokenAsync() cannot succeed — this fails soft (logs and
 // returns) rather than crashing the app or blocking the screens that
-// actually matter for this stage.
+// actually matter for this stage. This also means the sends this stage
+// wires up can't be exercised end-to-end against a real device in this
+// environment — the send-side logic and the client-side display/tap
+// handling below are each independently correct and verified, but the
+// full round trip is an honest verification gap, same class as every
+// prior stage's "no native simulator available" limitation.
 export function usePushTokenRegistration(member: CurrentMember | null | undefined) {
   useEffect(() => {
     if (!member) return;
@@ -73,4 +82,67 @@ async function registerForPushNotifications(member: CurrentMember) {
   if (error) {
     console.warn("[push] failed to register token:", error.message);
   }
+}
+
+// Each push this stage sends carries a `data.type` discriminator
+// (belt_promotion | breakdown_shared) plus the id it's about — this maps
+// a tap straight to the relevant screen instead of just opening the app
+// to wherever it was last left. Route destinations mirror the same
+// screens a user would navigate to manually for the same information
+// (Progress for a promotion, the breakdown detail screen for a shared
+// breakdown).
+type PushData =
+  { type: "belt_promotion"; memberId: string } | { type: "breakdown_shared"; breakdownId: string };
+
+// Validates the companion id field too, not just the discriminant — a
+// payload matching only `{ type: "breakdown_shared" }` (no breakdownId)
+// would otherwise pass this guard and reach
+// `router.push(\`/analysis/${data.breakdownId}\`)` as a silent
+// "/analysis/undefined" dead link. Not reachable from either of this
+// stage's two real senders today (both always include the field), but
+// cheap to make hold for a future third sender too (Stage M6 gate fix,
+// code-reviewer).
+function isPushData(data: unknown): data is PushData {
+  if (!data || typeof data !== "object" || !("type" in data)) return false;
+  if (data.type === "belt_promotion") {
+    return "memberId" in data && typeof data.memberId === "string";
+  }
+  if (data.type === "breakdown_shared") {
+    return "breakdownId" in data && typeof data.breakdownId === "string";
+  }
+  return false;
+}
+
+// Sets the foreground display behavior once (expo-notifications' default,
+// with no handler configured, is to NOT show anything while the app is
+// open) and wires tap-to-navigate. Call once from the authenticated app
+// shell, not per-screen — a second call would just replace the first
+// handler harmlessly, but there's no reason to register it more than
+// once.
+export function useNotificationHandling() {
+  const router = useRouter();
+
+  useEffect(() => {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      }),
+    });
+  }, []);
+
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data;
+      if (!isPushData(data)) return;
+      if (data.type === "belt_promotion") {
+        router.push("/progress");
+      } else {
+        router.push(`/analysis/${data.breakdownId}`);
+      }
+    });
+    return () => subscription.remove();
+  }, [router]);
 }

@@ -2,7 +2,7 @@ import { Redirect, Tabs } from "expo-router";
 import { Text } from "react-native";
 import { useAuth } from "@/lib/auth-context";
 import { useCurrentMember } from "@/lib/use-current-member";
-import { usePushTokenRegistration } from "@/lib/push-registration";
+import { usePushTokenRegistration, useNotificationHandling } from "@/lib/push-registration";
 
 // Real tab shell, mirroring apps/web's ATHLETE_NAV (Home, Check In, My
 // Progress, Analysis, Account). Tab icons are plain emoji glyphs rather
@@ -11,6 +11,7 @@ export default function AppLayout() {
   const { session, isLoading } = useAuth();
   const { data: member } = useCurrentMember();
   usePushTokenRegistration(member);
+  useNotificationHandling();
 
   if (isLoading) return null;
   if (!session) return <Redirect href="/login" />;
