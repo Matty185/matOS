@@ -68,7 +68,7 @@ export function VideoControls({
           <Pressable
             key={speed}
             onPress={() => onSetPlaybackRate(speed)}
-            className={`h-8 items-center justify-center rounded-md px-3 ${
+            className={`h-11 items-center justify-center rounded-md px-3 ${
               playbackRate === speed ? "bg-primary" : "bg-white/10"
             }`}
           >

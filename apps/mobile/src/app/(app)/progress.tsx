@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Alert, Text, View, ScrollView, Pressable, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, differenceInCalendarWeeks } from "date-fns";
 import { supabase } from "@/lib/supabase";
@@ -61,7 +62,7 @@ export default function ProgressScreen() {
             <Pressable
               key={t.key}
               onPress={() => setTab(t.key)}
-              className={`h-9 flex-1 items-center justify-center rounded-md ${
+              className={`h-11 flex-1 items-center justify-center rounded-md ${
                 tab === t.key ? "bg-primary" : "border border-neutral-300"
               }`}
             >
@@ -99,6 +100,7 @@ export default function ProgressScreen() {
 }
 
 function AttendanceTab({ memberId }: { memberId?: string }) {
+  const router = useRouter();
   const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ["my-attendance", memberId],
     queryFn: async () => {
@@ -133,13 +135,19 @@ function AttendanceTab({ memberId }: { memberId?: string }) {
       {isLoading ? (
         <Text className="font-sans text-sm text-neutral-600">Loading...</Text>
       ) : !data || data.attendance.length === 0 ? (
-        <View className="items-center gap-1 rounded-md border border-neutral-200 p-6">
+        <View className="items-center gap-3 rounded-md border border-neutral-200 p-6">
           <Text className="font-sans-bold text-sm text-neutral-900">
             No attendance recorded yet
           </Text>
           <Text className="text-center font-sans text-sm text-neutral-600">
             Check in to a class and your history will show up here.
           </Text>
+          <Pressable
+            onPress={() => router.push("/check-in")}
+            className="h-11 items-center justify-center rounded-md bg-primary px-4"
+          >
+            <Text className="font-sans-bold text-sm text-white">Check In</Text>
+          </Pressable>
         </View>
       ) : (
         <>
@@ -308,7 +316,7 @@ function LogsTab({ memberId }: { memberId?: string }) {
                   trigger={(open) => (
                     <Pressable
                       onPress={open}
-                      className="h-9 w-9 items-center justify-center rounded-md border border-neutral-300"
+                      className="h-11 w-11 items-center justify-center rounded-md border border-neutral-300"
                     >
                       <Text>✏️</Text>
                     </Pressable>
@@ -317,7 +325,7 @@ function LogsTab({ memberId }: { memberId?: string }) {
                 <Pressable
                   onPress={() => confirmDelete(row.id)}
                   disabled={deletingId === row.id}
-                  className="h-9 w-9 items-center justify-center rounded-md border border-neutral-300 disabled:opacity-60"
+                  className="h-11 w-11 items-center justify-center rounded-md border border-neutral-300 disabled:opacity-60"
                 >
                   <Text>🗑️</Text>
                 </Pressable>

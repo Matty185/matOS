@@ -209,10 +209,12 @@ export default function SignupScreen() {
             </Text>
           </Pressable>
 
-          <View className="mt-4 flex-row justify-center gap-1">
+          <View className="mt-4 flex-row items-center justify-center gap-1">
             <Text className="font-sans text-sm text-neutral-600">Already have an account?</Text>
-            <Link href="/login">
-              <Text className="font-sans-bold text-sm text-primary">Sign in</Text>
+            <Link href="/login" asChild>
+              <Pressable className="h-11 items-center justify-center">
+                <Text className="font-sans-bold text-sm text-primary">Sign in</Text>
+              </Pressable>
             </Link>
           </View>
         </ScrollView>

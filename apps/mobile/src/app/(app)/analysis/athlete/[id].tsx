@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Text, View, Pressable, ScrollView } from "react-native";
+import { Text, View, Pressable, ScrollView, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -22,6 +22,8 @@ export default function AthleteProfileScreen() {
     data: member,
     isLoading: memberLoading,
     error,
+    refetch,
+    isRefetching,
   } = useQuery({
     queryKey: ["member", id],
     queryFn: async () => {
@@ -40,6 +42,7 @@ export default function AthleteProfileScreen() {
     data: profileData,
     isLoading: profileLoading,
     error: profileError,
+    refetch: refetchProfile,
   } = useAthleteProfile({
     type: "member",
     id: id ?? "",
@@ -83,7 +86,18 @@ export default function AthleteProfileScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      <ScrollView contentContainerClassName="gap-4 p-4">
+      <ScrollView
+        contentContainerClassName="gap-4 p-4"
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={() => {
+              refetch();
+              refetchProfile();
+            }}
+          />
+        }
+      >
         <View className="flex-row items-center gap-3">
           <Text className="font-heading text-2xl tracking-wide text-primary">
             {member.first_name} {member.last_name}

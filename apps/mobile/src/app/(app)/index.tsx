@@ -99,17 +99,21 @@ export default function HomeScreen() {
           <GymTeaser />
         ) : (
           <>
-            <View className="flex-row items-center gap-3 rounded-md border border-neutral-200 p-4">
-              <Text className="text-2xl">🔥</Text>
-              <View>
-                <Text className="font-sans-bold text-2xl text-neutral-900">
-                  {data?.streak ?? 0} {data?.streak === 1 ? "week" : "weeks"}
-                </Text>
-                <Text className="font-sans text-sm text-neutral-600">
-                  Current attendance streak
-                </Text>
+            {isLoading ? (
+              <Text className="font-sans text-sm text-neutral-600">Loading...</Text>
+            ) : (
+              <View className="flex-row items-center gap-3 rounded-md border border-neutral-200 p-4">
+                <Text className="text-2xl">🔥</Text>
+                <View>
+                  <Text className="font-sans-bold text-2xl text-neutral-900">
+                    {data?.streak ?? 0} {data?.streak === 1 ? "week" : "weeks"}
+                  </Text>
+                  <Text className="font-sans text-sm text-neutral-600">
+                    Current attendance streak
+                  </Text>
+                </View>
               </View>
-            </View>
+            )}
 
             <View className="gap-2">
               <Text className="font-sans-bold text-lg text-neutral-900">Upcoming classes</Text>

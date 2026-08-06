@@ -94,10 +94,12 @@ export default function LoginScreen() {
           </Text>
         </Pressable>
 
-        <View className="mt-4 flex-row justify-center gap-1">
+        <View className="mt-4 flex-row items-center justify-center gap-1">
           <Text className="font-sans text-sm text-neutral-600">No gym yet?</Text>
-          <Link href="/signup">
-            <Text className="font-sans-bold text-sm text-primary">Create a workspace</Text>
+          <Link href="/signup" asChild>
+            <Pressable className="h-11 items-center justify-center">
+              <Text className="font-sans-bold text-sm text-primary">Create a workspace</Text>
+            </Pressable>
           </Link>
         </View>
       </KeyboardAvoidingView>

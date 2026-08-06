@@ -184,11 +184,17 @@ export default function ExternalPersonDetailScreen() {
               Couldn&apos;t load breakdowns. Pull to refresh.
             </Text>
           ) : !breakdowns || breakdowns.length === 0 ? (
-            <View className="items-center gap-1 rounded-md border border-neutral-200 p-6">
+            <View className="items-center gap-2 rounded-md border border-neutral-200 p-6">
               <Text className="font-sans-bold text-sm text-neutral-900">No breakdowns yet</Text>
               <Text className="text-center font-sans text-sm text-neutral-600">
                 Matches logged about this person will show up here.
               </Text>
+              <Pressable
+                onPress={() => router.push("/analysis/new")}
+                className="mt-2 h-11 items-center justify-center rounded-md bg-primary px-4"
+              >
+                <Text className="font-sans-bold text-sm text-white">Log a match</Text>
+              </Pressable>
             </View>
           ) : (
             <View className="gap-2">

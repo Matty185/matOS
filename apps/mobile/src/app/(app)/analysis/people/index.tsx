@@ -126,7 +126,7 @@ export default function ExternalPeopleListScreen() {
                     trigger={(open) => (
                       <Pressable
                         onPress={open}
-                        className="h-9 w-9 items-center justify-center rounded-md border border-neutral-300"
+                        className="h-11 w-11 items-center justify-center rounded-md border border-neutral-300"
                       >
                         <Text>✏️</Text>
                       </Pressable>
@@ -135,7 +135,7 @@ export default function ExternalPeopleListScreen() {
                   <Pressable
                     onPress={() => confirmDelete(p)}
                     disabled={deletingId === p.id}
-                    className="h-9 w-9 items-center justify-center rounded-md border border-neutral-300 disabled:opacity-60"
+                    className="h-11 w-11 items-center justify-center rounded-md border border-neutral-300 disabled:opacity-60"
                   >
                     <Text>🗑️</Text>
                   </Pressable>
