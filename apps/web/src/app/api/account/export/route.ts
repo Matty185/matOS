@@ -36,19 +36,40 @@ export const GET = withAuth(async (_request, context) => {
   const supabase = createClient();
   const serviceClient = createServiceRoleClient();
 
-  const [member, attendance, payments, beltHistory, logs, breakdowns, consent, pushTokens] =
-    await Promise.all([
-      supabase.from("members").select("*").eq("id", context.memberId).single(),
-      supabase.from("attendance").select("*").eq("member_id", context.memberId),
-      supabase.from("payments").select("*").eq("member_id", context.memberId),
-      supabase.from("belt_history").select("*").eq("member_id", context.memberId),
-      supabase.from("athlete_logs").select("*").eq("member_id", context.memberId),
-      serviceClient.from("breakdowns").select("*").eq("member_id", context.memberId),
-      supabase.from("gdpr_consents").select("*").eq("member_id", context.memberId).maybeSingle(),
-      // push_tokens (Stage M1) — RLS client is sufficient (push_tokens_all_self
-      // already scopes to self, no authorship-style restriction like breakdowns has).
-      supabase.from("push_tokens").select("*").eq("member_id", context.memberId),
-    ]);
+  const [
+    member,
+    attendance,
+    payments,
+    beltHistory,
+    logs,
+    breakdowns,
+    consent,
+    pushTokens,
+    memberships,
+    entitlements,
+    shareLinks,
+  ] = await Promise.all([
+    supabase.from("members").select("*").eq("id", context.memberId).single(),
+    supabase.from("attendance").select("*").eq("member_id", context.memberId),
+    supabase.from("payments").select("*").eq("member_id", context.memberId),
+    supabase.from("belt_history").select("*").eq("member_id", context.memberId),
+    supabase.from("athlete_logs").select("*").eq("member_id", context.memberId),
+    serviceClient.from("breakdowns").select("*").eq("member_id", context.memberId),
+    supabase.from("gdpr_consents").select("*").eq("member_id", context.memberId).maybeSingle(),
+    // push_tokens (Stage M1) — RLS client is sufficient (push_tokens_all_self
+    // already scopes to self, no authorship-style restriction like breakdowns has).
+    supabase.from("push_tokens").select("*").eq("member_id", context.memberId),
+    // memberships/entitlements/share_links (Stage M9 gate fix, database-
+    // reviewer): all three are genuine "data held about me," all three key
+    // by user_id (not member_id — Stage S1's account-primary schema, unlike
+    // every table above), and all three already have a self-scoped select
+    // policy (memberships_select_own, entitlements_select_own,
+    // share_links_all_own) — RLS client is sufficient, no service-role
+    // authorship-scoping gap like breakdowns has.
+    supabase.from("memberships").select("*").eq("user_id", context.userId),
+    supabase.from("entitlements").select("*").eq("user_id", context.userId),
+    supabase.from("share_links").select("*").eq("created_by", context.userId),
+  ]);
 
   const breakdownIds = (breakdowns.data ?? []).map((b) => b.id);
   const [breakdownPositions, breakdownEvents] =
@@ -71,6 +92,9 @@ export const GET = withAuth(async (_request, context) => {
     breakdown_events: breakdownEvents.data ?? [],
     gdpr_consent: consent.data ?? null,
     push_tokens: pushTokens.data ?? [],
+    memberships: memberships.data ?? [],
+    entitlements: entitlements.data ?? [],
+    share_links: shareLinks.data ?? [],
   };
 
   await writeAuditLog({

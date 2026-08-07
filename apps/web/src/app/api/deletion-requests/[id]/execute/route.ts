@@ -159,6 +159,7 @@ export const POST = withAuth(
       paymentsResult,
       beltHistoryResult,
       pushTokensResult,
+      notificationsResult,
     ] = await Promise.all([
       serviceClient.from("attendance").delete().eq("member_id", member.id),
       serviceClient.from("athlete_logs").delete().eq("member_id", member.id),
@@ -172,6 +173,13 @@ export const POST = withAuth(
       // member's live device push token would silently survive a GDPR
       // erasure request untouched while everything else was cleaned up.
       serviceClient.from("push_tokens").delete().eq("member_id", member.id),
+      // notifications (Stage M9 gate fix, database-reviewer): /api/account/
+      // delete-request writes this member's real first/last name into a
+      // coach's notifications.payload the moment they request deletion —
+      // notifications.recipient_user_id cascades on the COACH's auth-user
+      // deletion, not this member's, so that PII survives the anonymisation
+      // above untouched and indefinitely unless swept here explicitly.
+      serviceClient.from("notifications").delete().eq("payload->>member_id", member.id),
     ]);
 
     for (const [label, result] of [
@@ -181,6 +189,7 @@ export const POST = withAuth(
       ["payments", paymentsResult],
       ["belt_history", beltHistoryResult],
       ["push_tokens", pushTokensResult],
+      ["notifications", notificationsResult],
     ] as const) {
       if (result.error) {
         console.error(`[gdpr] failed to clean up ${label}`, result.error);

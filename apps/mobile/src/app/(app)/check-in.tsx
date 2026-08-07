@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { apiPost, type ApiErrorBody } from "@/lib/api";
 import { useCurrentMember } from "@/lib/use-current-member";
 import { useCheckInQueue } from "@/lib/checkin-queue";
+import { requestPushPermissionAndRegister } from "@/lib/push-registration";
 import { GymTeaser } from "@/components/gym-teaser";
 import type { Database } from "@matos/shared";
 
@@ -140,6 +141,15 @@ export default function CheckInScreen() {
       }
     } else {
       queryClient.invalidateQueries({ queryKey: ["check-in"] });
+      // Stage M9 store-compliance checklist: request push permission in
+      // context (a real check-in just happened) rather than at launch.
+      // Fire-and-forget — a declined/failed permission request must never
+      // block or error the check-in the user actually came here for.
+      if (member) {
+        requestPushPermissionAndRegister(member).catch((error) => {
+          console.warn("[push] permission request skipped:", error);
+        });
+      }
     }
     setCheckingInId(null);
   }

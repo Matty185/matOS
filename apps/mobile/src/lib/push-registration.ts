@@ -11,44 +11,62 @@ import type { CurrentMember } from "@/lib/use-current-member";
 // (apps/web/src/lib/push/send-push.ts, called from the belt-promotion and
 // breakdown-create routes) plus the two client-side pieces every push
 // needs regardless of who triggers it: how it displays while the app is
-// foregrounded, and what happens when it's tapped. Requesting permission
-// in a genuinely contextual moment (M3.4's store-compliance checklist:
-// "after first relevant event, not at launch") is M9's concern, not this
-// one; registering on every authenticated app open remains the interim
-// default.
+// foregrounded, and what happens when it's tapped.
+//
+// Stage M9 (store compliance checklist, §3.4: "Push permission requested
+// in context, not at launch") splits what M1 had bundled into one
+// always-both function: `usePushTokenRegistration` (called unconditionally
+// from the authenticated app shell on every mount) never shows the OS
+// permission dialog — it only re-syncs the token if permission was
+// already granted in some earlier session (keeps the token fresh across
+// reinstalls/token rotation, which needs no user interaction and isn't a
+// store-compliance concern). The actual permission *request* — the one
+// that shows a system dialog — only happens from
+// `requestPushPermissionAndRegister`, called from check-in.tsx after a
+// real check-in succeeds, a genuine "you're actively using this app"
+// moment rather than the first screen after signup. iOS/Android only ever
+// show the system dialog once per install regardless of how many times
+// requestPermissionsAsync is called, so calling this after every check-in
+// (not just literally the first one ever) is safe and requires no extra
+// first-time bookkeeping — subsequent calls silently resolve to the
+// already-decided status with no repeat prompt.
 //
 // No real EAS projectId exists yet (Stage M0's own known gap —
 // eas.json has no real project linked; `eas login`/`eas init` is an
 // interactive step needing the developer's own Expo account). Without
 // one, getExpoPushTokenAsync() cannot succeed — this fails soft (logs and
 // returns) rather than crashing the app or blocking the screens that
-// actually matter for this stage. This also means the sends this stage
-// wires up can't be exercised end-to-end against a real device in this
-// environment — the send-side logic and the client-side display/tap
-// handling below are each independently correct and verified, but the
-// full round trip is an honest verification gap, same class as every
-// prior stage's "no native simulator available" limitation.
+// actually matter. This also means the sends this stage wires up can't be
+// exercised end-to-end against a real device in this environment — the
+// send-side logic and the client-side display/tap handling below are each
+// independently correct and verified, but the full round trip is an
+// honest verification gap, same class as every prior stage's "no native
+// simulator available" limitation.
 export function usePushTokenRegistration(member: CurrentMember | null | undefined) {
   useEffect(() => {
     if (!member) return;
-    registerForPushNotifications(member).catch((error) => {
-      console.warn("[push] registration skipped:", error);
+    syncPushToken(member).catch((error) => {
+      console.warn("[push] token sync skipped:", error);
     });
   }, [member?.memberId]);
 }
 
-async function registerForPushNotifications(member: CurrentMember) {
+// Mount-safe: never calls requestPermissionsAsync, so it never shows a
+// system dialog. Only registers a token if permission was already granted
+// in an earlier session.
+async function syncPushToken(member: CurrentMember) {
+  if (!Device.isDevice) return;
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status !== "granted") return;
+  await obtainTokenAndUpsert(member);
+}
+
+// The contextual entry point (call from a real user action, never on
+// mount) — this is the one that may show the OS permission dialog.
+export async function requestPushPermissionAndRegister(member: CurrentMember) {
   if (!Device.isDevice) {
     // Simulators/emulators generally can't obtain a real push token —
     // nothing to register, not an error.
-    return;
-  }
-
-  const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-  if (!projectId) {
-    console.warn(
-      "[push] no EAS projectId configured (eas.json/app.json) — skipping token registration",
-    );
     return;
   }
 
@@ -59,6 +77,18 @@ async function registerForPushNotifications(member: CurrentMember) {
     finalStatus = status;
   }
   if (finalStatus !== "granted") return;
+
+  await obtainTokenAndUpsert(member);
+}
+
+async function obtainTokenAndUpsert(member: CurrentMember) {
+  const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+  if (!projectId) {
+    console.warn(
+      "[push] no EAS projectId configured (eas.json/app.json) — skipping token registration",
+    );
+    return;
+  }
 
   const { data: expoPushToken } = await Notifications.getExpoPushTokenAsync({ projectId });
 

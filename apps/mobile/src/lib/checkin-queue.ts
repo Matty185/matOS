@@ -4,6 +4,7 @@ import NetInfo from "@react-native-community/netinfo";
 import * as Crypto from "expo-crypto";
 import { supabase } from "@/lib/supabase";
 import { apiPost, type ApiErrorBody } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 
 // Stage M7 ("Offline hardening... check-in queued offline and submitted
 // on reconnect with server-side timestamp reconciliation"). Unlike
@@ -58,13 +59,19 @@ async function writeQueueFor(userId: string, queue: QueuedCheckIn[]): Promise<vo
   await AsyncStorage.setItem(storageKeyFor(userId), JSON.stringify(queue));
 }
 
-async function readQueue(): Promise<QueuedCheckIn[]> {
-  return readQueueFor(await currentUserId());
+// Only ever called from account.tsx's SoloDeleteAction — deliberately NOT
+// wired into sign-out (see the module comment above: sign-out is
+// reversible, clearing there would discard a real, not-yet-synced
+// completed action). Deletion is different: the account can never sign
+// back in, so a queue entry left under its key becomes permanently
+// orphaned dead data rather than dormant-until-next-sign-in (Stage M9
+// gate fix, security-reviewer).
+export async function clearCheckInQueueFor(userId: string): Promise<void> {
+  await AsyncStorage.removeItem(storageKeyFor(userId));
 }
 
-export async function enqueueCheckIn(classId: string): Promise<QueuedCheckIn> {
-  const userId = await currentUserId();
-  const queue = await readQueueFor(userId);
+export async function enqueueCheckIn(classId: string, ownerId: string): Promise<QueuedCheckIn> {
+  const queue = await readQueueFor(ownerId);
   const entry: QueuedCheckIn = {
     localId: Crypto.randomUUID(),
     classId,
@@ -73,7 +80,7 @@ export async function enqueueCheckIn(classId: string): Promise<QueuedCheckIn> {
     syncError: null,
   };
   queue.push(entry);
-  await writeQueueFor(userId, queue);
+  await writeQueueFor(ownerId, queue);
   return entry;
 }
 
@@ -182,63 +189,84 @@ async function runFlushPass(ownerId: string): Promise<QueuedCheckIn[]> {
 // as ALREADY_CHECKED_IN rather than creating a phantom row the way an
 // unguarded tag creation once could), so this is about avoiding wasted
 // duplicate requests, not preventing data corruption.
-let inFlight: Promise<QueuedCheckIn[]> | null = null;
-let inFlightOwnerId: string | null = null;
-let rerunRequested = false;
+//
+// Keyed by ownerId (Stage M9 gate fix, security-reviewer, MEDIUM) — the
+// original version used one bare global slot, not actually scoped to
+// which owner's pass it was, since ownerId was only resolved *inside* the
+// async body after the synchronous piggyback check already ran. On a
+// shared device, account A's in-flight pass could be piggybacked onto by
+// account B's own flush call the moment B signed in — B's promise would
+// then resolve to A's queue data, and B's own newly-enqueued entry
+// wouldn't be touched by that pass at all. Taking ownerId as a plain
+// synchronous parameter (mirroring tagging-sync.ts's
+// syncBreakdownDraft(breakdownId) exactly) lets the map lookup happen
+// before any async gap, so two different owners' calls can never coalesce
+// with each other — only genuinely-simultaneous same-owner calls do.
+const inFlightFlushes = new Map<string, Promise<QueuedCheckIn[]>>();
+const pendingRerun = new Set<string>();
 
-export function flushCheckInQueue(): Promise<QueuedCheckIn[]> {
-  if (inFlight && inFlightOwnerId) {
-    rerunRequested = true;
-    return inFlight;
+export function flushCheckInQueue(ownerId: string): Promise<QueuedCheckIn[]> {
+  const existing = inFlightFlushes.get(ownerId);
+  if (existing) {
+    pendingRerun.add(ownerId);
+    return existing;
   }
+
   const promise = (async () => {
-    const ownerId = await currentUserId();
-    inFlightOwnerId = ownerId;
     let result = await runFlushPass(ownerId);
-    while (rerunRequested) {
-      rerunRequested = false;
+    while (pendingRerun.has(ownerId)) {
+      pendingRerun.delete(ownerId);
       result = await runFlushPass(ownerId);
     }
     return result;
   })().finally(() => {
-    inFlight = null;
-    inFlightOwnerId = null;
+    inFlightFlushes.delete(ownerId);
   });
-  inFlight = promise;
+
+  inFlightFlushes.set(ownerId, promise);
   return promise;
 }
 
 export function useCheckInQueue() {
+  // The reactive session from auth-context, not currentUserId()'s async
+  // AsyncStorage read — synchronously available (React state, kept fresh
+  // by onAuthStateChange) so ownerId is known before flushCheckInQueue's
+  // own synchronous coalescing check runs, per the fix above.
+  const { session } = useAuth();
+  const ownerId = session?.user.id;
   const [queue, setQueue] = useState<QueuedCheckIn[]>([]);
   const [isFlushing, setIsFlushing] = useState(false);
   const wasOffline = useRef(false);
 
   const refresh = useCallback(async () => {
-    setQueue(await readQueue());
-  }, []);
+    if (!ownerId) return;
+    setQueue(await readQueueFor(ownerId));
+  }, [ownerId]);
 
   const flush = useCallback(async () => {
+    if (!ownerId) return;
     setIsFlushing(true);
     try {
-      setQueue(await flushCheckInQueue());
+      setQueue(await flushCheckInQueue(ownerId));
     } finally {
       setIsFlushing(false);
     }
-  }, []);
+  }, [ownerId]);
 
   const enqueue = useCallback(
     async (classId: string) => {
-      await enqueueCheckIn(classId);
+      if (!ownerId) return;
+      await enqueueCheckIn(classId, ownerId);
       await refresh();
       flush();
     },
-    [refresh, flush],
+    [ownerId, refresh, flush],
   );
 
   useEffect(() => {
     refresh().then(() => flush());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [ownerId]);
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
