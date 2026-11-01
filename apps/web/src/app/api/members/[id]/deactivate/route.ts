@@ -3,6 +3,7 @@ import { withAuth } from "@/lib/auth/withAuth";
 import { apiError } from "@/lib/api/response";
 import { createClient } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/audit/log";
+import { mapMemberGuardError } from "@/lib/api/member-guards";
 import { deactivateMemberSchema } from "@matos/shared";
 
 // POST /api/members/[id]/deactivate — coach/owner only. Sets active=false;
@@ -72,6 +73,10 @@ export const POST = withAuth(
       .select("id");
 
     if (updateError) {
+      // Stage O1 DB guards: last active owner (409), coach acting on a
+      // staff row (403).
+      const mapped = mapMemberGuardError(updateError);
+      if (mapped) return mapped;
       return apiError(500, "DEACTIVATE_FAILED", "Something went wrong — the change wasn't saved.");
     }
 

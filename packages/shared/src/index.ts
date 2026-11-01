@@ -15,6 +15,7 @@ export * from "./validation/breakdown";
 export * from "./validation/breakdown-event";
 export * from "./validation/breakdown-position";
 export * from "./validation/class";
+export * from "./validation/gym";
 export * from "./validation/external-person";
 export * from "./validation/invite";
 export * from "./validation/member";
@@ -30,6 +31,9 @@ export * from "./analysis/metric-format";
 export * from "./analysis/fetch-profile-data";
 export * from "./analysis/compare";
 export * from "./analysis/labels";
+
+export * from "./time/gym-time";
+export * from "./import/roster";
 
 export * from "./format/humanize";
 export * from "./utils";

@@ -1,4 +1,4 @@
-import { endOfMonth, startOfMonth, subMonths } from "date-fns";
+import { endOfMonth, parseISO, startOfMonth, subMonths } from "date-fns";
 import type { Database } from "@matos/shared";
 
 export type PaymentStatus = Database["public"]["Enums"]["payment_status"];
@@ -92,7 +92,9 @@ export function getOverduePeriodsForMember(
   window: MonthPeriod[],
   now: Date = new Date(),
 ): MonthPeriod[] {
-  const joinMonth = startOfMonth(new Date(member.join_date));
+  // parseISO reads "YYYY-MM-DD" as a local date; new Date() would read it
+  // as UTC midnight and land in the previous month west of UTC.
+  const joinMonth = startOfMonth(parseISO(member.join_date));
   return window.filter((period) => {
     const periodStart = new Date(period.year, period.month - 1, 1);
     if (periodStart < joinMonth) return false;
@@ -117,4 +119,28 @@ export function getOverdueMemberIds(
   }
 
   return overdue;
+}
+
+/**
+ * Stage O6: the members whose payment obligations are actually computed.
+ * - The gym owner is excluded — they don't owe their own gym a fee.
+ * - Each member's obligation starts at the later of their join date and
+ *   the gym's `payments_tracked_from` (the month MatOS started tracking
+ *   this gym's payments). Without this, a freshly onboarded gym whose
+ *   members joined years ago reads as entirely overdue on day one, because
+ *   no pre-MatOS payment history exists. NULL tracked-from = no clamp.
+ * Callers pass the result anywhere they'd pass members to the overdue
+ * helpers or render the payments grid, so every surface agrees.
+ */
+export function billableMembers<T extends MemberForOverdue & { role?: string }>(
+  members: T[],
+  paymentsTrackedFrom: string | null | undefined,
+): T[] {
+  return members
+    .filter((m) => m.role !== "gym_owner")
+    .map((m) =>
+      paymentsTrackedFrom && m.join_date < paymentsTrackedFrom
+        ? { ...m, join_date: paymentsTrackedFrom }
+        : m,
+    );
 }

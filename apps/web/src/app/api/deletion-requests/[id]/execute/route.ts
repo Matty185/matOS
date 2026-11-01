@@ -4,6 +4,7 @@ import { apiError } from "@/lib/api/response";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { writeAuditLog } from "@/lib/audit/log";
+import { isLastActiveOwner, LAST_OWNER_MESSAGE } from "@/lib/api/member-guards";
 
 // POST /api/deletion-requests/[id]/execute — gym_owner only (Gym Settings is
 // owner-only per plan §7's "Gym settings (owner)"). Executes plan §7's GDPR
@@ -56,6 +57,16 @@ export const POST = withAuth(
     }
 
     const serviceClient = createServiceRoleClient();
+
+    // Stage O1: the members_last_owner_guard trigger rejects deactivating a
+    // gym's sole active owner — and that update runs *after* the auth user
+    // is irreversibly deleted below. Checked first, with the service client
+    // (sees every owner row regardless of RLS), so this fails cleanly before
+    // anything is touched instead of leaving an un-anonymisable member row.
+    if (await isLastActiveOwner(serviceClient, member.id)) {
+      return apiError(409, "LAST_OWNER", LAST_OWNER_MESSAGE);
+    }
+
     const anonymizedEmail = `deleted-${member.id}@anonymized.invalid`;
 
     // Every step below is checked and aborts the whole request on failure —

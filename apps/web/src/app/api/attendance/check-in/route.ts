@@ -3,7 +3,12 @@ import { withAuth } from "@/lib/auth/withAuth";
 import { apiError } from "@/lib/api/response";
 import { createClient } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/audit/log";
-import { checkInSchema } from "@matos/shared";
+import {
+  checkInSchema,
+  gymWallClock,
+  timeStringToMinutes,
+  DEFAULT_GYM_TIMEZONE,
+} from "@matos/shared";
 
 const CHECK_IN_OPENS_MINUTES_BEFORE = 30;
 
@@ -42,12 +47,11 @@ const CLOCK_SKEW_TOLERANCE_MINUTES = 5;
 // can't claim a time outside a real valid window any more than it could
 // before this stage.
 //
-// KNOWN SIMPLIFICATION: classes.start_time has no timezone — this compares
-// it against server "now" (or the reconciled attempt time) as if both are
-// the same wall-clock time. Correct only when the server and the gym are
-// in the same timezone (true for a single-gym alpha running near its one
-// demo gym; not correct in general). No gym-timezone column exists yet to
-// do this properly — flagged in Stage 5 notes, not solved here.
+// Stage O1: every time-of-day decision (which weekday, is the window open)
+// is made in the gym's own IANA zone (gyms.timezone), not server time —
+// Vercel runs in UTC, which matched an Irish gym only in winter.
+// checked_in_date itself is derived by the attendance_set_checked_in_date
+// trigger in the same zone, so the route and the stored date always agree.
 export const POST = withAuth(
   async (_request, context, input) => {
     const supabase = createClient();
@@ -65,6 +69,13 @@ export const POST = withAuth(
     if (!classRow.active) {
       return apiError(409, "CLASS_INACTIVE", "This class is no longer active.");
     }
+
+    const { data: gym } = await supabase
+      .from("gyms")
+      .select("timezone")
+      .eq("id", context.gymId)
+      .single();
+    const timeZone = gym?.timezone ?? DEFAULT_GYM_TIMEZONE;
 
     const receivedAt = new Date();
     let effectiveTime = receivedAt;
@@ -85,22 +96,20 @@ export const POST = withAuth(
       effectiveTime = attempted;
     }
 
-    if (classRow.day_of_week !== effectiveTime.getDay()) {
+    const local = gymWallClock(effectiveTime, timeZone);
+
+    if (classRow.day_of_week !== local.dayOfWeek) {
       return apiError(400, "NOT_TODAY", "This class isn't scheduled for today.");
     }
 
-    const timeParts = classRow.start_time.split(":").map(Number);
-    const hours = timeParts[0] ?? 0;
-    const minutes = timeParts[1] ?? 0;
-    const classStart = new Date(effectiveTime);
-    classStart.setHours(hours, minutes, 0, 0);
-    const windowOpen = new Date(classStart.getTime() - CHECK_IN_OPENS_MINUTES_BEFORE * 60 * 1000);
-    const windowClose = new Date(classStart.getTime() + classRow.duration_minutes * 60 * 1000);
+    const classStartMinutes = timeStringToMinutes(classRow.start_time);
+    const windowOpenMinutes = classStartMinutes - CHECK_IN_OPENS_MINUTES_BEFORE;
+    const windowCloseMinutes = classStartMinutes + classRow.duration_minutes;
 
-    if (effectiveTime < windowOpen) {
+    if (local.minutesOfDay < windowOpenMinutes) {
       return apiError(400, "TOO_EARLY", "Check-in opens 30 minutes before class starts.");
     }
-    if (effectiveTime > windowClose) {
+    if (local.minutesOfDay > windowCloseMinutes) {
       return apiError(400, "TOO_LATE", "Check-in has closed for this class.");
     }
 
@@ -113,7 +122,10 @@ export const POST = withAuth(
         gym_id: context.gymId,
         checked_in_at: checkedInAt,
         checked_in_by: "self",
-        checked_in_date: checkedInAt.slice(0, 10),
+        // Placeholder — overwritten by the attendance_set_checked_in_date
+        // trigger (gym-zone date); supplied only because the column is
+        // required in the generated Insert type.
+        checked_in_date: local.date,
         offline_queued: offlineQueued,
       })
       .select("id")

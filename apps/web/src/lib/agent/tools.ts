@@ -105,7 +105,8 @@ export const READ_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: "get_belt_history",
-    description: "Get a specific member's belt promotion history, most recent first.",
+    description:
+      "Get a specific member's belt promotion history, most recent first. A row with is_initial=true is the rank they joined/were imported at, not a promotion.",
     input_schema: {
       type: "object",
       properties: {

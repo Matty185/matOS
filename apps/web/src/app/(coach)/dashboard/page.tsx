@@ -2,9 +2,22 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/empty-state";
-import { Activity, AlertTriangle, CalendarPlus, CreditCard, UserPlus } from "lucide-react";
+import {
+  Activity,
+  AlertTriangle,
+  CalendarPlus,
+  CheckCircle2,
+  Circle,
+  CreditCard,
+  UserPlus,
+} from "lucide-react";
+import { gymWallClock } from "@matos/shared";
 import { createClient } from "@/lib/supabase/server";
-import { trailingMonthWindow, getOverdueMemberIds } from "@/lib/payments/overdue";
+import { DismissSetupButton } from "@/components/shared/dismiss-setup-button";
+import { getCurrentMember } from "@/lib/auth/current-member";
+import { getGymTimeZone } from "@/lib/time/gym-timezone";
+import { trailingMonthWindow, getOverdueMemberIds, billableMembers } from "@/lib/payments/overdue";
+import { getPaymentsTrackedFrom } from "@/lib/payments/tracked-from";
 import { resolveAuditNames, describeAuditEntry, type AuditLogRow } from "@/lib/audit/format";
 
 const WINDOW_LENGTH = 6;
@@ -14,7 +27,11 @@ const RECENT_ACTIVITY_LIMIT = 10;
 async function getDashboardData() {
   const supabase = createClient();
   const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
+  // Gym-zone date (Stage O1) — attendance.checked_in_date is derived in the
+  // gym's timezone, so "today" must be too.
+  const member = await getCurrentMember();
+  const timeZone = member ? await getGymTimeZone(supabase, member.gymId) : undefined;
+  const todayStr = timeZone ? gymWallClock(today, timeZone).date : today.toISOString().slice(0, 10);
 
   const [
     { data: members, error: membersError },
@@ -24,7 +41,7 @@ async function getDashboardData() {
   ] = await Promise.all([
     supabase
       .from("members")
-      .select("id, first_name, last_name, join_date, role")
+      .select("id, first_name, last_name, join_date, role, user_id")
       .eq("active", true),
     supabase.from("classes").select("id").eq("active", true),
     supabase
@@ -54,7 +71,11 @@ async function getDashboardData() {
     .lte("period_year", maxYear);
   if (paymentsError) throw paymentsError;
 
-  const overdueIds = getOverdueMemberIds(activeMembers, payments ?? [], monthWindow);
+  const overdueIds = getOverdueMemberIds(
+    billableMembers(activeMembers, await getPaymentsTrackedFrom(supabase)),
+    payments ?? [],
+    monthWindow,
+  );
   const overdueMembers = activeMembers.filter((m) => overdueIds.has(m.id));
 
   // "Not seen 30+ days" per plan §7's dashboard flags. checked_in_at is
@@ -98,7 +119,57 @@ async function getDashboardData() {
     description: describeAuditEntry(row, names),
   }));
 
+  // Stage O4: setup checklist, shown to owners until the gym's onboarding
+  // is marked complete (in /setup, or once everything below is done).
+  let setup: { label: string; done: boolean; href: string }[] | null = null;
+  if (member?.role === "gym_owner") {
+    const { data: gymRow } = await supabase
+      .from("gyms")
+      .select("onboarding_completed_at, address, contact_email")
+      .eq("id", member.gymId)
+      .single();
+    if (gymRow && !gymRow.onboarding_completed_at) {
+      const athletes = activeMembers.filter((m) => m.role === "athlete");
+      const joined = athletes.filter((m) => m.user_id).length;
+      setup = [
+        {
+          label: "Add your gym's details",
+          done: Boolean(gymRow.address || gymRow.contact_email),
+          href: "/settings",
+        },
+        {
+          label: "Set up your timetable",
+          done: (allClasses ?? []).length > 0,
+          href: "/setup?step=timetable",
+        },
+        {
+          label: "Add your coaches",
+          done: activeMembers.some((m) => m.role === "coach"),
+          href: "/setup?step=team",
+        },
+        { label: "Import your members", done: athletes.length > 0, href: "/members/import" },
+        {
+          label: "Get half your members signed up",
+          done: athletes.length > 0 && joined * 2 >= athletes.length,
+          href: "/members?invite=not_invited",
+        },
+      ];
+      // Everything done → setup is complete; stop showing the card and
+      // stop routing "/" to the wizard (plan §3.3: "disappears
+      // automatically"). Owner-only update, allowed by gyms_update_owner.
+      if (setup.every((s) => s.done)) {
+        await supabase
+          .from("gyms")
+          .update({ onboarding_completed_at: new Date().toISOString() })
+          .eq("id", member.gymId)
+          .is("onboarding_completed_at", null);
+        setup = null;
+      }
+    }
+  }
+
   return {
+    setup,
     activeMemberCount: activeMembers.length,
     classesThisWeekCount: (allClasses ?? []).length,
     checkInsToday: checkInsToday ?? 0,
@@ -121,6 +192,7 @@ export default async function DashboardPage() {
 
   const quickActions = [
     { label: "Add member", href: "/members/new", icon: UserPlus },
+    { label: "Import members", href: "/members/import", icon: UserPlus },
     { label: "Mark attendance", href: "/attendance", icon: CalendarPlus },
     { label: "Record payment", href: "/payments", icon: CreditCard },
   ];
@@ -128,6 +200,53 @@ export default async function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="font-heading text-3xl tracking-wide">Dashboard</h1>
+
+      {data.setup ? (
+        <Card className="border-primary/40">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-lg">
+              Finish setting up your gym
+              <span className="text-sm font-normal text-muted-foreground">
+                {data.setup.filter((s) => s.done).length} of {data.setup.length} done
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <ul className="flex flex-col">
+              {data.setup.map((item) => (
+                <li key={item.label}>
+                  <Link
+                    href={item.href}
+                    className="flex min-h-11 items-center gap-3 rounded-md px-2 text-sm hover:bg-accent"
+                  >
+                    {item.done ? (
+                      <CheckCircle2
+                        className="h-5 w-5 shrink-0 text-green-600"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <Circle
+                        className="h-5 w-5 shrink-0 text-muted-foreground"
+                        aria-hidden="true"
+                      />
+                    )}
+                    <span className={item.done ? "text-muted-foreground line-through" : ""}>
+                      {item.label}
+                    </span>
+                    <span className="sr-only">{item.done ? "(done)" : "(to do)"}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild className="h-11">
+                <Link href="/setup">Open setup guide</Link>
+              </Button>
+              <DismissSetupButton />
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {statCards.map((stat) => (

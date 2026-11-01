@@ -133,7 +133,7 @@ export function PromoteBeltDialog({
                   <SelectContent>
                     {[0, 1, 2, 3, 4].map((n) => (
                       <SelectItem key={n} value={String(n)}>
-                        {n}
+                        {String(n)}
                       </SelectItem>
                     ))}
                   </SelectContent>

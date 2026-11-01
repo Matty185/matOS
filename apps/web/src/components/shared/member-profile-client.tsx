@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format, differenceInCalendarWeeks } from "date-fns";
@@ -12,6 +12,8 @@ import { BeltDisplay } from "@/components/shared/belt-display";
 import { EmptyState } from "@/components/shared/empty-state";
 import { AttendanceCalendar } from "@/components/shared/attendance-calendar";
 import { PromoteBeltDialog } from "@/components/shared/promote-belt-dialog";
+import { InviteShareDialog } from "@/components/shared/invite-share-dialog";
+import { PasswordResetLinkDialog } from "@/components/shared/password-reset-link-dialog";
 import { PaymentCellDialog } from "@/components/shared/payment-cell-dialog";
 import { ProfileView } from "@/components/shared/profile-view";
 import { PLAN_LABELS } from "@/lib/constants/member-labels";
@@ -40,33 +42,54 @@ export function MemberProfileClient({
   member,
   latestInvite,
   consent,
+  canManageAccess,
+  viewerIsOwner,
 }: {
   member: Member;
   latestInvite: Invite;
   consent: Consent;
+  // Stage O2: invite/reset links for a coach or owner row are owner-only
+  // (team management) — the API enforces it; this just hides the buttons.
+  canManageAccess: boolean;
+  viewerIsOwner: boolean;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const [isResending, setIsResending] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
+  // ?invite=1 — set by the Add Member form so the coach lands straight on
+  // "send them their link" after creating someone.
+  const [inviteOpen, setInviteOpen] = useState(
+    () => searchParams.get("invite") === "1" && !member.user_id && member.active,
+  );
+  const [resetOpen, setResetOpen] = useState(false);
+  const [isMakingCoach, setIsMakingCoach] = useState(false);
 
-  async function handleResendInvite() {
-    setIsResending(true);
+  // Stage O5: owner turns an existing athlete into a coach (same endpoint
+  // Settings → Team uses; DB enforces owner-only role changes).
+  async function handleMakeCoach() {
+    setIsMakingCoach(true);
     try {
-      const res = await fetch("/api/invite", {
-        method: "POST",
+      const res = await fetch(`/api/team/${member.id}/role`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ member_id: member.id }),
+        body: JSON.stringify({ role: "coach" }),
       });
       const body = await res.json();
       if (res.ok) {
-        toast.success("Invite resent.");
+        toast.success(
+          body.needsInvite
+            ? `${member.first_name} is now a coach — send them a fresh sign-up link (older links were cancelled).`
+            : `${member.first_name} is now a coach.`,
+        );
         router.refresh();
       } else {
-        toast.error(body.error ?? "Couldn't resend the invite.");
+        toast.error(body.error ?? "Couldn't change their role.");
       }
+    } catch {
+      toast.error("Couldn't change their role — check your connection.");
     } finally {
-      setIsResending(false);
+      setIsMakingCoach(false);
     }
   }
 
@@ -95,6 +118,17 @@ export function MemberProfileClient({
 
   return (
     <div className="flex flex-col gap-6">
+      <InviteShareDialog
+        member={member}
+        open={inviteOpen}
+        onOpenChange={(open) => {
+          setInviteOpen(open);
+          if (!open && searchParams.get("invite")) router.replace(`/members/${member.id}`);
+        }}
+        hasActiveInvite={Boolean(latestInvite && !latestInvite.claimed_at && !inviteExpired)}
+        onInviteCreated={() => router.refresh()}
+      />
+      <PasswordResetLinkDialog member={member} open={resetOpen} onOpenChange={setResetOpen} />
       <Link
         href="/members"
         className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -136,20 +170,46 @@ export function MemberProfileClient({
             currentBelt={member.belt}
             currentStripes={member.stripes}
           />
-          {!isClaimed ? (
+          {!isClaimed && member.active && canManageAccess ? (
             <Button
-              variant="outline"
+              variant={latestInvite && !inviteExpired ? "outline" : "default"}
               className="h-11"
-              onClick={handleResendInvite}
-              disabled={isResending}
+              onClick={() => setInviteOpen(true)}
             >
-              {isResending
-                ? "Sending..."
-                : !latestInvite
-                  ? "Send invite"
-                  : inviteExpired
-                    ? "Resend invite (expired)"
-                    : "Resend invite"}
+              {!latestInvite
+                ? "Invite to MatOS"
+                : inviteExpired
+                  ? "Invite again (link expired)"
+                  : "Share invite link"}
+            </Button>
+          ) : null}
+          {viewerIsOwner && member.role === "athlete" && member.active ? (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" className="h-11" disabled={isMakingCoach}>
+                  {isMakingCoach ? "Saving..." : "Make coach"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Make {member.first_name} a coach?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Coaches can see every member&apos;s details, payments and attendance. You can
+                    change this later in Settings → Team.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="h-11">Cancel</AlertDialogCancel>
+                  <AlertDialogAction className="h-11" onClick={handleMakeCoach}>
+                    Make coach
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          ) : null}
+          {isClaimed && member.active && canManageAccess ? (
+            <Button variant="outline" className="h-11" onClick={() => setResetOpen(true)}>
+              Password reset link
             </Button>
           ) : null}
           {member.active ? (
@@ -505,7 +565,7 @@ function BeltHistoryTab({ memberId }: { memberId: string }) {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("belt_history")
-        .select("belt, stripes, promoted_at, notes")
+        .select("belt, stripes, promoted_at, notes, is_initial")
         .eq("member_id", memberId)
         .order("promoted_at", { ascending: false });
       if (error) throw error;
@@ -534,7 +594,14 @@ function BeltHistoryTab({ memberId }: { memberId: string }) {
               {format(new Date(row.promoted_at), "MMM d, yyyy")}
             </span>
           </div>
-          {row.notes ? <p className="text-sm text-muted-foreground">{row.notes}</p> : null}
+          {/* Stage O1: a starting-rank row (set when the member was added or
+          imported) is not a promotion — labelled as such rather than
+          showing its auto-generated note. */}
+          {row.is_initial ? (
+            <p className="text-sm text-muted-foreground">Starting rank when joined</p>
+          ) : row.notes ? (
+            <p className="text-sm text-muted-foreground">{row.notes}</p>
+          ) : null}
         </li>
       ))}
     </ul>

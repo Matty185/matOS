@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import { format, startOfMonth } from "date-fns";
+import { format, parseISO, startOfMonth } from "date-fns";
 import { CreditCard, ChevronLeft, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -24,9 +24,11 @@ import {
   isOverdue,
   periodKey,
   getOverdueMemberIds,
+  billableMembers,
   type PaymentStatus,
   type MonthPeriod,
 } from "@/lib/payments/overdue";
+import { getPaymentsTrackedFrom } from "@/lib/payments/tracked-from";
 
 type MemberRow = { id: string; first_name: string; last_name: string; join_date: string };
 type PaymentRow = {
@@ -56,11 +58,14 @@ export default function PaymentsPage() {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("members")
-        .select("id, first_name, last_name, join_date")
+        .select("id, first_name, last_name, join_date, role")
         .eq("active", true)
         .order("last_name", { ascending: true });
       if (error) throw error;
-      return data as MemberRow[];
+      // Owner excluded and each member's first billable month clamped to
+      // when MatOS started tracking this gym's payments (Stage O6) — the
+      // grid renders "—" before that, exactly like before a member joined.
+      return billableMembers(data as MemberRow[], await getPaymentsTrackedFrom(supabase));
     },
   });
 
@@ -214,7 +219,7 @@ export default function PaymentsPage() {
           </TableHeader>
           <TableBody>
             {visibleMembers.map((member) => {
-              const joinMonth = startOfMonth(new Date(member.join_date));
+              const joinMonth = startOfMonth(parseISO(member.join_date));
               return (
                 <TableRow key={member.id}>
                   <TableCell className="whitespace-nowrap font-medium">

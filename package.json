@@ -16,6 +16,7 @@
     "lint": "npm run lint --workspace=apps/web",
     "format": "prettier --write .",
     "seed": "tsx scripts/seed.ts",
+    "provision-gym": "tsx scripts/provision-gym.ts",
     "prepare": "husky"
   },
   "lint-staged": {

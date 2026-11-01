@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Users } from "lucide-react";
@@ -9,6 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import { BeltDisplay, ALL_BELTS, BELT_LABELS } from "@/components/shared/belt-display";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PaymentCellDialog } from "@/components/shared/payment-cell-dialog";
+import { BulkInviteDialog } from "@/components/shared/bulk-invite-dialog";
 import { PLAN_LABELS } from "@/lib/constants/member-labels";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,6 +73,60 @@ function useMembers() {
   });
 }
 
+// Stage O4: where each member is in getting onto MatOS.
+type SignupStatus = "joined" | "invited" | "expired" | "not_invited";
+
+const SIGNUP_FILTER_OPTIONS: { value: "all" | SignupStatus; label: string }[] = [
+  { value: "all", label: "All sign-up status" },
+  { value: "not_invited", label: "Not invited" },
+  { value: "invited", label: "Invited" },
+  { value: "expired", label: "Invite expired" },
+  { value: "joined", label: "Joined" },
+];
+
+function useLatestInvites() {
+  return useQuery({
+    queryKey: ["invites", "latest"],
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("invites")
+        .select("member_id, claimed_at, expires_at, created_at")
+        // "Joined" comes from members.user_id, so claimed invites are
+        // irrelevant here; dropping them keeps this well under PostgREST's
+        // 1000-row cap even after several rounds of re-sent links.
+        .is("claimed_at", null)
+        .order("created_at", { ascending: false })
+        .limit(1000);
+      if (error) throw error;
+      // Newest first, so the first row seen per member is their latest.
+      const map = new Map<string, { claimed_at: string | null; expires_at: string }>();
+      for (const row of data) if (!map.has(row.member_id)) map.set(row.member_id, row);
+      return map;
+    },
+  });
+}
+
+function signupStatus(
+  member: { user_id: string | null },
+  invite: { claimed_at: string | null; expires_at: string } | undefined,
+): SignupStatus {
+  if (member.user_id) return "joined";
+  if (!invite) return "not_invited";
+  return new Date(invite.expires_at) < new Date() ? "expired" : "invited";
+}
+
+function SignupBadge({ status }: { status: SignupStatus }) {
+  if (status === "joined") return <Badge variant="outline">Joined</Badge>;
+  if (status === "invited") return <Badge variant="secondary">Invited</Badge>;
+  if (status === "expired") return <Badge variant="destructive">Invite expired</Badge>;
+  return (
+    <Badge variant="outline" className="border-dashed text-muted-foreground">
+      Not invited
+    </Badge>
+  );
+}
+
 type CurrentPeriodPayment = { status: PaymentStatus; amount: number | null; notes: string | null };
 
 function useCurrentPeriodPayments() {
@@ -118,8 +174,17 @@ export default function MembersPage() {
     isError: paymentsError,
   } = useCurrentPeriodPayments();
   const queryClient = useQueryClient();
+  const { data: invites } = useLatestInvites();
+  const searchParams = useSearchParams();
 
   const [search, setSearch] = useState("");
+  const [signupFilter, setSignupFilter] = useState<"all" | SignupStatus>(() => {
+    const fromUrl = searchParams.get("invite");
+    return SIGNUP_FILTER_OPTIONS.some((o) => o.value === fromUrl)
+      ? (fromUrl as SignupStatus)
+      : "all";
+  });
+  const [bulkInviteIds, setBulkInviteIds] = useState<string[] | null>(null);
   const [beltFilter, setBeltFilter] = useState("all");
   const [planFilter, setPlanFilter] = useState<"all" | MembershipPlan>("all");
   const [paymentFilter, setPaymentFilter] = useState<"all" | PaymentStatus | "no_record">("all");
@@ -141,6 +206,9 @@ export default function MembersPage() {
       if (!showInactive && !m.active) return false;
       if (beltFilter !== "all" && !m.belt.startsWith(beltFilter)) return false;
       if (planFilter !== "all" && m.membership_plan !== planFilter) return false;
+      if (signupFilter !== "all" && signupStatus(m, invites?.get(m.id)) !== signupFilter) {
+        return false;
+      }
       if (paymentFilter !== "all") {
         const status = payments?.get(m.id)?.status ?? "no_record";
         if (status !== paymentFilter) return false;
@@ -152,7 +220,24 @@ export default function MembersPage() {
       }
       return true;
     });
-  }, [members, search, beltFilter, planFilter, paymentFilter, showInactive, payments]);
+  }, [
+    members,
+    search,
+    beltFilter,
+    planFilter,
+    paymentFilter,
+    signupFilter,
+    showInactive,
+    payments,
+    invites,
+  ]);
+
+  // Selected members who can actually be invited (active, not yet joined).
+  const invitableSelected = useMemo(
+    () =>
+      (members ?? []).filter((m) => selected.has(m.id) && m.active && !m.user_id).map((m) => m.id),
+    [members, selected],
+  );
 
   function toggleSelected(id: string) {
     setSelected((prev) => {
@@ -170,7 +255,12 @@ export default function MembersPage() {
       const res = await fetch("/api/payments/mark-paid", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ member_ids: Array.from(selected) }),
+        // Owners don't pay their own gym (Stage O6) — never record one.
+        body: JSON.stringify({
+          member_ids: Array.from(selected).filter(
+            (id) => members?.find((m) => m.id === id)?.role !== "gym_owner",
+          ),
+        }),
       });
       const body = await res.json();
       if (res.ok) {
@@ -212,10 +302,13 @@ export default function MembersPage() {
         <EmptyState
           icon={Users}
           title="No members yet"
-          description="Add your first member to get started — they'll get an invite email automatically."
-          actionLabel="Add member"
-          actionHref="/members/new"
+          description="Import your whole roster at once — paste a list or upload a spreadsheet, with everyone's current belt."
+          actionLabel="Import members"
+          actionHref="/members/import"
         />
+        <Button asChild variant="link" className="h-11 self-center">
+          <Link href="/members/new">Or add one person</Link>
+        </Button>
       </div>
     );
   }
@@ -224,9 +317,14 @@ export default function MembersPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="font-heading text-3xl tracking-wide">Members</h1>
-        <Button asChild className="h-11">
-          <Link href="/members/new">Add member</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline" className="h-11">
+            <Link href="/members/import">Import</Link>
+          </Button>
+          <Button asChild className="h-11">
+            <Link href="/members/new">Add member</Link>
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -275,6 +373,21 @@ export default function MembersPage() {
             ))}
           </SelectContent>
         </Select>
+        <Select
+          value={signupFilter}
+          onValueChange={(v) => setSignupFilter(v as typeof signupFilter)}
+        >
+          <SelectTrigger className="h-11 w-44" aria-label="Filter by sign-up status">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {SIGNUP_FILTER_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <label className="flex h-11 items-center gap-2 text-sm">
           <Checkbox checked={showInactive} onCheckedChange={(c) => setShowInactive(c === true)} />
           Show inactive
@@ -287,6 +400,31 @@ export default function MembersPage() {
             disabled={isMarkingPaid}
           >
             {isMarkingPaid ? "Marking..." : `Mark ${selected.size} paid (this month)`}
+          </Button>
+        ) : null}
+        {invitableSelected.length > 0 ? (
+          <Button
+            className="h-11"
+            onClick={() => setBulkInviteIds(invitableSelected.slice(0, 100))}
+          >
+            {invitableSelected.length > 100
+              ? "Invite first 100"
+              : `Invite ${invitableSelected.length}`}
+          </Button>
+        ) : null}
+        {filtered.length > 0 ? (
+          <Button
+            variant="ghost"
+            className="h-11"
+            onClick={() =>
+              setSelected((prev) =>
+                prev.size === filtered.length ? new Set() : new Set(filtered.map((m) => m.id)),
+              )
+            }
+          >
+            {selected.size === filtered.length
+              ? "Clear selection"
+              : `Select all ${filtered.length}`}
           </Button>
         ) : null}
       </div>
@@ -305,8 +443,9 @@ export default function MembersPage() {
                 <TableHead className="w-10" />
                 <TableHead>Name</TableHead>
                 <TableHead>Belt</TableHead>
-                <TableHead>Plan</TableHead>
+                <TableHead className="hidden md:table-cell">Plan</TableHead>
                 <TableHead>Payment</TableHead>
+                <TableHead>Sign-up</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -341,28 +480,39 @@ export default function MembersPage() {
                   <TableCell>
                     <BeltDisplay belt={member.belt} stripes={member.stripes} size="sm" />
                   </TableCell>
-                  <TableCell>{PLAN_LABELS[member.membership_plan]}</TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {PLAN_LABELS[member.membership_plan]}
+                  </TableCell>
                   <TableCell>
-                    <button
-                      type="button"
-                      className="flex h-11 w-full items-center rounded-md"
-                      aria-label={`${member.first_name} ${member.last_name}'s payment status — edit`}
-                      onClick={() =>
-                        setPaymentDialogMember({
-                          id: member.id,
-                          name: `${member.first_name} ${member.last_name}`,
-                        })
-                      }
-                    >
-                      <PaymentBadge
-                        status={
-                          paymentsError
-                            ? "no_record"
-                            : (payments?.get(member.id)?.status ?? "no_record")
+                    {member.role === "gym_owner" ? (
+                      // Owners don't pay their own gym (Stage O6, matches
+                      // billableMembers in lib/payments/overdue).
+                      <span className="text-muted-foreground">—</span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="flex h-11 w-full items-center rounded-md"
+                        aria-label={`${member.first_name} ${member.last_name}'s payment status — edit`}
+                        onClick={() =>
+                          setPaymentDialogMember({
+                            id: member.id,
+                            name: `${member.first_name} ${member.last_name}`,
+                          })
                         }
-                        isLoading={paymentsLoading}
-                      />
-                    </button>
+                      >
+                        <PaymentBadge
+                          status={
+                            paymentsError
+                              ? "no_record"
+                              : (payments?.get(member.id)?.status ?? "no_record")
+                          }
+                          isLoading={paymentsLoading}
+                        />
+                      </button>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <SignupBadge status={signupStatus(member, invites?.get(member.id))} />
                   </TableCell>
                   <TableCell>
                     {member.active ? (
@@ -377,6 +527,18 @@ export default function MembersPage() {
           </Table>
         </div>
       )}
+
+      <BulkInviteDialog
+        memberIds={bulkInviteIds ?? []}
+        open={bulkInviteIds !== null}
+        onOpenChange={(open) => {
+          if (!open) setBulkInviteIds(null);
+        }}
+        onDone={() => {
+          setSelected(new Set());
+          void queryClient.invalidateQueries({ queryKey: ["invites", "latest"] });
+        }}
+      />
 
       <PaymentCellDialog
         open={paymentDialogMember !== null}

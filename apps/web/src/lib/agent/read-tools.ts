@@ -4,8 +4,10 @@ import {
   trailingMonthWindow,
   getOverdueMemberIds,
   getOverduePeriodsForMember,
+  billableMembers,
   periodKey,
 } from "@/lib/payments/overdue";
+import { getPaymentsTrackedFrom } from "@/lib/payments/tracked-from";
 import {
   fetchAthleteProfileData,
   type ProfileSubject,
@@ -155,7 +157,9 @@ export async function executeReadTool(
       if (!memberId) return [];
       const { data, error } = await supabase
         .from("belt_history")
-        .select("belt, stripes, promoted_at, notes")
+        // is_initial (Stage O1): a starting rank recorded at add/import time,
+        // not a promotion — the model must not count it as one.
+        .select("belt, stripes, promoted_at, notes, is_initial")
         .eq("member_id", memberId)
         .order("promoted_at", { ascending: false });
       if (error) throw error;
@@ -166,11 +170,11 @@ export async function executeReadTool(
       const window = trailingMonthWindow(6);
       const minYear = window[0]!.year;
       const maxYear = window[window.length - 1]!.year;
-      const [{ data: members, error: membersError }, { data: payments, error: paymentsError }] =
+      const [{ data: rawMembers, error: membersError }, { data: payments, error: paymentsError }] =
         await Promise.all([
           supabase
             .from("members")
-            .select("id, first_name, last_name, join_date")
+            .select("id, first_name, last_name, join_date, role")
             .eq("active", true),
           supabase
             .from("payments")
@@ -181,7 +185,9 @@ export async function executeReadTool(
       if (membersError) throw membersError;
       if (paymentsError) throw paymentsError;
 
-      const overdueIds = getOverdueMemberIds(members ?? [], payments ?? [], window);
+      // Owner excluded, obligations clamped to when tracking began (Stage O6).
+      const members = billableMembers(rawMembers ?? [], await getPaymentsTrackedFrom(supabase));
+      const overdueIds = getOverdueMemberIds(members, payments ?? [], window);
       const statusByKey = new Map(
         (payments ?? []).map((p) => [
           periodKey(p.member_id, { month: p.period_month, year: p.period_year }),
@@ -189,7 +195,7 @@ export async function executeReadTool(
         ]),
       );
 
-      return (members ?? [])
+      return members
         .filter((m) => overdueIds.has(m.id))
         .map((m) => {
           // Must use the same join-date-aware helper getOverdueMemberIds

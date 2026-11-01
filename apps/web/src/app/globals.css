@@ -76,3 +76,39 @@
     font-family: var(--font-heading);
   }
 }
+
+/* Stage O4: printing the bulk invite sheet. The sheet lives inside a Radix
+   dialog portal (a direct child of <body>). Everything else is removed from
+   layout entirely (display, not visibility — hidden-but-laid-out pages
+   would print as blank trailing pages), and the dialog's fixed/scroll box
+   is flattened so the cards paginate in normal flow. */
+@media print {
+  body > *:not(:has(.invite-sheet)) {
+    display: none !important;
+  }
+  body {
+    overflow: visible !important;
+  }
+  .invite-sheet-dialog {
+    position: static !important;
+    transform: none !important;
+    max-height: none !important;
+    max-width: none !important;
+    width: 100% !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: 0 !important;
+    padding: 0 !important;
+  }
+  .invite-sheet-dialog > *:not(.invite-sheet-wrap) {
+    display: none !important;
+  }
+  .invite-sheet-wrap > *:not(.invite-sheet) {
+    display: none !important;
+  }
+  [data-radix-dialog-overlay],
+  .invite-sheet-dialog ~ *,
+  body > * > [data-state="open"]:not(.invite-sheet-dialog) {
+    display: none !important;
+  }
+}

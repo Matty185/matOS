@@ -226,6 +226,7 @@ export type Database = {
           belt: Database["public"]["Enums"]["belt_color"];
           gym_id: string;
           id: string;
+          is_initial: boolean;
           member_id: string;
           notes: string | null;
           promoted_at: string;
@@ -236,6 +237,7 @@ export type Database = {
           belt: Database["public"]["Enums"]["belt_color"];
           gym_id: string;
           id?: string;
+          is_initial?: boolean;
           member_id: string;
           notes?: string | null;
           promoted_at?: string;
@@ -246,6 +248,7 @@ export type Database = {
           belt?: Database["public"]["Enums"]["belt_color"];
           gym_id?: string;
           id?: string;
+          is_initial?: boolean;
           member_id?: string;
           notes?: string | null;
           promoted_at?: string;
@@ -703,6 +706,9 @@ export type Database = {
           kind: Database["public"]["Enums"]["gym_kind"];
           logo_url: string | null;
           name: string;
+          onboarding_completed_at: string | null;
+          payments_tracked_from: string | null;
+          timezone: string;
         };
         Insert: {
           active?: boolean;
@@ -713,6 +719,9 @@ export type Database = {
           kind?: Database["public"]["Enums"]["gym_kind"];
           logo_url?: string | null;
           name: string;
+          onboarding_completed_at?: string | null;
+          payments_tracked_from?: string | null;
+          timezone?: string;
         };
         Update: {
           active?: boolean;
@@ -723,6 +732,9 @@ export type Database = {
           kind?: Database["public"]["Enums"]["gym_kind"];
           logo_url?: string | null;
           name?: string;
+          onboarding_completed_at?: string | null;
+          payments_tracked_from?: string | null;
+          timezone?: string;
         };
         Relationships: [];
       };
@@ -1115,6 +1127,17 @@ export type Database = {
           last_name: string;
           role: Database["public"]["Enums"]["member_role"];
           user_id: string;
+        }[];
+      };
+      import_members: {
+        Args: {
+          p_gym_id: string;
+          p_role: Database["public"]["Enums"]["member_role"];
+          p_rows: Json;
+        };
+        Returns: {
+          email: string;
+          id: string;
         }[];
       };
       increment_agent_query_count: {

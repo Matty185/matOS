@@ -61,20 +61,39 @@ function scrubAgentQuery(query: string | null | undefined): string | null {
  * primary operation it's describing.
  */
 export async function writeAuditLog(params: WriteAuditLogParams): Promise<void> {
+  await writeAuditLogStrict(params);
+}
+
+/**
+ * Stage O2 (security review): same write, but reports whether it landed.
+ * For actions that hand a credential to staff (invite links, password
+ * reset links), the audit row is a precondition, not a side effect — the
+ * caller writes it first and refuses to return the credential if it fails,
+ * so a link can never exist without a record of who made it.
+ */
+export async function writeAuditLogStrict(
+  params: WriteAuditLogParams | WriteAuditLogParams[],
+): Promise<boolean> {
   const supabase = createServiceRoleClient();
-  const { error } = await supabase.from("audit_log").insert({
-    gym_id: params.gymId,
-    actor_id: params.actorId,
-    action: params.action,
-    entity_type: params.entityType,
-    entity_id: params.entityId ?? null,
-    before_state: scrub(params.beforeState),
-    after_state: scrub(params.afterState),
-    initiated_by: params.initiatedBy ?? "coach_manual",
-    agent_query: scrubAgentQuery(params.agentQuery),
-  });
+  const rows = (Array.isArray(params) ? params : [params]).map((p) => ({
+    gym_id: p.gymId,
+    actor_id: p.actorId,
+    action: p.action,
+    entity_type: p.entityType,
+    entity_id: p.entityId ?? null,
+    before_state: scrub(p.beforeState),
+    after_state: scrub(p.afterState),
+    initiated_by: p.initiatedBy ?? "coach_manual",
+    agent_query: scrubAgentQuery(p.agentQuery),
+  }));
+  if (rows.length === 0) return true;
+  // One statement — a multi-row insert is atomic, so either every row is
+  // recorded or none is.
+  const { error } = await supabase.from("audit_log").insert(rows);
 
   if (error) {
     console.error("[audit] failed to write audit_log row", error);
+    return false;
   }
+  return true;
 }

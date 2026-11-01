@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MemberProfileClient } from "@/components/shared/member-profile-client";
+import { getCurrentMember } from "@/lib/auth/current-member";
 
 export default async function MemberProfilePage({ params }: { params: { id: string } }) {
   const supabase = createClient();
@@ -23,7 +24,21 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
       .maybeSingle(),
   ]);
 
+  const viewer = await getCurrentMember();
+  // Never the viewer's own row (their own password lives on /account), and
+  // staff rows only for the owner — mirrors the API checks.
+  const canManageAccess =
+    viewer !== null &&
+    viewer.memberId !== member.id &&
+    (member.role === "athlete" || viewer.role === "gym_owner");
+
   return (
-    <MemberProfileClient member={member} latestInvite={invite ?? null} consent={consent ?? null} />
+    <MemberProfileClient
+      member={member}
+      latestInvite={invite ?? null}
+      consent={consent ?? null}
+      canManageAccess={canManageAccess}
+      viewerIsOwner={viewer?.role === "gym_owner"}
+    />
   );
 }

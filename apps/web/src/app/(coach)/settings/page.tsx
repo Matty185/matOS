@@ -1,28 +1,71 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Settings2 } from "lucide-react";
+import { ListChecks } from "lucide-react";
+import { DEFAULT_GYM_TIMEZONE } from "@matos/shared";
 import { getCurrentMember } from "@/lib/auth/current-member";
-import { EmptyState } from "@/components/shared/empty-state";
+import { createClient } from "@/lib/supabase/server";
 import { GdprSection } from "@/components/shared/gdpr-section";
+import { GymDetailsForm } from "@/components/shared/gym-details-form";
+import { TeamManager } from "@/components/shared/team-manager";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 // Owner-only per plan §7 ("Gym settings (owner)") — the (coach) layout
 // admits both coach and gym_owner, so this page adds its own narrower gate
 // rather than the layout doing it for every route under it.
 //
-// Stage 8 scope is specifically "GDPR settings" per plan §10 row 8's own
-// wording, not the full "gym details, logo, coach management, danger zone"
-// list — those remain a later-stage placeholder.
+// Stage O5: gym details + team management land here (previously a
+// placeholder beside the Stage 8 GDPR section).
 export default async function SettingsPage() {
   const member = await getCurrentMember();
   if (member?.role !== "gym_owner") redirect("/dashboard");
 
+  const supabase = createClient();
+  const { data: gym } = await supabase
+    .from("gyms")
+    .select("name, address, contact_email, timezone, onboarding_completed_at")
+    .eq("id", member.gymId)
+    .single();
+
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="font-heading text-3xl tracking-wide">Gym Settings</h1>
-      <EmptyState
-        icon={Settings2}
-        title="Nothing to configure yet"
-        description="Gym details, logo, and coach management land here in a later stage."
-      />
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="font-heading text-3xl tracking-wide">Gym Settings</h1>
+        <Button asChild variant="outline" className="h-11">
+          <Link href="/setup">
+            <ListChecks className="mr-2 h-4 w-4" />
+            {gym?.onboarding_completed_at ? "Setup guide" : "Continue setup"}
+          </Link>
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Gym</CardTitle>
+          <CardDescription>How your gym appears to members, and its local time.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <GymDetailsForm
+            defaultValues={{
+              name: gym?.name ?? "",
+              address: gym?.address ?? "",
+              contact_email: gym?.contact_email ?? "",
+              timezone: gym?.timezone ?? DEFAULT_GYM_TIMEZONE,
+            }}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Team</CardTitle>
+          <CardDescription>Owners and coaches who run the gym.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <TeamManager currentMemberId={member.memberId} />
+        </CardContent>
+      </Card>
+
       <GdprSection />
     </div>
   );

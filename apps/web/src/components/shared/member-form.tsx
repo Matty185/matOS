@@ -5,6 +5,7 @@ import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { createMemberSchema, editMemberSchema } from "@matos/shared";
+import { ALL_BELTS, BELT_LABELS, type BeltColor } from "@/components/shared/belt-display";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,6 +33,11 @@ type MemberFormValues = {
   emergency_contact_phone?: string;
   membership_plan: "monthly" | "casual" | "comp_team";
   notes?: string;
+  // Create mode only (Stage O2): starting rank + join date. After creation
+  // belt only changes via Promote.
+  belt?: BeltColor;
+  stripes?: number;
+  join_date?: string;
 };
 
 type MemberFormProps =
@@ -52,7 +58,9 @@ export function MemberForm(props: MemberFormProps) {
     // single static MemberFormValues shared by both modes — the resolver
     // actually used always matches whichever schema is active at runtime.
     resolver: zodResolver(isEdit ? editMemberSchema : createMemberSchema) as never,
-    defaultValues: isEdit ? props.defaultValues : { membership_plan: "monthly" },
+    defaultValues: isEdit
+      ? props.defaultValues
+      : { membership_plan: "monthly", belt: "white", stripes: 0, join_date: "" },
   });
 
   async function onSubmit(data: MemberFormValues) {
@@ -74,15 +82,19 @@ export function MemberForm(props: MemberFormProps) {
     if (isEdit) {
       toast.success("Member updated.");
       router.push(`/members/${props.memberId}`);
-    } else {
+    } else if (body.emailEnabled) {
       if (body.inviteSent) {
         toast.success(`${data.first_name} added — invite email sent.`);
       } else {
         toast.warning(
-          `${data.first_name} added, but the invite email failed to send. You can resend it from their profile.`,
+          `${data.first_name} added, but the invite email failed to send. Share their invite link instead.`,
         );
       }
-      router.push(`/members/${body.memberId}`);
+      router.push(`/members/${body.memberId}${body.inviteSent ? "" : "?invite=1"}`);
+    } else {
+      // Stage O2 (no verified email domain): straight to the share dialog.
+      toast.success(`${data.first_name} added.`);
+      router.push(`/members/${body.memberId}?invite=1`);
     }
     router.refresh();
   }
@@ -112,9 +124,74 @@ export function MemberForm(props: MemberFormProps) {
           <Input id="email" type="email" className="h-11" {...register("email")} />
           {errors.email ? <p className="text-sm text-destructive">{errors.email.message}</p> : null}
           <p className="text-xs text-muted-foreground">
-            An invite email is sent to this address automatically.
+            They&apos;ll sign in with this. You&apos;ll send them their sign-up link next.
           </p>
         </div>
+      ) : null}
+
+      {!isEdit ? (
+        <fieldset className="flex flex-col gap-3 rounded-md border p-4">
+          <legend className="px-1 text-sm font-medium">Current rank</legend>
+          <div className="grid grid-cols-[1fr_auto] gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="belt">Belt</Label>
+              <Controller
+                name="belt"
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className="h-11" id="belt">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ALL_BELTS.map((b) => (
+                        <SelectItem key={b} value={b}>
+                          {BELT_LABELS[b]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="stripes">Stripes</Label>
+              <Controller
+                name="stripes"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    value={String(field.value ?? 0)}
+                    onValueChange={(v) => field.onChange(Number(v))}
+                  >
+                    <SelectTrigger className="h-11 w-24" id="stripes">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[0, 1, 2, 3, 4].map((n) => (
+                        <SelectItem key={n} value={String(n)}>
+                          {String(n)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
+          </div>
+          {errors.stripes ? (
+            <p className="text-sm text-destructive">{errors.stripes.message}</p>
+          ) : null}
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="join_date">Training here since</Label>
+            <Input id="join_date" type="date" className="h-11" {...register("join_date")} />
+            {errors.join_date ? (
+              <p className="text-sm text-destructive">{errors.join_date.message}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">Leave blank for today.</p>
+            )}
+          </div>
+        </fieldset>
       ) : null}
 
       <div className="flex flex-col gap-1.5">

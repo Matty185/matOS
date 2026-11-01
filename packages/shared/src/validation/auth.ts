@@ -28,3 +28,17 @@ export const signupSchema = z
   });
 
 export type SignupInput = z.infer<typeof signupSchema>;
+
+// Stage O2: choosing a new password from a coach-issued reset link
+// (/reset-password). Same rule as every other password in the app.
+export const resetPasswordSchema = z
+  .object({
+    password: z.string().min(8, "Password must be at least 8 characters."),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match.",
+    path: ["confirmPassword"],
+  });
+
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

@@ -46,7 +46,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
 
   const { data: invite, error: inviteError } = await supabase
     .from("invites")
-    .select("id, member_id, gym_id, claimed_at, expires_at, attempt_count")
+    .select("id, member_id, gym_id, claimed_at, expires_at, attempt_count, created_by")
     .eq("token_hash", tokenHash)
     .single();
 
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
 
   const { data: member, error: memberError } = await supabase
     .from("members")
-    .select("id, gym_id, email, user_id")
+    .select("id, gym_id, email, user_id, role")
     .eq("id", invite.member_id)
     .single();
 
@@ -116,6 +116,28 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
 
   if (member.user_id) {
     return apiError(409, "MEMBER_ALREADY_CLAIMED", "This account has already been claimed.");
+  }
+
+  // Stage O4/O5 (defence in depth): a coach/owner login may only be claimed
+  // from a link minted by an owner of that gym (or the operator's
+  // provisioning script, created_by null). The role route already expires
+  // older links on promotion; this catches any path that misses it.
+  if (member.role !== "athlete" && invite.created_by) {
+    const { data: issuer } = await supabase
+      .from("members")
+      .select("id")
+      .eq("user_id", invite.created_by)
+      .eq("gym_id", member.gym_id)
+      .eq("role", "gym_owner")
+      .eq("active", true)
+      .maybeSingle();
+    if (!issuer) {
+      return apiError(
+        403,
+        "INVITE_NOT_VALID_FOR_ROLE",
+        "This link can't be used for a coach account. Ask the gym owner for a new one.",
+      );
+    }
   }
 
   // Determined fresh here, not trusted from the client — an attacker

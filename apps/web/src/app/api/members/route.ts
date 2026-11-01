@@ -2,15 +2,16 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/withAuth";
 import { apiError } from "@/lib/api/response";
 import { createClient } from "@/lib/supabase/server";
-import { createAndSendInvite } from "@/lib/auth/create-invite";
+import { createInvite } from "@/lib/auth/create-invite";
+import { isInviteEmailEnabled } from "@/lib/email/invite";
 import { writeAuditLog } from "@/lib/audit/log";
 import { createMemberSchema } from "@matos/shared";
 
 // POST /api/members — coach/owner only. Creates an athlete member row (this
 // form never creates coach/owner rows — see Stage 1's role-escalation
 // trigger and CLAUDE.md's owner-only "coach management," which this app
-// doesn't build in the alpha) and automatically sends the invite email per
-// plan §7 ("on add, invite email sent automatically").
+// doesn't build in the alpha). Plan §7's "on add, invite email sent
+// automatically" now applies only when email is enabled (Stage O2).
 export const POST = withAuth(
   async (_request, context, input) => {
     // Stage S2: a personal workspace's role is gym_owner, which satisfies
@@ -28,22 +29,30 @@ export const POST = withAuth(
 
     const supabase = createClient();
 
-    const { data: member, error: insertError } = await supabase
-      .from("members")
-      .insert({
-        gym_id: context.gymId,
-        role: "athlete",
-        first_name: input.first_name,
-        last_name: input.last_name,
-        email: input.email,
-        phone: input.phone || null,
-        emergency_contact_name: input.emergency_contact_name || null,
-        emergency_contact_phone: input.emergency_contact_phone || null,
-        membership_plan: input.membership_plan,
-        notes: input.notes || null,
-      })
-      .select("id")
-      .single();
+    // Stage O2: via import_members (one row) rather than a bare insert, so
+    // the starting rank lands atomically as an is_initial belt_history row
+    // alongside the member — same path as bulk import (/api/members/import).
+    // p_gym_id/p_role are server-chosen, never from the request body.
+    const { data: inserted, error: insertError } = await supabase.rpc("import_members", {
+      p_gym_id: context.gymId,
+      p_role: "athlete",
+      p_rows: [
+        {
+          first_name: input.first_name,
+          last_name: input.last_name,
+          email: input.email,
+          phone: input.phone || null,
+          emergency_contact_name: input.emergency_contact_name || null,
+          emergency_contact_phone: input.emergency_contact_phone || null,
+          membership_plan: input.membership_plan,
+          notes: input.notes || null,
+          belt: input.belt,
+          stripes: input.stripes,
+          join_date: input.join_date || null,
+        },
+      ],
+    });
+    const member = inserted?.[0];
 
     if (insertError || !member) {
       // members_gym_email_unique (Stage 1) is the likely cause of a
@@ -51,6 +60,7 @@ export const POST = withAuth(
       if (insertError?.code === "23505") {
         return apiError(409, "EMAIL_TAKEN", "A member with this email already exists in your gym.");
       }
+      console.error("[members] create failed", insertError);
       return apiError(
         500,
         "MEMBER_CREATE_FAILED",
@@ -68,31 +78,42 @@ export const POST = withAuth(
       initiatedBy: "coach_manual",
     });
 
-    const { data: gym } = await supabase
-      .from("gyms")
-      .select("name")
-      .eq("id", context.gymId)
-      .single();
+    // Stage O2: auto-invite by email only once a verified sending domain is
+    // configured. Otherwise the coach shares the invite link from the
+    // member's profile (the create form routes straight there with the
+    // share dialog open).
+    let inviteSent = false;
+    let inviteError: string | null = null;
+    if (isInviteEmailEnabled()) {
+      const { data: gym } = await supabase
+        .from("gyms")
+        .select("name")
+        .eq("id", context.gymId)
+        .single();
 
-    const inviteResult = await createAndSendInvite({
-      memberId: member.id,
-      memberGymId: context.gymId,
-      memberFirstName: input.first_name,
-      memberEmail: input.email,
-      gymName: gym?.name ?? "your gym",
-      actorUserId: context.userId,
-    });
+      const inviteResult = await createInvite({
+        memberId: member.id,
+        memberGymId: context.gymId,
+        memberFirstName: input.first_name,
+        memberEmail: input.email,
+        gymName: gym?.name ?? "your gym",
+        actorUserId: context.userId,
+        delivery: "email",
+      });
+      inviteSent = inviteResult.ok;
+      inviteError = inviteResult.ok ? null : inviteResult.message;
+    }
 
     // The member record is real, useful data regardless of whether the
     // invite email happened to send — don't roll it back over an email
-    // provider hiccup. Surface the failure so the coach knows to resend
-    // rather than assume it went out.
+    // provider hiccup.
     return NextResponse.json(
       {
         success: true,
         memberId: member.id,
-        inviteSent: inviteResult.ok,
-        inviteError: inviteResult.ok ? null : inviteResult.message,
+        emailEnabled: isInviteEmailEnabled(),
+        inviteSent,
+        inviteError,
       },
       { status: 201 },
     );

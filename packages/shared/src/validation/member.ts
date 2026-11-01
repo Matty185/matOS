@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { agentQueryField } from "./agent";
 
-const BELT_VALUES = [
+export const BELT_VALUES = [
   "white",
   "grey_white",
   "grey",
@@ -21,9 +21,10 @@ const BELT_VALUES = [
   "black",
 ] as const;
 
-const PLAN_VALUES = ["monthly", "casual", "comp_team"] as const;
+export const PLAN_VALUES = ["monthly", "casual", "comp_team"] as const;
 
-export const createMemberSchema = z.object({
+// Contact/plan fields shared by create and edit.
+const memberFieldsSchema = z.object({
   first_name: z.string().trim().min(1, "First name is required.").max(100),
   last_name: z.string().trim().min(1, "Last name is required.").max(100),
   email: z.string().trim().toLowerCase().email("Enter a valid email address."),
@@ -34,13 +35,66 @@ export const createMemberSchema = z.object({
   notes: z.string().trim().max(2000).optional().or(z.literal("")),
 });
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+// Stage O2/O3: a member's *starting* rank and join date are set at creation
+// (recorded as an is_initial belt_history row, not a promotion) — an
+// existing gym's purple belt shouldn't have to be "promoted" from white.
+// After creation, belt changes only ever go through .../promote.
+export const startingRankFields = {
+  belt: z.enum(BELT_VALUES).default("white"),
+  stripes: z.coerce.number().int().min(0, "Stripes are 0–4.").max(4, "Stripes are 0–4.").default(0),
+  join_date: z
+    .string()
+    .regex(ISO_DATE, "Use a date like 2024-03-01.")
+    .refine((v) => !Number.isNaN(new Date(`${v}T00:00:00Z`).getTime()), "Not a real date.")
+    .refine(
+      (v) => v <= new Date(Date.now() + 86_400_000).toISOString().slice(0, 10),
+      "Join date can't be in the future.",
+    )
+    .optional()
+    .or(z.literal("")),
+};
+
+export const createMemberSchema = memberFieldsSchema.extend(startingRankFields);
+
 export type CreateMemberInput = z.infer<typeof createMemberSchema>;
+
+export const MAX_IMPORT_ROWS = 300;
+
+// Bulk import (Stage O3). Same per-row rules as a single create; duplicate
+// emails within one batch are rejected here (with the row numbers) rather
+// than surfacing as an opaque unique-violation from the database.
+export const importMembersSchema = z
+  .object({
+    members: z
+      .array(createMemberSchema)
+      .min(1, "Nothing to import.")
+      .max(MAX_IMPORT_ROWS, `At most ${MAX_IMPORT_ROWS} members per import.`),
+  })
+  .superRefine((data, ctx) => {
+    const seen = new Map<string, number>();
+    data.members.forEach((m, i) => {
+      const prev = seen.get(m.email);
+      if (prev !== undefined) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["members", i, "email"],
+          message: `Same email as row ${prev + 1}.`,
+        });
+      } else {
+        seen.set(m.email, i);
+      }
+    });
+  });
+
+export type ImportMembersInput = z.infer<typeof importMembersSchema>;
 
 // Same fields as create, minus email — changing the email a member logs in
 // with is an auth.users concern, not a plain member-record edit; out of
 // scope here (belt/stripes/role/active all have their own dedicated
 // actions — promote, and deactivate — not this generic edit).
-export const editMemberSchema = createMemberSchema
+export const editMemberSchema = memberFieldsSchema
   .omit({ email: true })
   .extend({ agent_query: agentQueryField });
 

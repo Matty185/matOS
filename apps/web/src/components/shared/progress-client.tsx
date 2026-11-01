@@ -128,7 +128,7 @@ function BeltHistoryTab({ memberId }: { memberId: string }) {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("belt_history")
-        .select("belt, stripes, promoted_at, notes")
+        .select("belt, stripes, promoted_at, notes, is_initial")
         .eq("member_id", memberId)
         .order("promoted_at", { ascending: false });
       if (error) throw error;
@@ -157,7 +157,14 @@ function BeltHistoryTab({ memberId }: { memberId: string }) {
               {format(new Date(row.promoted_at), "MMM d, yyyy")}
             </span>
           </div>
-          {row.notes ? <p className="text-sm text-muted-foreground">{row.notes}</p> : null}
+          {/* Stage O1: a starting-rank row (set when the member was added or
+          imported) is not a promotion — labelled as such rather than
+          showing its auto-generated note. */}
+          {row.is_initial ? (
+            <p className="text-sm text-muted-foreground">Starting rank when joined</p>
+          ) : row.notes ? (
+            <p className="text-sm text-muted-foreground">{row.notes}</p>
+          ) : null}
         </li>
       ))}
     </ul>

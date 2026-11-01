@@ -13,7 +13,8 @@ import {
 } from "@/lib/agent/tools";
 import { executeReadTool } from "@/lib/agent/read-tools";
 import { buildSystemPrompt } from "@/lib/agent/system-prompt";
-import { trailingMonthWindow, getOverdueMemberIds } from "@/lib/payments/overdue";
+import { trailingMonthWindow, getOverdueMemberIds, billableMembers } from "@/lib/payments/overdue";
+import { getPaymentsTrackedFrom } from "@/lib/payments/tracked-from";
 
 const RATE_LIMIT_WARNING_AT = 40;
 const RATE_LIMIT_BLOCK_AT = 50;
@@ -94,7 +95,7 @@ export const POST = withAuth(
     const minYear = overdueWindow[0]!.year;
     const maxYear = overdueWindow[overdueWindow.length - 1]!.year;
     const [{ data: overdueMembers }, { data: overduePayments }] = await Promise.all([
-      supabase.from("members").select("id, join_date").eq("active", true),
+      supabase.from("members").select("id, join_date, role").eq("active", true),
       supabase
         .from("payments")
         .select("member_id, period_month, period_year, status")
@@ -102,7 +103,7 @@ export const POST = withAuth(
         .lte("period_year", maxYear),
     ]);
     const overdueCount = getOverdueMemberIds(
-      overdueMembers ?? [],
+      billableMembers(overdueMembers ?? [], await getPaymentsTrackedFrom(supabase)),
       overduePayments ?? [],
       overdueWindow,
     ).size;

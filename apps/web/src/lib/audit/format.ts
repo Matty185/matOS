@@ -184,6 +184,25 @@ export function describeAuditEntry(row: AuditLogRow, ctx: AuditNameContext): str
       return `${actor} claimed their invite and joined.`;
     case "agent.query":
       return `${actor} asked the assistant a question.`;
+    case "member.password_reset_link_created":
+      return `${actor} created a password reset link for ${subjectNameFor(row, ctx)}.`;
+    case "members.imported": {
+      const count = typeof after.count === "number" ? after.count : 0;
+      return `${actor} imported ${count} member${count === 1 ? "" : "s"}.`;
+    }
+    case "gym.updated":
+      return `${actor} updated the gym's details.`;
+    case "gym.onboarding_completed":
+      return `${actor} finished setting up the gym.`;
+    case "team.coach_added":
+      return `${actor} added ${subjectNameFor(row, ctx)} as a coach.`;
+    case "team.role_changed": {
+      const role = typeof after.role === "string" ? after.role : "";
+      const label = role === "gym_owner" ? "an owner" : role === "coach" ? "a coach" : "an athlete";
+      return `${actor} made ${subjectNameFor(row, ctx)} ${label}.`;
+    }
+    case "gym.provisioned":
+      return "Gym created on MatOS.";
     default:
       return `${actor} performed "${row.action}"${row.entity_type ? ` on ${row.entity_type}` : ""}.`;
   }
