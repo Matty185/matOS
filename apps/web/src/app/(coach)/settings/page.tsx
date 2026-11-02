@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { GdprSection } from "@/components/shared/gdpr-section";
 import { GymDetailsForm } from "@/components/shared/gym-details-form";
 import { TeamManager } from "@/components/shared/team-manager";
+import { PromotionRulesForm } from "@/components/shared/promotion-rules-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -23,7 +24,9 @@ export default async function SettingsPage() {
   const supabase = createClient();
   const { data: gym } = await supabase
     .from("gyms")
-    .select("name, address, contact_email, timezone, onboarding_completed_at")
+    .select(
+      "name, address, contact_email, timezone, onboarding_completed_at, promotion_classes_per_stripe, promotion_months_per_stripe",
+    )
     .eq("id", member.gymId)
     .single();
 
@@ -52,6 +55,19 @@ export default async function SettingsPage() {
               contact_email: gym?.contact_email ?? "",
               timezone: gym?.timezone ?? DEFAULT_GYM_TIMEZONE,
             }}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Promotions</CardTitle>
+          <CardDescription>When someone shows as ready for their next stripe.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PromotionRulesForm
+            classesPerStripe={gym?.promotion_classes_per_stripe ?? null}
+            monthsPerStripe={gym?.promotion_months_per_stripe ?? null}
           />
         </CardContent>
       </Card>

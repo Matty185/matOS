@@ -2,6 +2,13 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MemberProfileClient } from "@/components/shared/member-profile-client";
 import { getCurrentMember } from "@/lib/auth/current-member";
+import { computeReadiness } from "@matos/shared";
+import {
+  fetchPromotionProgress,
+  fetchPromotionRule,
+  formatGymDate,
+} from "@/lib/promotions/readiness";
+import { getGymTimeZone } from "@/lib/time/gym-timezone";
 
 export default async function MemberProfilePage({ params }: { params: { id: string } }) {
   const supabase = createClient();
@@ -9,7 +16,7 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
   const { data: member } = await supabase.from("members").select("*").eq("id", params.id).single();
   if (!member) notFound();
 
-  const [{ data: invite }, { data: consent }] = await Promise.all([
+  const [{ data: invite }, { data: consent }, rule, progress] = await Promise.all([
     supabase
       .from("invites")
       .select("claimed_at, expires_at")
@@ -22,7 +29,25 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
       .select("data_storage_consent, consented_at")
       .eq("member_id", params.id)
       .maybeSingle(),
+    fetchPromotionRule(supabase),
+    fetchPromotionProgress(supabase, params.id).catch(() => new Map()),
   ]);
+  const p = progress.get(member.id);
+  const promotion = p
+    ? {
+        readiness: computeReadiness({
+          belt: member.belt,
+          stripes: member.stripes,
+          lastPromotedAt: p.lastPromotedAt,
+          lastIsInitial: p.lastIsInitial,
+          classesSince: p.classesSince,
+          rule,
+        }),
+        sinceLabel: formatGymDate(p.lastPromotedAt, await getGymTimeZone(supabase, member.gym_id)),
+        lastIsInitial: p.lastIsInitial as boolean,
+        rule,
+      }
+    : null;
 
   const viewer = await getCurrentMember();
   // Never the viewer's own row (their own password lives on /account), and
@@ -39,6 +64,7 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
       consent={consent ?? null}
       canManageAccess={canManageAccess}
       viewerIsOwner={viewer?.role === "gym_owner"}
+      promotion={promotion}
     />
   );
 }

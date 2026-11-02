@@ -196,6 +196,8 @@ export function describeAuditEntry(row: AuditLogRow, ctx: AuditNameContext): str
     }
     case "gym.updated":
       return `${actor} updated the gym's details.`;
+    case "gym.promotion_rules_updated":
+      return `${actor} changed the promotion guidance.`;
     case "gym.onboarding_completed":
       return `${actor} finished setting up the gym.`;
     case "team.coach_added":

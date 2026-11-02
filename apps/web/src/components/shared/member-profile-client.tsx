@@ -32,11 +32,17 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import type { Database } from "@matos/shared";
+import type { Database, PromotionRule, Readiness } from "@matos/shared";
 
 type Member = Database["public"]["Tables"]["members"]["Row"];
 type Invite = { claimed_at: string | null; expires_at: string } | null;
 type Consent = { data_storage_consent: boolean; consented_at: string | null } | null;
+type Promotion = {
+  readiness: Readiness;
+  sinceLabel: string;
+  lastIsInitial: boolean;
+  rule: PromotionRule;
+} | null;
 
 export function MemberProfileClient({
   member,
@@ -44,7 +50,9 @@ export function MemberProfileClient({
   consent,
   canManageAccess,
   viewerIsOwner,
+  promotion,
 }: {
+  promotion: Promotion;
   member: Member;
   latestInvite: Invite;
   consent: Consent;
@@ -306,7 +314,12 @@ export function MemberProfileClient({
         </TabsList>
 
         <TabsContent value="overview" className="pt-4">
-          <OverviewTab member={member} latestInvite={latestInvite} consent={consent} />
+          <OverviewTab
+            member={member}
+            latestInvite={latestInvite}
+            consent={consent}
+            promotion={promotion}
+          />
         </TabsContent>
         <TabsContent value="attendance" className="pt-4">
           <AttendanceTab memberId={member.id} joinDate={member.join_date} />
@@ -335,14 +348,43 @@ export function MemberProfileClient({
   );
 }
 
+function promotionSummary(p: NonNullable<Promotion>): string {
+  const r = p.readiness;
+  if (r.reason === "belt_change") return `${r.nextStep} — your call.`;
+  const status =
+    r.status === "ready"
+      ? "Ready for "
+      : r.status === "close"
+        ? "Close to "
+        : r.status === "not_yet"
+          ? "Working towards "
+          : "Next: ";
+  const counts = [
+    p.rule.classesPerStripe
+      ? `${r.classesSince}/${p.rule.classesPerStripe} classes`
+      : `${r.classesSince} classes`,
+    r.monthsProgress !== null && p.rule.monthsPerStripe
+      ? `${r.monthsSince}/${p.rule.monthsPerStripe} months`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  const since = p.lastIsInitial
+    ? `since being added (${p.sinceLabel})`
+    : `since last promotion (${p.sinceLabel})`;
+  return `${status}${r.nextStep} — ${counts} ${since}.`;
+}
+
 function OverviewTab({
   member,
   latestInvite,
   consent,
+  promotion,
 }: {
   member: Member;
   latestInvite: Invite;
   consent: Consent;
+  promotion: Promotion;
 }) {
   const isClaimed = Boolean(member.user_id);
 
@@ -353,6 +395,9 @@ function OverviewTab({
       <InfoCard label="Emergency contact" value={member.emergency_contact_name || "—"} />
       <InfoCard label="Emergency phone" value={member.emergency_contact_phone || "—"} />
       <InfoCard label="Joined" value={format(new Date(member.join_date), "MMM d, yyyy")} />
+      {promotion && member.active && promotion.readiness.nextStep ? (
+        <InfoCard label="Next promotion" value={promotionSummary(promotion)} />
+      ) : null}
       <InfoCard
         label="Account status"
         value={

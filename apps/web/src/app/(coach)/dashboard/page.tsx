@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/empty-state";
 import {
+  Award,
   Activity,
   AlertTriangle,
   CalendarPlus,
@@ -11,7 +12,8 @@ import {
   CreditCard,
   UserPlus,
 } from "lucide-react";
-import { gymWallClock } from "@matos/shared";
+import { computeReadiness, gymWallClock } from "@matos/shared";
+import { fetchPromotionProgress, fetchPromotionRule } from "@/lib/promotions/readiness";
 import { createClient } from "@/lib/supabase/server";
 import { DismissSetupButton } from "@/components/shared/dismiss-setup-button";
 import { getCurrentMember } from "@/lib/auth/current-member";
@@ -41,7 +43,9 @@ async function getDashboardData() {
   ] = await Promise.all([
     supabase
       .from("members")
-      .select("id, first_name, last_name, email, join_date, role, membership_plan, user_id")
+      .select(
+        "id, first_name, last_name, email, join_date, role, membership_plan, user_id, belt, stripes",
+      )
       .eq("active", true),
     supabase.from("classes").select("id").eq("active", true),
     supabase
@@ -171,8 +175,30 @@ async function getDashboardData() {
     }
   }
 
+  // Flow audit 5.3: how many are due a promotion (guidance).
+  const [rule, progress] = await Promise.all([
+    fetchPromotionRule(supabase),
+    fetchPromotionProgress(supabase).catch(() => new Map()),
+  ]);
+  const readyForPromotion = activeMembers.filter((m) => {
+    const p = progress.get(m.id);
+    return (
+      p !== undefined &&
+      computeReadiness({
+        belt: m.belt,
+        stripes: m.stripes,
+        lastPromotedAt: p.lastPromotedAt,
+        lastIsInitial: p.lastIsInitial,
+        classesSince: p.classesSince,
+        rule,
+        now: today,
+      }).status === "ready"
+    );
+  }).length;
+
   return {
     setup,
+    readyForPromotion,
     activeMemberCount: activeMembers.length,
     classesThisWeekCount: (allClasses ?? []).length,
     checkInsToday: checkInsToday ?? 0,
@@ -276,6 +302,20 @@ export default async function DashboardPage() {
           </Button>
         ))}
       </div>
+
+      {data.readyForPromotion > 0 ? (
+        <Link
+          href="/promotions"
+          className="flex min-h-11 items-center gap-2 rounded-md border border-primary/40 bg-primary/5 p-3 text-sm hover:bg-primary/10"
+        >
+          <Award className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+          <span>
+            <span className="font-medium">{data.readyForPromotion}</span>{" "}
+            {data.readyForPromotion === 1 ? "member is" : "members are"} ready for promotion. Review
+            →
+          </span>
+        </Link>
+      ) : null}
 
       {data.overdueMembers.length > 0 || data.notSeenMembers.length > 0 ? (
         <div className="flex flex-col gap-2">

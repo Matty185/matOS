@@ -34,17 +34,29 @@ type PromoteBeltDialogProps = {
   memberId: string;
   currentBelt: BeltColor;
   currentStripes: number;
+  // Flow audit 5.3: open pre-filled with the suggested next step (the
+  // Promotions page), instead of the current rank.
+  suggestedBelt?: BeltColor;
+  suggestedStripes?: number;
+  triggerLabel?: string;
+  triggerVariant?: "default" | "outline";
 };
 
 export function PromoteBeltDialog({
   memberId,
   currentBelt,
   currentStripes,
+  suggestedBelt,
+  suggestedStripes,
+  triggerLabel = "Promote belt",
+  triggerVariant = "outline",
 }: PromoteBeltDialogProps) {
   const router = useRouter();
+  const initialBelt = suggestedBelt ?? currentBelt;
+  const initialStripes = suggestedStripes ?? currentStripes;
   const [open, setOpen] = useState(false);
-  const [belt, setBelt] = useState<BeltColor>(currentBelt);
-  const [stripes, setStripes] = useState(currentStripes);
+  const [belt, setBelt] = useState<BeltColor>(initialBelt);
+  const [stripes, setStripes] = useState(initialStripes);
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [celebrating, setCelebrating] = useState(false);
@@ -52,8 +64,8 @@ export function PromoteBeltDialog({
   function resetAndClose() {
     setOpen(false);
     setCelebrating(false);
-    setBelt(currentBelt);
-    setStripes(currentStripes);
+    setBelt(initialBelt);
+    setStripes(initialStripes);
     setNotes("");
     router.refresh();
   }
@@ -81,13 +93,22 @@ export function PromoteBeltDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!next) resetAndClose();
-        else setOpen(true);
+        if (!next) {
+          resetAndClose();
+        } else {
+          // Re-read the rank each time it opens: after a promotion the page
+          // refreshes but this component stays mounted, so state from the
+          // first render would offer the rank they already hold.
+          setBelt(initialBelt);
+          setStripes(initialStripes);
+          setNotes("");
+          setOpen(true);
+        }
       }}
     >
       <DialogTrigger asChild>
-        <Button variant="outline" className="h-11">
-          Promote belt
+        <Button variant={triggerVariant} className="h-11">
+          {triggerLabel}
         </Button>
       </DialogTrigger>
       <DialogContent>

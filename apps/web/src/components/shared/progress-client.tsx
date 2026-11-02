@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { format, differenceInCalendarWeeks } from "date-fns";
 import { CalendarCheck, Award, NotebookText, Pencil, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { fetchPromotionProgress } from "@/lib/promotions/readiness";
 import { BeltDisplay } from "@/components/shared/belt-display";
 import { EmptyState } from "@/components/shared/empty-state";
 import { athleteLogSchema, type AthleteLogInput } from "@matos/shared";
@@ -148,26 +149,29 @@ function BeltHistoryTab({ memberId }: { memberId: string }) {
   }
 
   return (
-    <ul className="flex flex-col gap-2">
-      {data.map((row, i) => (
-        <li key={i} className="flex flex-col gap-1 rounded-md border p-3">
-          <div className="flex items-center justify-between">
-            <BeltDisplay belt={row.belt} stripes={row.stripes} size="sm" showLabel />
-            <span className="text-xs text-muted-foreground">
-              {format(new Date(row.promoted_at), "MMM d, yyyy")}
-            </span>
-          </div>
-          {/* Stage O1: a starting-rank row (set when the member was added or
+    <div className="flex flex-col gap-3">
+      <ClassesSinceCard memberId={memberId} />
+      <ul className="flex flex-col gap-2">
+        {data.map((row, i) => (
+          <li key={i} className="flex flex-col gap-1 rounded-md border p-3">
+            <div className="flex items-center justify-between">
+              <BeltDisplay belt={row.belt} stripes={row.stripes} size="sm" showLabel />
+              <span className="text-xs text-muted-foreground">
+                {format(new Date(row.promoted_at), "MMM d, yyyy")}
+              </span>
+            </div>
+            {/* Stage O1: a starting-rank row (set when the member was added or
           imported) is not a promotion — labelled as such rather than
           showing its auto-generated note. */}
-          {row.is_initial ? (
-            <p className="text-sm text-muted-foreground">Starting rank when joined</p>
-          ) : row.notes ? (
-            <p className="text-sm text-muted-foreground">{row.notes}</p>
-          ) : null}
-        </li>
-      ))}
-    </ul>
+            {row.is_initial ? (
+              <p className="text-sm text-muted-foreground">Starting rank when joined</p>
+            ) : row.notes ? (
+              <p className="text-sm text-muted-foreground">{row.notes}</p>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -387,5 +391,26 @@ function LogFormDialog(props: LogFormDialogProps) {
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// Flow audit 5.3: motivating, coach-neutral — the count only, not the gym's
+// threshold (coaches decide promotions; a visible target invites pressure).
+function ClassesSinceCard({ memberId }: { memberId: string }) {
+  const { data } = useQuery({
+    queryKey: ["my-promotion-progress", memberId],
+    queryFn: async () =>
+      (await fetchPromotionProgress(createClient(), memberId)).get(memberId) ?? null,
+  });
+  if (!data) return null;
+  return (
+    <div className="rounded-md border p-3">
+      <p className="text-2xl font-semibold">{data.classesSince}</p>
+      <p className="text-sm text-muted-foreground">
+        {data.classesSince === 1 ? "class" : "classes"} since your{" "}
+        {data.lastIsInitial ? "rank was set when you joined" : "last promotion"} (
+        {format(new Date(data.lastPromotedAt), "d MMM yyyy")})
+      </p>
+    </div>
   );
 }

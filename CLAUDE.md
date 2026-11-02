@@ -572,3 +572,41 @@ O4/O5 gate: security BLOCKED once (B1 — a link a coach minted for an athlete r
 - **Coach attendance (4.3).** Search; Owner/Coach/Inactive badges; Remove (confirm, audit-first `DELETE /api/attendance/[id]`); the date defaults to the gym's today; the mark route takes `date` and stamps the class start in the gym zone (`gymLocalToInstant`, DST-checked for Europe/Dublin), rejecting future dates, wrong weekdays, impossible dates and anything over a year old.
 
 **Gate.** security + database + code reviewers: no BLOCKED. Fixed from the gate: invites expire on email change, claim/edit race, audit-first attendance removal, calendar-valid bounded dates, interrupted-erasure check, null-safe athlete self-update guard (`is distinct from`), blank-email check, setup checklist ignoring roster-only members, reactivate payment copy, server-side billing rule, removal confirmation, deactivated members' check-ins still visible, Owner badge. Accepted: deactivation doesn't sync `memberships.active` (pre-existing; access is governed by `members.active`).
+
+### 2026-11-02 — Promotion readiness (flow audit 5.3)
+
+**Context.** The most BJJ-specific feature competitors lead with: who is due a stripe, based on attendance and time since their last promotion. MatOS already had all the data (belt_history, attendance).
+
+**Decision.** Migration `20261102140000`:
+
+- `gyms.promotion_classes_per_stripe` / `promotion_months_per_stripe` (defaults 30 / 3; at least one must stay set). Owner-edited from Settings or the Promotions page via `PATCH /api/gym/promotion-rules`.
+- An `attendance (member_id, checked_in_at)` index, which replaces the redundant single-column one.
+- `promotion_progress(p_member_id)` (SECURITY INVOKER): each active member's latest belt_history row and the classes since. RLS scopes it to the staff's gym or the athlete's own row.
+
+The rules live in `packages/shared/src/belt/readiness.ts` (`computeReadiness`), so every surface agrees:
+
+- **Ready** means every active criterion is met; **close** means at least 75% of each.
+- **Stripes only.** A belt change (from 4 stripes) is always "your call" and is never counted as ready. White belts with 4 stripes (adult or kid?) and green/black get no suggested belt.
+- Black belts are excluded.
+- For a member still on the starting rank they were added with, the months criterion is ignored, because that date is their join date rather than a promotion. Classes count attendance recorded in MatOS.
+
+Where it shows:
+
+- **Promotions page:** Ready / Close / Everyone filters and search. "Promote to …" opens the existing dialog pre-filled with the suggested rank.
+- **Dashboard:** a "ready for promotion" banner.
+- **Member profile:** a "Next promotion" card.
+- **Athlete Belt History:** the count of classes since the last promotion. The target is not shown in the UI, though the thresholds are readable through the gyms row, so this is a UX choice and not confidentiality.
+
+**Gate.** security + database + code reviewers: no BLOCKED. Fixed:
+
+- The promote dialog re-reads the current rank on every open. Previously, after a promotion it could re-submit the rank already held, creating a duplicate history row and resetting the clock.
+- Starting-rank months are no longer counted.
+- Belt changes are excluded from "ready".
+- Month-end month counting.
+- Gym-timezone, server-formatted dates (hydration-safe).
+- Filter buttons use aria-pressed.
+- An inline error state on the page.
+- A DB check that at least one criterion is set.
+- Redundant index dropped.
+
+Accepted: every existing gym gets the 30/3 default (guidance only, editable); the join-date fallback uses UTC midnight (only for members with no belt_history, which O1 made impossible for new members).

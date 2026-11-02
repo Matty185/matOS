@@ -69,13 +69,13 @@ GoCardless). Vendor claims are marketing, not verified.
 
 ## 5. Belts & progression
 
-| #   | Flow                                                            | Rating | Notes                                                                                                                                                                                  |
-| --- | --------------------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 5.1 | Promote belt / stripe (with celebration)                        | ✅     |                                                                                                                                                                                        |
-| 5.2 | Starting rank on import / sign-up                               | ✅     |                                                                                                                                                                                        |
-| 5.3 | **Promotion readiness** (classes and time since last promotion) | ⚪ P1  | The single most BJJ-specific feature competitors lead with (attendance + time-in-rank criteria). All the data already exists; mostly a computed view plus a "ready for a stripe" list. |
-| 5.4 | Grading day / bulk promotions                                   | ⚪ P2  | Promote several people at once after a grading.                                                                                                                                        |
-| 5.5 | Curriculum / technique tracking                                 | ⚪ P2  |                                                                                                                                                                                        |
+| #   | Flow                                                            | Rating              | Notes                                                                                                                                                                                  |
+| --- | --------------------------------------------------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 5.1 | Promote belt / stripe (with celebration)                        | ✅                  |                                                                                                                                                                                        |
+| 5.2 | Starting rank on import / sign-up                               | ✅                  |                                                                                                                                                                                        |
+| 5.3 | **Promotion readiness** (classes and time since last promotion) | ✅ built 2026-11-02 | The single most BJJ-specific feature competitors lead with (attendance + time-in-rank criteria). All the data already exists; mostly a computed view plus a "ready for a stripe" list. |
+| 5.4 | Grading day / bulk promotions                                   | ⚪ P2               | Promote several people at once after a grading.                                                                                                                                        |
+| 5.5 | Curriculum / technique tracking                                 | ⚪ P2               |                                                                                                                                                                                        |
 
 ## 6. Payments
 

@@ -26,6 +26,33 @@ export const updateGymSchema = z.object({
 
 export type UpdateGymInput = z.infer<typeof updateGymSchema>;
 
+// Flow audit 5.3: promotion guidance (owner, Settings or the Promotions
+// page). Blank/null turns a criterion off; at least one must stay on.
+const optionalCount = (max: number, label: string) =>
+  z
+    .union([
+      z.literal(""),
+      z.null(),
+      z.coerce
+        .number()
+        .int()
+        .min(1, `${label} must be at least 1.`)
+        .max(max, `${label} can be at most ${max}.`),
+    ])
+    .transform((v) => (v === "" || v === null ? null : v));
+
+export const promotionRulesSchema = z
+  .object({
+    promotion_classes_per_stripe: optionalCount(500, "Classes"),
+    promotion_months_per_stripe: optionalCount(60, "Months"),
+  })
+  .refine(
+    (d) => d.promotion_classes_per_stripe !== null || d.promotion_months_per_stripe !== null,
+    { message: "Set at least one: classes or months.", path: ["promotion_classes_per_stripe"] },
+  );
+
+export type PromotionRulesInput = z.infer<typeof promotionRulesSchema>;
+
 // Stage O5: owner adds a coach (Settings → Team / setup wizard). Coaches
 // get a starting rank too — they're on the mat like everyone else.
 export const addCoachSchema = z.object({

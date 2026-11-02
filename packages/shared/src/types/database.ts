@@ -708,6 +708,8 @@ export type Database = {
           name: string;
           onboarding_completed_at: string | null;
           payments_tracked_from: string | null;
+          promotion_classes_per_stripe: number | null;
+          promotion_months_per_stripe: number | null;
           timezone: string;
         };
         Insert: {
@@ -721,6 +723,8 @@ export type Database = {
           name: string;
           onboarding_completed_at?: string | null;
           payments_tracked_from?: string | null;
+          promotion_classes_per_stripe?: number | null;
+          promotion_months_per_stripe?: number | null;
           timezone?: string;
         };
         Update: {
@@ -734,6 +738,8 @@ export type Database = {
           name?: string;
           onboarding_completed_at?: string | null;
           payments_tracked_from?: string | null;
+          promotion_classes_per_stripe?: number | null;
+          promotion_months_per_stripe?: number | null;
           timezone?: string;
         };
         Relationships: [];
@@ -1199,6 +1205,15 @@ export type Database = {
       increment_signup_link_attempt: {
         Args: { p_link_id: string };
         Returns: number;
+      };
+      promotion_progress: {
+        Args: { p_member_id?: string };
+        Returns: {
+          classes_since: number;
+          last_is_initial: boolean;
+          last_promoted_at: string;
+          member_id: string;
+        }[];
       };
       redeem_signup_link: {
         Args: {

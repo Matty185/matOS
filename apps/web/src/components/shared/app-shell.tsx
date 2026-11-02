@@ -16,6 +16,7 @@ import {
   TrendingUp,
   UserCog,
   Swords,
+  Award,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@matos/shared";
@@ -36,6 +37,7 @@ const COACH_NAV: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Members", href: "/members", icon: Users },
   { label: "Attendance", href: "/attendance", icon: CalendarCheck },
+  { label: "Promotions", href: "/promotions", icon: Award },
   { label: "Classes", href: "/classes", icon: CalendarDays },
   { label: "Payments", href: "/payments", icon: CreditCard },
   { label: "Analysis", href: "/analysis", icon: Swords },
