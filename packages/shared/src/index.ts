@@ -8,6 +8,7 @@
 export * from "./types/database";
 
 export * from "./validation/account";
+export * from "./validation/announcement";
 export * from "./validation/agent";
 export * from "./validation/attendance";
 export * from "./validation/auth";

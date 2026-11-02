@@ -188,6 +188,12 @@ export function describeAuditEntry(row: AuditLogRow, ctx: AuditNameContext): str
       const before = asRecord(row.before_state);
       return `${actor} undid the ${before.kind === "moved" ? "move" : "cancellation"} of ${className(row, ctx)} on ${sessionDateLabel(before.session_date)}.`;
     }
+    case "announcement.posted":
+      return `${actor} posted the announcement "${typeof after.title === "string" ? after.title : "untitled"}".`;
+    case "announcement.deleted": {
+      const before = asRecord(row.before_state);
+      return `${actor} took down the announcement "${typeof before.title === "string" ? before.title : "untitled"}".`;
+    }
     case "analysis.created":
       return `${actor} uploaded a video for analysis.`;
     case "athlete_log.created":

@@ -634,3 +634,34 @@ Accepted:
 - The attendance guard is check-then-insert; a check-in landing in the same instant can stick to a just-cancelled session.
 - Mobile (parked) still lists the plain timetable; the server refuses check-in to a cancelled session there too.
 - The athlete check-in button's open/closed state uses the device clock (server is the real check).
+
+### 2026-11-02 — Announcements (flow audit 7.1)
+
+**Context.** Coaches had no way to tell members about closures, seminars or gradings inside MatOS. The `notifications` table has existed since Stage 1, but nothing renders it.
+
+**Decision.** A new `announcements` table (migration `20261102160000`), one row per post, rather than fanning out into `notifications` with one row per recipient. Nothing needs per-person delivery state yet, and a broadcast row holds no member data, so the GDPR erasure and export sweeps don't change.
+
+- Columns: `title` (1–100), optional `body` (up to 2000), a required `show_until` date (inclusive, in the gym's timezone), and `created_by`. `created_by` follows the invites pattern: auth.users, `on delete set null`, forced to the caller by `enforce_created_by_self()`.
+- RLS: every gym member can read; coach/owner can insert and delete. There is no edit: take it down and post again. UPDATE and TRUNCATE are revoked.
+- `POST /api/announcements` enforces "show until" from today to today + 90 days in the gym's timezone and allows at most 10 showing at once. It refuses personal workspaces. The audit is strict: the post is removed if the audit row can't be written.
+- `DELETE /api/announcements/[id]` writes the audit row first, then deletes.
+- Audit actions: `announcement.posted` and `announcement.deleted`.
+
+Where it shows:
+
+- A coach **Announcements** page (sidebar) to post and take down. It also lists posts that ended in the last 30 days.
+- Live posts at the top of the athlete **Home** page and on the coach **Dashboard**.
+- No per-member "dismiss": the required, capped `show_until` makes posts clear themselves.
+
+**Gate.** security + database + code reviewers: no BLOCKED. Fixed:
+
+- The coach Dashboard now shows what members see.
+- The form warns "Don't include anyone's personal details".
+- `delete-solo` deletes a personal workspace's announcements. The route refuses them, but RLS would let the workspace owner insert one directly.
+
+Accepted:
+
+- The cap of 10 is check-then-insert, so concurrent posts can go slightly over it. Home is limited to 10 anyway.
+- If a coach names a member in a post, that text stays in the immutable audit log and isn't reachable by the erasure sweep. This is the same as other coach-written free text.
+- No email or push delivery: email waits for a verified sending domain (audit 7.4), and mobile is parked.
+- No assistant tool for announcements.

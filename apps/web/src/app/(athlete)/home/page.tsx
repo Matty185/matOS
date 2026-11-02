@@ -15,6 +15,8 @@ import {
 } from "@matos/shared";
 import { Badge } from "@/components/ui/badge";
 import { fetchSessionChanges } from "@/lib/classes/session-changes";
+import { fetchLiveAnnouncements } from "@/lib/announcements/fetch";
+import { AnnouncementCard, type AnnouncementView } from "@/components/shared/announcement-card";
 import { getGymTimeZone } from "@/lib/time/gym-timezone";
 import type { Database } from "@matos/shared";
 
@@ -51,6 +53,14 @@ export default async function AthleteHomePage() {
     console.error("[home] couldn't load class changes");
   }
 
+  // Flow audit 7.1: gym announcements first. Degrade to none on error.
+  let announcements: AnnouncementView[] = [];
+  try {
+    announcements = await fetchLiveAnnouncements(supabase, today);
+  } catch {
+    console.error("[home] couldn't load announcements");
+  }
+
   const streak = computeAttendanceStreak((attendanceRows ?? []).map((a) => a.checked_in_date));
   const upcoming = computeUpcomingClasses(classRows ?? [], { fromDate: today, changes, cap: 6 });
 
@@ -62,6 +72,17 @@ export default async function AthleteHomePage() {
           <BeltDisplay belt={memberRow.belt} stripes={memberRow.stripes} size="lg" showLabel />
         ) : null}
       </div>
+
+      {announcements.length > 0 ? (
+        <section className="flex flex-col gap-2" aria-labelledby="announcements-heading">
+          <h2 id="announcements-heading" className="sr-only">
+            Announcements
+          </h2>
+          {announcements.map((a) => (
+            <AnnouncementCard key={a.id} announcement={a} today={today} />
+          ))}
+        </section>
+      ) : null}
 
       <div className="flex items-center gap-3 rounded-md border p-4">
         <Flame className="h-8 w-8 shrink-0 text-primary" />

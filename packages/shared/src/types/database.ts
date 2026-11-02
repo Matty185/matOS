@@ -62,6 +62,44 @@ export type Database = {
           },
         ];
       };
+      announcements: {
+        Row: {
+          body: string | null;
+          created_at: string;
+          created_by: string | null;
+          gym_id: string;
+          id: string;
+          show_until: string;
+          title: string;
+        };
+        Insert: {
+          body?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          gym_id: string;
+          id?: string;
+          show_until: string;
+          title: string;
+        };
+        Update: {
+          body?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          gym_id?: string;
+          id?: string;
+          show_until?: string;
+          title?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "announcements_gym_id_fkey";
+            columns: ["gym_id"];
+            isOneToOne: false;
+            referencedRelation: "gyms";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       athlete_logs: {
         Row: {
           created_at: string;

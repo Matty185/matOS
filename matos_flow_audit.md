@@ -92,12 +92,12 @@ GoCardless). Vendor claims are marketing, not verified.
 
 ## 7. Communication
 
-| #   | Flow                                             | Rating            | Notes                                                                                                                        |
-| --- | ------------------------------------------------ | ----------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| 7.1 | Announcements (closures, seminars, gradings)     | ⚪ P1             | The `notifications` table exists but nothing renders it. Even an in-app banner on athlete Home would cover most of it.       |
-| 7.2 | Message one member                               | 🟡                | Only via the invite/reset share dialogs (WhatsApp/email from the coach's phone). No general "contact" action on the profile. |
-| 7.3 | Re-engage members not seen recently              | 🟡 P2             | The dashboard flags them; no one-tap "send a message" action.                                                                |
-| 7.4 | Transactional email (invites, resets, reminders) | 🟡 P1 — **infra** | Blocked on verifying an email sending domain; this unblocks 1.9, 6.5 and 7.1 by email.                                       |
+| #   | Flow                                             | Rating              | Notes                                                                                                                        |
+| --- | ------------------------------------------------ | ------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| 7.1 | Announcements (closures, seminars, gradings)     | ✅ built 2026-11-02 | The `notifications` table exists but nothing renders it. Even an in-app banner on athlete Home would cover most of it.       |
+| 7.2 | Message one member                               | 🟡                  | Only via the invite/reset share dialogs (WhatsApp/email from the coach's phone). No general "contact" action on the profile. |
+| 7.3 | Re-engage members not seen recently              | 🟡 P2               | The dashboard flags them; no one-tap "send a message" action.                                                                |
+| 7.4 | Transactional email (invites, resets, reminders) | 🟡 P1 — **infra**   | Blocked on verifying an email sending domain; this unblocks 1.9, 6.5 and 7.1 by email.                                       |
 
 ## 8. Families & kids
 

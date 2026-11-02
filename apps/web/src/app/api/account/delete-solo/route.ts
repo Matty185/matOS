@@ -97,6 +97,18 @@ export const POST = withAuth(async (_request, context) => {
     }
   }
 
+  // Flow audit 7.1: the route refuses announcements in personal
+  // workspaces, but RLS would let the workspace owner insert one directly.
+  // Clear any so their text doesn't outlive the workspace.
+  const { error: announcementsError } = await supabase
+    .from("announcements")
+    .delete()
+    .eq("gym_id", personalGymId);
+  if (announcementsError) {
+    console.error("[delete-solo] failed to delete announcements", announcementsError);
+    return apiError(500, "INTERNAL_ERROR", "Something went wrong — nothing was deleted.");
+  }
+
   const { error: consentError } = await supabase
     .from("gdpr_consents")
     .delete()

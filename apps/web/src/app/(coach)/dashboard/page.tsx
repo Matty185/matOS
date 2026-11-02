@@ -20,6 +20,8 @@ import { getCurrentMember } from "@/lib/auth/current-member";
 import { getGymTimeZone } from "@/lib/time/gym-timezone";
 import { trailingMonthWindow, getOverdueMemberIds, billableMembers } from "@/lib/payments/overdue";
 import { getPaymentsTrackedFrom } from "@/lib/payments/tracked-from";
+import { fetchLiveAnnouncements } from "@/lib/announcements/fetch";
+import { AnnouncementCard, type AnnouncementView } from "@/components/shared/announcement-card";
 import { resolveAuditNames, describeAuditEntry, type AuditLogRow } from "@/lib/audit/format";
 
 const WINDOW_LENGTH = 6;
@@ -196,8 +198,18 @@ async function getDashboardData() {
     );
   }).length;
 
+  // Flow audit 7.1: what members currently see on Home.
+  let announcements: AnnouncementView[] = [];
+  try {
+    announcements = await fetchLiveAnnouncements(supabase, todayStr);
+  } catch {
+    console.error("[dashboard] couldn't load announcements");
+  }
+
   return {
     setup,
+    announcements,
+    todayStr,
     readyForPromotion,
     activeMemberCount: activeMembers.length,
     classesThisWeekCount: (allClasses ?? []).length,
@@ -229,6 +241,22 @@ export default async function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="font-heading text-3xl tracking-wide">Dashboard</h1>
+
+      {data.announcements.length > 0 ? (
+        <section className="flex flex-col gap-2" aria-labelledby="dash-announcements-heading">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="dash-announcements-heading" className="text-lg font-medium">
+              Announcements members can see
+            </h2>
+            <Button asChild variant="outline" className="h-11">
+              <Link href="/announcements">Manage</Link>
+            </Button>
+          </div>
+          {data.announcements.map((a) => (
+            <AnnouncementCard key={a.id} announcement={a} today={data.todayStr} />
+          ))}
+        </section>
+      ) : null}
 
       {data.setup ? (
         <Card className="border-primary/40">
