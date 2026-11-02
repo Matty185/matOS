@@ -22,6 +22,7 @@ import { TimetableEditor } from "@/components/shared/timetable-editor";
 import { TeamManager } from "@/components/shared/team-manager";
 import { RosterImporter } from "@/components/shared/roster-importer";
 import { BulkInviteDialog } from "@/components/shared/bulk-invite-dialog";
+import { SignupLinkDialog } from "@/components/shared/signup-link-dialog";
 import { Button } from "@/components/ui/button";
 
 const STEPS = [
@@ -147,6 +148,7 @@ export function SetupWizard({
   }, [unsavedRows]);
   const [importedCount, setImportedCount] = useState<number | null>(null);
   const [bulkIds, setBulkIds] = useState<string[] | null>(null);
+  const [signupLinkOpen, setSignupLinkOpen] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const { data: counts, isFetching: countsFetching } = useSetupCounts();
 
@@ -287,6 +289,22 @@ export function SetupWizard({
                   Import more below, or carry on.
                 </p>
               ) : null}
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-dashed p-3">
+                <p className="text-sm text-muted-foreground">
+                  Don&apos;t have everyone&apos;s details? Send sign-up links and people fill in
+                  their own.
+                </p>
+                <Button variant="outline" className="h-11" onClick={() => setSignupLinkOpen(true)}>
+                  Sign-up link
+                </Button>
+              </div>
+              <SignupLinkDialog
+                open={signupLinkOpen}
+                onOpenChange={(open) => {
+                  setSignupLinkOpen(open);
+                  if (!open) void refreshCounts();
+                }}
+              />
               <RosterImporter
                 onUnsavedChange={handleUnsaved}
                 onImported={(n) => {

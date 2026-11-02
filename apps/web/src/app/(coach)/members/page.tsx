@@ -11,6 +11,7 @@ import { BeltDisplay, ALL_BELTS, BELT_LABELS } from "@/components/shared/belt-di
 import { EmptyState } from "@/components/shared/empty-state";
 import { PaymentCellDialog } from "@/components/shared/payment-cell-dialog";
 import { BulkInviteDialog } from "@/components/shared/bulk-invite-dialog";
+import { SignupLinkDialog } from "@/components/shared/signup-link-dialog";
 import { PLAN_LABELS } from "@/lib/constants/member-labels";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -185,6 +186,7 @@ export default function MembersPage() {
       : "all";
   });
   const [bulkInviteIds, setBulkInviteIds] = useState<string[] | null>(null);
+  const [signupLinkOpen, setSignupLinkOpen] = useState(false);
   const [beltFilter, setBeltFilter] = useState("all");
   const [planFilter, setPlanFilter] = useState<"all" | MembershipPlan>("all");
   const [paymentFilter, setPaymentFilter] = useState<"all" | PaymentStatus | "no_record">("all");
@@ -306,9 +308,22 @@ export default function MembersPage() {
           actionLabel="Import members"
           actionHref="/members/import"
         />
-        <Button asChild variant="link" className="h-11 self-center">
-          <Link href="/members/new">Or add one person</Link>
-        </Button>
+        <div className="flex flex-wrap justify-center gap-2">
+          <Button asChild variant="link" className="h-11">
+            <Link href="/members/new">Or add one person</Link>
+          </Button>
+          <Button variant="link" className="h-11" onClick={() => setSignupLinkOpen(true)}>
+            Or send a sign-up link
+          </Button>
+        </div>
+        <SignupLinkDialog
+          open={signupLinkOpen}
+          onOpenChange={(open) => {
+            setSignupLinkOpen(open);
+            // Someone may have signed up while it was open.
+            if (!open) void queryClient.invalidateQueries({ queryKey: ["members"] });
+          }}
+        />
       </div>
     );
   }
@@ -318,6 +333,9 @@ export default function MembersPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="font-heading text-3xl tracking-wide">Members</h1>
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" className="h-11" onClick={() => setSignupLinkOpen(true)}>
+            Sign-up link
+          </Button>
           <Button asChild variant="outline" className="h-11">
             <Link href="/members/import">Import</Link>
           </Button>
@@ -527,6 +545,15 @@ export default function MembersPage() {
           </Table>
         </div>
       )}
+
+      <SignupLinkDialog
+        open={signupLinkOpen}
+        onOpenChange={(open) => {
+          setSignupLinkOpen(open);
+          // Someone may have signed up while it was open.
+          if (!open) void queryClient.invalidateQueries({ queryKey: ["members"] });
+        }}
+      />
 
       <BulkInviteDialog
         memberIds={bulkInviteIds ?? []}

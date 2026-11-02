@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { BELT_VALUES } from "./member";
 
 // Referenced by the claim route now and by Stage 8's GDPR export/deletion
 // flows later — keep this the single source of truth for which consent
@@ -63,3 +64,53 @@ export const bulkInviteSchema = z.object({
 });
 
 export type BulkInviteInput = z.infer<typeof bulkInviteSchema>;
+
+// Stage O7: self-serve sign-up links. The coach mints a one-time link with
+// no details attached; the person who opens it fills these in themselves.
+// Athlete role only (decided server-side, never from the body).
+//
+// `existing_account`: the visitor says this email already has a MatOS
+// account, so `password` is that account's password (verified by a real
+// sign-in) rather than a new one. The server still decides the branch from
+// its own lookup and refuses a mismatch, so the flag only picks which
+// checks the form runs.
+const signupDetailsFields = {
+  first_name: z.string().trim().min(1, "First name is required.").max(100),
+  last_name: z.string().trim().min(1, "Last name is required.").max(100),
+  email: z.string().trim().toLowerCase().email("Enter a valid email address."),
+  phone: z.string().trim().max(30).optional().or(z.literal("")),
+  emergency_contact_name: z.string().trim().max(100).optional().or(z.literal("")),
+  emergency_contact_phone: z.string().trim().max(30).optional().or(z.literal("")),
+  belt: z.enum(BELT_VALUES).default("white"),
+  stripes: z.coerce.number().int().min(0, "Stripes are 0–4.").max(4, "Stripes are 0–4.").default(0),
+  consent: z.literal(true, {
+    message: "You must accept the data storage consent to continue.",
+  }),
+};
+
+export const joinGymSchema = z
+  .object({
+    ...signupDetailsFields,
+    existing_account: z.boolean().default(false),
+    password: z.string().min(1, "Password is required."),
+    confirmPassword: z.string().optional(),
+  })
+  .superRefine((d, ctx) => {
+    if (d.existing_account) return;
+    if (d.password.length < 8) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Password must be at least 8 characters.",
+        path: ["password"],
+      });
+    }
+    if (d.password !== d.confirmPassword) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Passwords don't match.",
+        path: ["confirmPassword"],
+      });
+    }
+  });
+
+export type JoinGymInput = z.infer<typeof joinGymSchema>;

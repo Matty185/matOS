@@ -1112,6 +1112,57 @@ export type Database = {
           },
         ];
       };
+      signup_links: {
+        Row: {
+          attempt_count: number;
+          created_at: string;
+          created_by: string | null;
+          expires_at: string;
+          gym_id: string;
+          id: string;
+          token_hash: string;
+          used_at: string | null;
+          used_by_member_id: string | null;
+        };
+        Insert: {
+          attempt_count?: number;
+          created_at?: string;
+          created_by?: string | null;
+          expires_at: string;
+          gym_id: string;
+          id?: string;
+          token_hash: string;
+          used_at?: string | null;
+          used_by_member_id?: string | null;
+        };
+        Update: {
+          attempt_count?: number;
+          created_at?: string;
+          created_by?: string | null;
+          expires_at?: string;
+          gym_id?: string;
+          id?: string;
+          token_hash?: string;
+          used_at?: string | null;
+          used_by_member_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "signup_links_gym_id_fkey";
+            columns: ["gym_id"];
+            isOneToOne: false;
+            referencedRelation: "gyms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "signup_links_used_by_member_id_fkey";
+            columns: ["used_by_member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -1145,6 +1196,19 @@ export type Database = {
         Returns: number;
       };
       increment_invite_attempt: { Args: { invite_id: string }; Returns: number };
+      increment_signup_link_attempt: {
+        Args: { p_link_id: string };
+        Returns: number;
+      };
+      redeem_signup_link: {
+        Args: {
+          p_consent_version: string;
+          p_details: Json;
+          p_link_id: string;
+          p_user_id: string;
+        };
+        Returns: string;
+      };
       set_active_gym: { Args: { p_gym_id: string }; Returns: undefined };
       tag_position: {
         Args: {

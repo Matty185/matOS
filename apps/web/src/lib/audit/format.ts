@@ -201,6 +201,12 @@ export function describeAuditEntry(row: AuditLogRow, ctx: AuditNameContext): str
       const label = role === "gym_owner" ? "an owner" : role === "coach" ? "a coach" : "an athlete";
       return `${actor} made ${subjectNameFor(row, ctx)} ${label}.`;
     }
+    case "signup_link.created":
+      return `${actor} created a sign-up link.`;
+    case "signup_link.cancelled":
+      return `${actor} cancelled a sign-up link.`;
+    case "member.self_registered":
+      return `${subjectNameFor(row, ctx)} joined using a sign-up link.`;
     case "gym.provisioned":
       return "Gym created on MatOS.";
     default:
