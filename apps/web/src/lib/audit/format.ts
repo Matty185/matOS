@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database, Json } from "@matos/shared";
+import { formatClassTime, formatSessionDate, type Database, type Json } from "@matos/shared";
 
 export type AuditLogRow = Database["public"]["Tables"]["audit_log"]["Row"];
 type Client = SupabaseClient<Database>;
@@ -114,6 +114,12 @@ const PERIOD_LABEL = (state: Record<string, Json>) => {
     : "that period";
 };
 
+function sessionDateLabel(value: Json | undefined): string {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? formatSessionDate(value)
+    : "a date";
+}
+
 // "Plain-English actions" per plan §7 (dashboard recent-activity feed) and
 // §7's audit log spec — every action string writeAuditLog() is ever called
 // with (24 as of Stage 11) maps to a real sentence here; unrecognized
@@ -174,6 +180,14 @@ export function describeAuditEntry(row: AuditLogRow, ctx: AuditNameContext): str
       return `${actor} updated the class ${className(row, ctx)}.`;
     case "class.deleted":
       return `${actor} removed the class ${className(row, ctx)}.`;
+    case "class.session_cancelled":
+      return `${actor} cancelled ${className(row, ctx)} on ${sessionDateLabel(after.session_date)}.`;
+    case "class.session_moved":
+      return `${actor} moved ${className(row, ctx)} on ${sessionDateLabel(after.session_date)} to ${sessionDateLabel(after.new_date)}${typeof after.new_start_time === "string" ? `, ${formatClassTime(after.new_start_time)}` : ""}.`;
+    case "class.session_change_undone": {
+      const before = asRecord(row.before_state);
+      return `${actor} undid the ${before.kind === "moved" ? "move" : "cancellation"} of ${className(row, ctx)} on ${sessionDateLabel(before.session_date)}.`;
+    }
     case "analysis.created":
       return `${actor} uploaded a video for analysis.`;
     case "athlete_log.created":

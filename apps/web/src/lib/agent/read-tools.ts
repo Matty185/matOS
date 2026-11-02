@@ -12,6 +12,10 @@ import {
   fetchAthleteProfileData,
   type ProfileSubject,
   METRIC_CATALOG,
+  addDaysToDate,
+  dayOfWeekOfDate,
+  DEFAULT_GYM_TIMEZONE,
+  gymWallClock,
   type Database,
 } from "@matos/shared";
 
@@ -149,7 +153,36 @@ export async function executeReadTool(
       if (input.active_only !== false) query = query.eq("active", true);
       const { data, error } = await query;
       if (error) throw error;
-      return data;
+
+      // Flow audit 3.2: one-off cancellations/moves in the next two weeks, so
+      // "is there class on Monday?" isn't answered from the template alone.
+      // The active gym via current_member(): an account can see several gyms
+      // rows (personal workspace + real gym), so an unfiltered read could pick
+      // the wrong timezone.
+      const { data: current } = await supabase.rpc("current_member");
+      const gymId = current?.[0]?.gym_id;
+      const { data: gym } = gymId
+        ? await supabase.from("gyms").select("timezone").eq("id", gymId).maybeSingle()
+        : { data: null };
+      const today = gymWallClock(new Date(), gym?.timezone ?? DEFAULT_GYM_TIMEZONE).date;
+      const { data: rawChanges, error: changesError } = await supabase
+        .from("class_session_changes")
+        .select(
+          "class_id, session_date, kind, new_date, new_start_time, note, classes(name, day_of_week, active)",
+        )
+        .gte("session_date", addDaysToDate(today, -6))
+        .lte("session_date", addDaysToDate(today, 14))
+        .or(`session_date.gte.${today},new_date.gte.${today}`)
+        .order("session_date", { ascending: true });
+      if (changesError) throw changesError;
+      // Drop changes left stale by a later edit of the class's weekday, or on
+      // inactive classes — the schedule ignores those too (sessionsOnDate).
+      const changes = (rawChanges ?? [])
+        .filter(
+          (c) => c.classes?.active && dayOfWeekOfDate(c.session_date) === c.classes.day_of_week,
+        )
+        .map(({ classes, ...rest }) => ({ ...rest, class_name: classes?.name }));
+      return { today, classes: data, one_off_changes_next_14_days: changes };
     }
 
     case "get_belt_history": {

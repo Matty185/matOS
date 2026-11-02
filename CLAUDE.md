@@ -610,3 +610,27 @@ Where it shows:
 - Redundant index dropped.
 
 Accepted: every existing gym gets the 30/3 default (guidance only, editable); the join-date fallback uses UTC midnight (only for members with no belt_history, which O1 made impossible for new members).
+
+### 2026-11-02 — Cancel or move one session (flow audit 3.2)
+
+**Context.** Bank holidays, seminars and a coach away mean a single date of a recurring class doesn't run, or runs at another time. With the template model (rule 7), a cancelled class still showed as upcoming and still accepted check-ins.
+
+**Decision.** A per-date _exception_ table, not per-session instances (still out of scope). Migration `20261102150000`:
+
+- `class_session_changes`: `class_id`, `session_date`, `kind` (`cancelled` / `moved`), `new_date` + `new_start_time` for a move, optional `note` shown to members.
+- A move stays within six days of the original date. Together with `unique (class_id, session_date)` and a partial unique on `(class_id, new_date)`, a class can never have two sessions on one calendar date, which the attendance unique key relies on.
+- A trigger derives `gym_id` from the class and checks the date falls on the class's weekday. RLS: every gym member reads, coach/owner insert and delete, no update (undo + redo). TRUNCATE/UPDATE revoked.
+- Editing a class's weekday deletes its exceptions (trigger on `classes`), since they no longer describe real sessions.
+
+One resolver, `sessionsOnDate` in `packages/shared/src/classes/sessions.ts`, decides what runs on a date (scheduled / cancelled / moved away / moved in). Used by the self check-in route, the coach mark route (both fail closed if changes can't be read), athlete Home and Check-in, the coach Attendance page, and the assistant's `get_classes` (now also returns changes in the next 14 days).
+
+Coach UI: "Cancel or move a date" on each class (next eight dates), and a "Cancelled or moved sessions" list with Undo on the Classes page. Rules: only today or later; not a session anyone has checked in to; undo refused once the original date has passed or people have checked in to the moved session. Every change and undo is audited strictly (`class.session_cancelled` / `class.session_moved` / `class.session_change_undone`).
+
+**Gate.** security + database + code reviewers: no BLOCKED. Fixed: gym timezone resolved from `current_member()` (an account can see several gyms rows), moves whose original date passed still listed, stale exceptions on weekday edit, TRUNCATE/UPDATE revokes, same-day time change undoable after check-ins, assistant ignores stale changes.
+
+Accepted:
+
+- A coach writing directly through REST with their own token skips the route's audit row and friendly checks (same as other staff-writable tables; coaches are trusted).
+- The attendance guard is check-then-insert; a check-in landing in the same instant can stick to a just-cancelled session.
+- Mobile (parked) still lists the plain timetable; the server refuses check-in to a cancelled session there too.
+- The athlete check-in button's open/closed state uses the device clock (server is the real check).

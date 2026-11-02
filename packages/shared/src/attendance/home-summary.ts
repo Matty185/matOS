@@ -1,5 +1,11 @@
-import { format, startOfWeek, subWeeks, addDays } from "date-fns";
+import { format, startOfWeek, subWeeks } from "date-fns";
 import type { Database } from "../types/database";
+import {
+  addDaysToDate,
+  sessionsOnDate,
+  type ClassSession,
+  type SessionChange,
+} from "../classes/sessions";
 
 type ClassRow = Database["public"]["Tables"]["classes"]["Row"];
 
@@ -31,29 +37,31 @@ export function computeAttendanceStreak(checkInDates: string[]): number {
   return streak;
 }
 
-export type UpcomingClass = { date: Date; classRow: ClassRow };
+export type UpcomingClass = ClassSession<ClassRow> & {
+  /** Local-midnight Date for the listed day (kept for existing callers). */
+  dateValue: Date;
+};
 
-// Walks the next `daysAhead` calendar days (default 7), filtering the gym's
-// active classes by day_of_week and sorting by start_time each day, capped
-// at `cap` total entries (default 5) — not 5 per day.
+// Walks the next `daysAhead` calendar days (default 7) from `fromDate`
+// (YYYY-MM-DD in the gym's zone; defaults to the device's today), listing the
+// gym's active classes with one-off changes applied (flow audit 3.2):
+// cancelled and moved-away sessions stay listed so members see the change.
+// Capped at `cap` total entries (default 5) — not 5 per day.
 export function computeUpcomingClasses(
   activeClasses: ClassRow[],
-  options?: { daysAhead?: number; cap?: number; from?: Date },
+  options?: { daysAhead?: number; cap?: number; fromDate?: string; changes?: SessionChange[] },
 ): UpcomingClass[] {
   const daysAhead = options?.daysAhead ?? 7;
   const cap = options?.cap ?? 5;
-  const from = options?.from ?? new Date();
+  const fromDate = options?.fromDate ?? format(new Date(), "yyyy-MM-dd");
+  const changes = options?.changes ?? [];
 
   const upcoming: UpcomingClass[] = [];
   for (let offset = 0; offset < daysAhead && upcoming.length < cap; offset++) {
-    const date = addDays(from, offset);
-    const dayOfWeek = date.getDay();
-    const dayClasses = activeClasses
-      .filter((c) => c.day_of_week === dayOfWeek)
-      .sort((a, b) => a.start_time.localeCompare(b.start_time));
-    for (const c of dayClasses) {
+    const date = addDaysToDate(fromDate, offset);
+    for (const session of sessionsOnDate(activeClasses, changes, date)) {
       if (upcoming.length >= cap) break;
-      upcoming.push({ date, classRow: c });
+      upcoming.push({ ...session, dateValue: new Date(`${date}T00:00:00`) });
     }
   }
   return upcoming;

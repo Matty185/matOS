@@ -8,7 +8,12 @@ import {
   gymWallClock,
   timeStringToMinutes,
   DEFAULT_GYM_TIMEZONE,
+  formatSessionDate,
+  sessionRuns,
+  sessionsOnDate,
+  type SessionChange,
 } from "@matos/shared";
+import { fetchSessionChanges } from "@/lib/classes/session-changes";
 
 const CHECK_IN_OPENS_MINUTES_BEFORE = 30;
 
@@ -98,11 +103,33 @@ export const POST = withAuth(
 
     const local = gymWallClock(effectiveTime, timeZone);
 
-    if (classRow.day_of_week !== local.dayOfWeek) {
+    // Flow audit 3.2: apply one-off changes (cancelled / moved sessions).
+    // Fail closed: if the changes can't be read, don't accept a check-in for
+    // a session that may have been cancelled.
+    let changes: SessionChange[];
+    try {
+      changes = await fetchSessionChanges(supabase, local.date, local.date, classRow.id);
+    } catch {
+      return apiError(500, "CHECK_IN_FAILED", "Something went wrong — check-in wasn't saved.");
+    }
+    const listed = sessionsOnDate([classRow], changes, local.date);
+    const session = listed.find((s) => sessionRuns(s.status));
+    if (!session) {
+      const today = listed[0];
+      if (today?.status === "cancelled") {
+        return apiError(409, "SESSION_CANCELLED", "This class is cancelled today.");
+      }
+      if (today?.status === "moved_away" && today.change?.new_date) {
+        return apiError(
+          409,
+          "SESSION_MOVED",
+          `This class was moved to ${formatSessionDate(today.change.new_date)}.`,
+        );
+      }
       return apiError(400, "NOT_TODAY", "This class isn't scheduled for today.");
     }
 
-    const classStartMinutes = timeStringToMinutes(classRow.start_time);
+    const classStartMinutes = timeStringToMinutes(session.startTime);
     const windowOpenMinutes = classStartMinutes - CHECK_IN_OPENS_MINUTES_BEFORE;
     const windowCloseMinutes = classStartMinutes + classRow.duration_minutes;
 

@@ -3,7 +3,15 @@ import { withAuth } from "@/lib/auth/withAuth";
 import { apiError } from "@/lib/api/response";
 import { createClient } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/audit/log";
-import { gymLocalToInstant, gymWallClock, markAttendanceSchema } from "@matos/shared";
+import {
+  gymLocalToInstant,
+  gymWallClock,
+  markAttendanceSchema,
+  sessionRuns,
+  sessionsOnDate,
+  type SessionChange,
+} from "@matos/shared";
+import { fetchSessionChanges } from "@/lib/classes/session-changes";
 import { getGymTimeZone } from "@/lib/time/gym-timezone";
 
 // POST /api/attendance/mark — coach/owner only. Any member, any class, any
@@ -34,10 +42,30 @@ export const POST = withAuth(
       if (input.date > today) {
         return apiError(400, "FUTURE_DATE", "You can't mark attendance for a future date.");
       }
-      const classStart = gymLocalToInstant(input.date, classRow.start_time, timeZone);
-      if (gymWallClock(classStart, timeZone).dayOfWeek !== classRow.day_of_week) {
+      // Flow audit 3.2: one-off changes decide whether (and when) the class
+      // ran on this date. Fail closed if they can't be read.
+      let changes: SessionChange[];
+      try {
+        changes = await fetchSessionChanges(supabase, input.date, input.date, input.class_id);
+      } catch {
+        return apiError(
+          500,
+          "MARK_ATTENDANCE_FAILED",
+          "Something went wrong — attendance wasn't saved.",
+        );
+      }
+      const listed = sessionsOnDate([{ id: input.class_id, ...classRow }], changes, input.date);
+      const session = listed.find((s) => sessionRuns(s.status));
+      if (!session) {
+        if (listed[0]?.status === "cancelled") {
+          return apiError(409, "SESSION_CANCELLED", "That session was cancelled.");
+        }
+        if (listed[0]?.status === "moved_away") {
+          return apiError(409, "SESSION_MOVED", "That session was moved to another date.");
+        }
         return apiError(400, "WRONG_DAY", "That class doesn't run on this date.");
       }
+      const classStart = gymLocalToInstant(input.date, session.startTime, timeZone);
       // Marked before today's class starts: stamp now (still today).
       checkedInAt = (classStart > now ? now : classStart).toISOString();
     }

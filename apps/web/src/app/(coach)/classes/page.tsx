@@ -20,7 +20,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import type { Database } from "@matos/shared";
+import {
+  formatClassTime,
+  formatSessionDate,
+  type Database,
+  type SessionChange,
+} from "@matos/shared";
+import { SessionChangeDialog } from "@/components/shared/session-change-dialog";
+import { useGymToday } from "@/hooks/use-gym-today";
 
 type ClassRow = Database["public"]["Tables"]["classes"]["Row"];
 
@@ -58,10 +65,34 @@ function useClasses() {
   });
 }
 
+// Flow audit 3.2: one-off changes whose original or new date is today or later.
+function useUpcomingChanges(today: string | null) {
+  return useQuery({
+    queryKey: ["class-session-changes", today],
+    enabled: !!today,
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("class_session_changes")
+        .select("id, class_id, session_date, kind, new_date, new_start_time, note")
+        // A move created before its original date can still be upcoming
+        // after that date passes, so match on either date.
+        .or(`session_date.gte.${today!},new_date.gte.${today!}`)
+        .order("session_date", { ascending: true });
+      if (error) throw error;
+      return data as SessionChange[];
+    },
+  });
+}
+
 export default function ClassesPage() {
   const { data: classes, isLoading, error } = useClasses();
+  const today = useGymToday();
+  const { data: changes, error: changesError } = useUpcomingChanges(today);
   const queryClient = useQueryClient();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [undoingId, setUndoingId] = useState<string | null>(null);
+  const classById = useMemo(() => new Map((classes ?? []).map((c) => [c.id, c])), [classes]);
 
   const byDay = useMemo(() => {
     const groups: ClassRow[][] = Array.from({ length: 7 }, () => []);
@@ -73,6 +104,25 @@ export default function ClassesPage() {
 
   function refetch() {
     queryClient.invalidateQueries({ queryKey: ["classes"] });
+    queryClient.invalidateQueries({ queryKey: ["class-session-changes"] });
+  }
+
+  async function handleUndo(change: SessionChange) {
+    setUndoingId(change.id);
+    try {
+      const res = await fetch(`/api/class-session-changes/${change.id}`, { method: "DELETE" });
+      const body = await res.json().catch(() => ({}));
+      if (res.ok) {
+        toast.success("Change undone. The session runs as normal.");
+        refetch();
+      } else {
+        toast.error(body.error ?? "Couldn't undo this change.");
+      }
+    } catch {
+      toast.error("Couldn't undo — check your connection.");
+    } finally {
+      setUndoingId(null);
+    }
   }
 
   async function handleDelete(id: string) {
@@ -124,6 +174,59 @@ export default function ClassesPage() {
         />
       ) : (
         <div className="flex flex-col gap-6">
+          {changesError ? (
+            <p role="alert" className="text-sm text-destructive">
+              Couldn&apos;t load cancelled or moved sessions. Try refreshing.
+            </p>
+          ) : changes && changes.length > 0 ? (
+            <section className="flex flex-col gap-2" aria-labelledby="changes-heading">
+              <h2 id="changes-heading" className="text-lg font-medium">
+                Cancelled or moved sessions
+              </h2>
+              <ul className="flex flex-col gap-2">
+                {changes.map((ch) => {
+                  const c = classById.get(ch.class_id);
+                  return (
+                    <li
+                      key={ch.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed p-3"
+                    >
+                      <div className="flex flex-col gap-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium">{c?.name ?? "A class"}</span>
+                          <Badge variant={ch.kind === "cancelled" ? "destructive" : "secondary"}>
+                            {ch.kind === "cancelled" ? "Cancelled" : "Moved"}
+                          </Badge>
+                        </div>
+                        <span className="text-sm text-muted-foreground">
+                          {formatSessionDate(ch.session_date)}
+                          {c ? `, ${formatClassTime(c.start_time)}` : ""}
+                          {ch.kind === "moved" && ch.new_date && ch.new_start_time
+                            ? ` → ${formatSessionDate(ch.new_date)}, ${formatClassTime(ch.new_start_time)}`
+                            : ""}
+                          {ch.note ? ` · ${ch.note}` : ""}
+                        </span>
+                      </div>
+                      {today && ch.session_date < today ? (
+                        // The original date has passed; undoing would only
+                        // drop the moved session (the server refuses it).
+                        <span className="text-sm text-muted-foreground">Original date passed</span>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          className="h-11"
+                          disabled={undoingId === ch.id}
+                          onClick={() => handleUndo(ch)}
+                        >
+                          {undoingId === ch.id ? "Undoing..." : "Undo"}
+                        </Button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ) : null}
           {DAY_LABELS.map((dayLabel, dayIndex) => {
             const dayClasses = byDay[dayIndex] ?? [];
             if (dayClasses.length === 0) return null;
@@ -147,7 +250,15 @@ export default function ClassesPage() {
                           {c.max_capacity ? ` · max ${c.max_capacity}` : ""}
                         </span>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
+                        {c.active && today ? (
+                          <SessionChangeDialog
+                            classRow={c}
+                            today={today}
+                            changes={changes ?? []}
+                            onSaved={refetch}
+                          />
+                        ) : null}
                         <ClassFormDialog
                           mode="edit"
                           classId={c.id}

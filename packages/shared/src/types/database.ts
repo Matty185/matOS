@@ -470,6 +470,57 @@ export type Database = {
           },
         ];
       };
+      class_session_changes: {
+        Row: {
+          class_id: string;
+          created_at: string;
+          gym_id: string;
+          id: string;
+          kind: Database["public"]["Enums"]["class_session_change_kind"];
+          new_date: string | null;
+          new_start_time: string | null;
+          note: string | null;
+          session_date: string;
+        };
+        Insert: {
+          class_id: string;
+          created_at?: string;
+          gym_id: string;
+          id?: string;
+          kind: Database["public"]["Enums"]["class_session_change_kind"];
+          new_date?: string | null;
+          new_start_time?: string | null;
+          note?: string | null;
+          session_date: string;
+        };
+        Update: {
+          class_id?: string;
+          created_at?: string;
+          gym_id?: string;
+          id?: string;
+          kind?: Database["public"]["Enums"]["class_session_change_kind"];
+          new_date?: string | null;
+          new_start_time?: string | null;
+          note?: string | null;
+          session_date?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "class_session_changes_class_id_fkey";
+            columns: ["class_id"];
+            isOneToOne: false;
+            referencedRelation: "classes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "class_session_changes_gym_id_fkey";
+            columns: ["gym_id"];
+            isOneToOne: false;
+            referencedRelation: "gyms";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       classes: {
         Row: {
           active: boolean;
@@ -1276,6 +1327,7 @@ export type Database = {
       breakdown_status: "in_progress" | "complete";
       breakdown_visibility: "private" | "gym";
       checked_in_by: "self" | "coach";
+      class_session_change_kind: "cancelled" | "moved";
       class_type: "gi" | "no_gi" | "comp" | "open_mat";
       entitlement_plan: "solo" | "gym";
       entitlement_source: "iap_apple" | "iap_google" | "stripe" | "manual";
@@ -1436,6 +1488,7 @@ export const Constants = {
       breakdown_status: ["in_progress", "complete"],
       breakdown_visibility: ["private", "gym"],
       checked_in_by: ["self", "coach"],
+      class_session_change_kind: ["cancelled", "moved"],
       class_type: ["gi", "no_gi", "comp", "open_mat"],
       entitlement_plan: ["solo", "gym"],
       entitlement_source: ["iap_apple", "iap_google", "stripe", "manual"],

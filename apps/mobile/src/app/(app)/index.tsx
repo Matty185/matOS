@@ -130,7 +130,7 @@ export default function HomeScreen() {
                 </View>
               ) : (
                 <View className="gap-2">
-                  {data.upcoming.map(({ date, classRow }, i) => (
+                  {data.upcoming.map(({ dateValue: date, classRow }, i) => (
                     <View
                       key={`${classRow.id}-${i}`}
                       className="flex-row items-center justify-between gap-3 rounded-md border border-neutral-200 p-3"

@@ -23,6 +23,7 @@ export * from "./validation/payment";
 export * from "./validation/share-link";
 
 export * from "./attendance/home-summary";
+export * from "./classes/sessions";
 export * from "./belt/constants";
 export * from "./belt/readiness";
 

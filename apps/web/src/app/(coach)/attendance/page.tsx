@@ -4,7 +4,17 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { CalendarCheck, ChevronDown, Search } from "lucide-react";
-import { DEFAULT_GYM_TIMEZONE, gymWallClock, type Database } from "@matos/shared";
+import {
+  addDaysToDate,
+  describeSessionChange,
+  formatClassTime,
+  sessionRuns,
+  sessionsOnDate,
+  type ClassSession,
+  type Database,
+  type SessionChange,
+} from "@matos/shared";
+import { useGymToday } from "@/hooks/use-gym-today";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
@@ -33,33 +43,6 @@ const CLASS_TYPE_LABELS: Record<ClassRow["class_type"], string> = {
   open_mat: "Open Mat",
 };
 
-function formatTime(time: string) {
-  const parts = time.split(":");
-  const h = Number(parts[0] ?? 0);
-  const m = parts[1] ?? "00";
-  const period = h >= 12 ? "PM" : "AM";
-  const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${h12}:${m} ${period}`;
-}
-
-/** 0 = Sunday for a plain YYYY-MM-DD calendar date, independent of device zone. */
-function dayOfWeekOf(date: string) {
-  return new Date(`${date}T00:00:00Z`).getUTCDay();
-}
-
-function useGymToday() {
-  const { data: timeZone } = useQuery({
-    queryKey: ["gym-timezone"],
-    queryFn: async () => {
-      const supabase = createClient();
-      const { data } = await supabase.from("gyms").select("timezone").limit(1).maybeSingle();
-      return data?.timezone ?? DEFAULT_GYM_TIMEZONE;
-    },
-    staleTime: Infinity,
-  });
-  return timeZone ? gymWallClock(new Date(), timeZone).date : null;
-}
-
 export default function AttendancePage() {
   // "Today" is the gym's today (flow audit 4.3), not the coach's device date.
   const gymToday = useGymToday();
@@ -67,21 +50,30 @@ export default function AttendancePage() {
   const selectedDate = pickedDate ?? gymToday;
   const queryClient = useQueryClient();
 
-  const dayOfWeek = selectedDate ? dayOfWeekOf(selectedDate) : null;
-
-  const { data: classes, isLoading } = useQuery({
-    queryKey: ["classes", "by-day", dayOfWeek],
-    enabled: dayOfWeek !== null,
+  // Flow audit 3.2: the date's sessions with one-off changes applied. All
+  // active classes are needed: a session moved onto this date can belong to a
+  // class that usually runs on another weekday.
+  const {
+    data: sessions,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["classes", "sessions-on", selectedDate],
+    enabled: !!selectedDate,
     queryFn: async () => {
       const supabase = createClient();
-      const { data, error } = await supabase
-        .from("classes")
-        .select("*")
-        .eq("day_of_week", dayOfWeek!)
-        .eq("active", true)
-        .order("start_time", { ascending: true });
-      if (error) throw error;
-      return data;
+      const date = selectedDate!;
+      const [classesRes, changesRes] = await Promise.all([
+        supabase.from("classes").select("*").eq("active", true),
+        supabase
+          .from("class_session_changes")
+          .select("id, class_id, session_date, kind, new_date, new_start_time, note")
+          .gte("session_date", addDaysToDate(date, -6))
+          .lte("session_date", addDaysToDate(date, 6)),
+      ]);
+      if (classesRes.error) throw classesRes.error;
+      if (changesRes.error) throw changesRes.error;
+      return sessionsOnDate(classesRes.data, changesRes.data as SessionChange[], date);
     },
   });
 
@@ -117,7 +109,11 @@ export default function AttendancePage() {
 
       {!selectedDate || isLoading ? (
         <p className="text-sm text-muted-foreground">Loading classes...</p>
-      ) : !classes || classes.length === 0 ? (
+      ) : error ? (
+        <p role="alert" className="text-sm text-destructive">
+          Couldn&apos;t load classes. Try refreshing.
+        </p>
+      ) : !sessions || sessions.length === 0 ? (
         <EmptyState
           icon={CalendarCheck}
           title="No classes scheduled"
@@ -127,16 +123,46 @@ export default function AttendancePage() {
         />
       ) : (
         <div className="flex flex-col gap-3">
-          {classes.map((c) => (
-            <ClassAttendanceCard key={c.id} classRow={c} date={selectedDate} />
-          ))}
+          {sessions.map((session) =>
+            sessionRuns(session.status) ? (
+              <ClassAttendanceCard
+                key={`${session.classRow.id}-run`}
+                session={session}
+                date={selectedDate}
+              />
+            ) : (
+              <ChangedSessionCard key={`${session.classRow.id}-off`} session={session} />
+            ),
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function ClassAttendanceCard({ classRow, date }: { classRow: ClassRow; date: string }) {
+function ChangedSessionCard({ session }: { session: ClassSession<ClassRow> }) {
+  const label = describeSessionChange(session);
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed p-4">
+      <div className="flex flex-col gap-1">
+        <span className="font-medium text-muted-foreground line-through">
+          {session.classRow.name}
+        </span>
+        <span className="text-sm text-muted-foreground">
+          {formatClassTime(session.startTime)}
+          {label ? ` · ${label}` : ""}
+          {session.change?.note ? ` · ${session.change.note}` : ""}
+        </span>
+      </div>
+      <Badge variant={session.status === "cancelled" ? "destructive" : "secondary"}>
+        {session.status === "cancelled" ? "Cancelled" : "Moved"}
+      </Badge>
+    </div>
+  );
+}
+
+function ClassAttendanceCard({ session, date }: { session: ClassSession<ClassRow>; date: string }) {
+  const classRow = session.classRow;
   const [expanded, setExpanded] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -250,7 +276,8 @@ function ClassAttendanceCard({ classRow, date }: { classRow: ClassRow; date: str
             </Badge>
           </div>
           <span className="text-sm text-muted-foreground">
-            {formatTime(classRow.start_time)} · {classRow.duration_minutes} min
+            {formatClassTime(session.startTime)} · {classRow.duration_minutes} min
+            {session.status === "moved_in" ? ` · ${describeSessionChange(session)}` : ""}
           </span>
         </div>
         <ChevronDown

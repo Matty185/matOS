@@ -86,7 +86,8 @@ export const READ_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: "get_classes",
-    description: "List the gym's recurring weekly classes.",
+    description:
+      "List the gym's recurring weekly classes, plus any one-off cancelled or moved sessions in the next 14 days (a cancelled session does not run that date).",
     input_schema: {
       type: "object",
       properties: {

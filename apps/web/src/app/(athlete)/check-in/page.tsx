@@ -8,7 +8,17 @@ import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import type { Database } from "@matos/shared";
+import {
+  addDaysToDate,
+  describeSessionChange,
+  formatClassTime,
+  sessionRuns,
+  sessionsOnDate,
+  type ClassSession,
+  type Database,
+  type SessionChange,
+} from "@matos/shared";
+import { useGymToday } from "@/hooks/use-gym-today";
 
 type ClassRow = Database["public"]["Tables"]["classes"]["Row"];
 
@@ -21,27 +31,16 @@ const CLASS_TYPE_LABELS: Record<ClassRow["class_type"], string> = {
 
 const CHECK_IN_OPENS_MINUTES_BEFORE = 30;
 
-function formatTime(time: string) {
-  const parts = time.split(":");
-  const h = Number(parts[0] ?? 0);
-  const m = parts[1] ?? "00";
-  const period = h >= 12 ? "PM" : "AM";
-  const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${h12}:${m} ${period}`;
-}
-
-function todayIsoDate() {
-  const now = new Date();
-  const offset = now.getTimezoneOffset();
-  return new Date(now.getTime() - offset * 60 * 1000).toISOString().slice(0, 10);
-}
-
 // Mirrors the server-side window check in /api/attendance/check-in — this
 // copy only decides which button state to *show*; the server independently
 // re-validates the window and is the actual enforcement (CLAUDE.md: RLS/
 // server checks are the boundary, client checks are UX convenience only).
-function getWindowState(classRow: ClassRow, now: Date): "too_early" | "open" | "too_late" {
-  const timeParts = classRow.start_time.split(":").map(Number);
+function getWindowState(
+  session: ClassSession<ClassRow>,
+  now: Date,
+): "too_early" | "open" | "too_late" {
+  const classRow = session.classRow;
+  const timeParts = session.startTime.split(":").map(Number);
   const hours = timeParts[0] ?? 0;
   const minutes = timeParts[1] ?? 0;
   const classStart = new Date(now);
@@ -57,8 +56,8 @@ export default function CheckInPage() {
   const [now, setNow] = useState(() => new Date());
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
   const queryClient = useQueryClient();
-  const today = todayIsoDate();
-  const dayOfWeek = new Date(`${today}T00:00:00`).getDay();
+  // The gym's today (its timezone), matching the server's check-in rules.
+  const today = useGymToday();
 
   // Re-evaluate window state every 30s so a class that just opened (or just
   // closed) updates without a manual refresh.
@@ -68,8 +67,10 @@ export default function CheckInPage() {
   }, []);
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["check-in", "today", dayOfWeek],
+    queryKey: ["check-in", "today", today],
+    enabled: !!today,
     queryFn: async () => {
+      const date = today!;
       const supabase = createClient();
       const {
         data: { user },
@@ -83,24 +84,28 @@ export default function CheckInPage() {
       const member = current?.[0];
       if (!member) throw new Error("No member record");
 
-      const [classesRes, attendanceRes] = await Promise.all([
-        supabase
-          .from("classes")
-          .select("*")
-          .eq("day_of_week", dayOfWeek)
-          .eq("active", true)
-          .order("start_time", { ascending: true }),
+      // All active classes, not just today's weekday: a session moved onto
+      // today (flow audit 3.2) can belong to a class that usually runs on
+      // another day.
+      const [classesRes, attendanceRes, changesRes] = await Promise.all([
+        supabase.from("classes").select("*").eq("active", true),
         supabase
           .from("attendance")
           .select("class_id")
           .eq("member_id", member.id)
-          .eq("checked_in_date", today),
+          .eq("checked_in_date", date),
+        supabase
+          .from("class_session_changes")
+          .select("id, class_id, session_date, kind, new_date, new_start_time, note")
+          .gte("session_date", addDaysToDate(date, -6))
+          .lte("session_date", addDaysToDate(date, 6)),
       ]);
       if (classesRes.error) throw classesRes.error;
       if (attendanceRes.error) throw attendanceRes.error;
+      if (changesRes.error) throw changesRes.error;
 
       return {
-        classes: classesRes.data,
+        sessions: sessionsOnDate(classesRes.data, changesRes.data as SessionChange[], date),
         checkedInClassIds: new Set(attendanceRes.data.map((a) => a.class_id)),
       };
     },
@@ -126,7 +131,7 @@ export default function CheckInPage() {
     }
   }
 
-  if (isLoading) {
+  if (isLoading || !today) {
     return (
       <div className="flex flex-col gap-6">
         <h1 className="font-heading text-3xl tracking-wide">Check In</h1>
@@ -146,7 +151,7 @@ export default function CheckInPage() {
     );
   }
 
-  if (!data || data.classes.length === 0) {
+  if (!data || data.sessions.length === 0) {
     return (
       <div className="flex flex-col gap-6">
         <h1 className="font-heading text-3xl tracking-wide">Check In</h1>
@@ -163,26 +168,46 @@ export default function CheckInPage() {
     <div className="flex flex-col gap-6">
       <h1 className="font-heading text-3xl tracking-wide">Check In</h1>
       <ul className="flex flex-col gap-3">
-        {data.classes.map((c) => {
+        {data.sessions.map((session) => {
+          const c = session.classRow;
           const alreadyCheckedIn = data.checkedInClassIds.has(c.id);
-          const windowState = getWindowState(c, now);
+          const runs = sessionRuns(session.status);
+          const windowState = getWindowState(session, now);
+          const changeLabel = describeSessionChange(session);
 
           return (
             <li
-              key={c.id}
-              className="flex flex-col gap-3 rounded-md border p-4 sm:flex-row sm:items-center sm:justify-between"
+              key={`${c.id}-${session.status}`}
+              className={`flex flex-col gap-3 rounded-md border p-4 sm:flex-row sm:items-center sm:justify-between ${runs ? "" : "border-dashed"}`}
             >
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">{c.name}</span>
+                  <span
+                    className={`font-medium ${runs ? "" : "text-muted-foreground line-through"}`}
+                  >
+                    {c.name}
+                  </span>
                   <Badge variant="outline">{CLASS_TYPE_LABELS[c.class_type]}</Badge>
                 </div>
                 <span className="text-sm text-muted-foreground">
-                  {formatTime(c.start_time)} · {c.duration_minutes} min
+                  {formatClassTime(session.startTime)} · {c.duration_minutes} min
                 </span>
+                {changeLabel ? (
+                  <span className="text-sm text-muted-foreground">
+                    {changeLabel}
+                    {session.change?.note ? ` · ${session.change.note}` : ""}
+                  </span>
+                ) : null}
               </div>
 
-              {alreadyCheckedIn ? (
+              {!runs ? (
+                <Badge
+                  variant={session.status === "cancelled" ? "destructive" : "secondary"}
+                  className="flex h-11 w-fit items-center px-3"
+                >
+                  {session.status === "cancelled" ? "Cancelled" : "Moved"}
+                </Badge>
+              ) : alreadyCheckedIn ? (
                 <Badge className="flex h-11 w-fit items-center gap-1.5 px-3">
                   <CheckCircle2 className="h-4 w-4" /> Already checked in
                 </Badge>

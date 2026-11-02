@@ -1,10 +1,21 @@
 import { CalendarDays, Flame } from "lucide-react";
-import { format } from "date-fns";
 import { getCurrentMember } from "@/lib/auth/current-member";
 import { createClient } from "@/lib/supabase/server";
 import { BeltDisplay } from "@/components/shared/belt-display";
 import { EmptyState } from "@/components/shared/empty-state";
-import { computeAttendanceStreak, computeUpcomingClasses } from "@matos/shared";
+import {
+  addDaysToDate,
+  computeAttendanceStreak,
+  computeUpcomingClasses,
+  describeSessionChange,
+  formatClassTime,
+  formatSessionDate,
+  gymWallClock,
+  type SessionChange,
+} from "@matos/shared";
+import { Badge } from "@/components/ui/badge";
+import { fetchSessionChanges } from "@/lib/classes/session-changes";
+import { getGymTimeZone } from "@/lib/time/gym-timezone";
 import type { Database } from "@matos/shared";
 
 type ClassRow = Database["public"]["Tables"]["classes"]["Row"];
@@ -15,15 +26,6 @@ const CLASS_TYPE_LABELS: Record<ClassRow["class_type"], string> = {
   comp: "Comp",
   open_mat: "Open Mat",
 };
-
-function formatTime(time: string) {
-  const parts = time.split(":");
-  const h = Number(parts[0] ?? 0);
-  const m = parts[1] ?? "00";
-  const period = h >= 12 ? "PM" : "AM";
-  const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${h12}:${m} ${period}`;
-}
 
 export default async function AthleteHomePage() {
   const member = await getCurrentMember();
@@ -37,8 +39,20 @@ export default async function AthleteHomePage() {
     supabase.from("classes").select("*").eq("active", true),
   ]);
 
+  // Flow audit 3.2: list from the gym's today with one-off changes applied
+  // (cancelled / moved sessions). If the changes can't be read, show the plain
+  // timetable rather than failing the page.
+  const timeZone = await getGymTimeZone(supabase, member.gymId);
+  const today = gymWallClock(new Date(), timeZone).date;
+  let changes: SessionChange[] = [];
+  try {
+    changes = await fetchSessionChanges(supabase, today, addDaysToDate(today, 6));
+  } catch {
+    console.error("[home] couldn't load class changes");
+  }
+
   const streak = computeAttendanceStreak((attendanceRows ?? []).map((a) => a.checked_in_date));
-  const upcoming = computeUpcomingClasses(classRows ?? []);
+  const upcoming = computeUpcomingClasses(classRows ?? [], { fromDate: today, changes, cap: 6 });
 
   return (
     <div className="flex flex-col gap-6">
@@ -69,20 +83,42 @@ export default async function AthleteHomePage() {
           />
         ) : (
           <ul className="flex flex-col gap-2">
-            {upcoming.map(({ date, classRow }, i) => (
-              <li
-                key={`${classRow.id}-${i}`}
-                className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm"
-              >
-                <div className="flex flex-col gap-0.5">
-                  <span className="font-medium">{classRow.name}</span>
-                  <span className="text-muted-foreground">
-                    {format(date, "EEEE")} · {formatTime(classRow.start_time)} ·{" "}
-                    {CLASS_TYPE_LABELS[classRow.class_type]}
-                  </span>
-                </div>
-              </li>
-            ))}
+            {upcoming.map((session, i) => {
+              const { date, classRow, startTime, status, change } = session;
+              const off = status === "cancelled" || status === "moved_away";
+              const label = describeSessionChange(session);
+              return (
+                <li
+                  key={`${classRow.id}-${date}-${i}`}
+                  className={`flex items-center justify-between gap-3 rounded-md border p-3 text-sm ${off ? "border-dashed" : ""}`}
+                >
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <span
+                      className={`font-medium ${off ? "text-muted-foreground line-through" : ""}`}
+                    >
+                      {classRow.name}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {date === today ? "Today" : formatSessionDate(date)} ·{" "}
+                      {formatClassTime(startTime)} · {CLASS_TYPE_LABELS[classRow.class_type]}
+                    </span>
+                    {label ? (
+                      <span className="text-muted-foreground">
+                        {label}
+                        {change?.note ? ` · ${change.note}` : ""}
+                      </span>
+                    ) : null}
+                  </div>
+                  {status === "cancelled" ? (
+                    <Badge variant="destructive">Cancelled</Badge>
+                  ) : status === "moved_away" ? (
+                    <Badge variant="secondary">Moved</Badge>
+                  ) : status === "moved_in" ? (
+                    <Badge variant="secondary">Changed</Badge>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
