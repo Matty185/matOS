@@ -84,7 +84,7 @@ export const POST = withAuth(
     // share dialog open).
     let inviteSent = false;
     let inviteError: string | null = null;
-    if (isInviteEmailEnabled()) {
+    if (isInviteEmailEnabled() && input.email) {
       const { data: gym } = await supabase
         .from("gyms")
         .select("name")

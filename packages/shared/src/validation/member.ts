@@ -56,7 +56,20 @@ export const startingRankFields = {
     .or(z.literal("")),
 };
 
-export const createMemberSchema = memberFieldsSchema.extend(startingRankFields);
+// Email is optional on create (flow audit 8.1): kids and anyone without
+// their own email are roster-only — no login, and no invite can be sent.
+// Blank becomes null so the per-gym unique constraint never sees "".
+export const createMemberSchema = memberFieldsSchema.extend({
+  ...startingRankFields,
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email("Enter a valid email address, or leave it blank.")
+    .optional()
+    .or(z.literal(""))
+    .transform((v) => (v ? v : null)),
+});
 
 export type CreateMemberInput = z.infer<typeof createMemberSchema>;
 
@@ -75,6 +88,7 @@ export const importMembersSchema = z
   .superRefine((data, ctx) => {
     const seen = new Map<string, number>();
     data.members.forEach((m, i) => {
+      if (!m.email) return;
       const prev = seen.get(m.email);
       if (prev !== undefined) {
         ctx.addIssue({
@@ -94,9 +108,17 @@ export type ImportMembersInput = z.infer<typeof importMembersSchema>;
 // with is an auth.users concern, not a plain member-record edit; out of
 // scope here (belt/stripes/role/active all have their own dedicated
 // actions — promote, and deactivate — not this generic edit).
-export const editMemberSchema = memberFieldsSchema
-  .omit({ email: true })
-  .extend({ agent_query: agentQueryField });
+// Email on edit (flow audit 1.11): absent = unchanged, "" = remove (the
+// member becomes roster-only), otherwise the corrected address. The route
+// only allows it while the member hasn't signed up — after that the email
+// is their login.
+export const editMemberSchema = memberFieldsSchema.omit({ email: true }).extend({
+  email: z
+    .union([z.literal(""), z.string().trim().toLowerCase().email("Enter a valid email address.")])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === "" ? null : v)),
+  agent_query: agentQueryField,
+});
 
 export type EditMemberInput = z.infer<typeof editMemberSchema>;
 
@@ -119,3 +141,8 @@ export const deactivateMemberSchema = z.object({
 });
 
 export type DeactivateMemberInput = z.infer<typeof deactivateMemberSchema>;
+
+// The undo for deactivation (a member returning after injury or travel).
+export const reactivateMemberSchema = z.object({
+  confirm: z.literal(true, { message: "Confirmation is required." }),
+});

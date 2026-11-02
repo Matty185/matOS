@@ -794,7 +794,7 @@ export type Database = {
           active: boolean;
           belt: Database["public"]["Enums"]["belt_color"];
           created_at: string;
-          email: string;
+          email: string | null;
           emergency_contact_name: string | null;
           emergency_contact_phone: string | null;
           first_name: string;
@@ -815,7 +815,7 @@ export type Database = {
           active?: boolean;
           belt?: Database["public"]["Enums"]["belt_color"];
           created_at?: string;
-          email: string;
+          email?: string | null;
           emergency_contact_name?: string | null;
           emergency_contact_phone?: string | null;
           first_name: string;
@@ -836,7 +836,7 @@ export type Database = {
           active?: boolean;
           belt?: Database["public"]["Enums"]["belt_color"];
           created_at?: string;
-          email?: string;
+          email?: string | null;
           emergency_contact_name?: string | null;
           emergency_contact_phone?: string | null;
           first_name?: string;

@@ -13,6 +13,7 @@ import { PaymentCellDialog } from "@/components/shared/payment-cell-dialog";
 import { BulkInviteDialog } from "@/components/shared/bulk-invite-dialog";
 import { SignupLinkDialog } from "@/components/shared/signup-link-dialog";
 import { PLAN_LABELS } from "@/lib/constants/member-labels";
+import { isBillable } from "@/lib/payments/overdue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -75,7 +76,7 @@ function useMembers() {
 }
 
 // Stage O4: where each member is in getting onto MatOS.
-type SignupStatus = "joined" | "invited" | "expired" | "not_invited";
+type SignupStatus = "joined" | "invited" | "expired" | "not_invited" | "no_login";
 
 const SIGNUP_FILTER_OPTIONS: { value: "all" | SignupStatus; label: string }[] = [
   { value: "all", label: "All sign-up status" },
@@ -83,6 +84,7 @@ const SIGNUP_FILTER_OPTIONS: { value: "all" | SignupStatus; label: string }[] = 
   { value: "invited", label: "Invited" },
   { value: "expired", label: "Invite expired" },
   { value: "joined", label: "Joined" },
+  { value: "no_login", label: "No email (no login)" },
 ];
 
 function useLatestInvites() {
@@ -109,10 +111,11 @@ function useLatestInvites() {
 }
 
 function signupStatus(
-  member: { user_id: string | null },
+  member: { user_id: string | null; email: string | null },
   invite: { claimed_at: string | null; expires_at: string } | undefined,
 ): SignupStatus {
   if (member.user_id) return "joined";
+  if (!member.email) return "no_login";
   if (!invite) return "not_invited";
   return new Date(invite.expires_at) < new Date() ? "expired" : "invited";
 }
@@ -121,6 +124,13 @@ function SignupBadge({ status }: { status: SignupStatus }) {
   if (status === "joined") return <Badge variant="outline">Joined</Badge>;
   if (status === "invited") return <Badge variant="secondary">Invited</Badge>;
   if (status === "expired") return <Badge variant="destructive">Invite expired</Badge>;
+  if (status === "no_login") {
+    return (
+      <Badge variant="outline" className="text-muted-foreground">
+        No login
+      </Badge>
+    );
+  }
   return (
     <Badge variant="outline" className="border-dashed text-muted-foreground">
       Not invited
@@ -212,13 +222,14 @@ export default function MembersPage() {
         return false;
       }
       if (paymentFilter !== "all") {
+        if (!isBillable(m)) return false;
         const status = payments?.get(m.id)?.status ?? "no_record";
         if (status !== paymentFilter) return false;
       }
       if (search) {
         const q = search.toLowerCase();
         const name = `${m.first_name} ${m.last_name}`.toLowerCase();
-        if (!name.includes(q) && !m.email.toLowerCase().includes(q)) return false;
+        if (!name.includes(q) && !(m.email ?? "").toLowerCase().includes(q)) return false;
       }
       return true;
     });
@@ -234,10 +245,13 @@ export default function MembersPage() {
     invites,
   ]);
 
-  // Selected members who can actually be invited (active, not yet joined).
+  // Selected members who can actually be invited (active, not yet joined,
+  // and with an email to sign in with).
   const invitableSelected = useMemo(
     () =>
-      (members ?? []).filter((m) => selected.has(m.id) && m.active && !m.user_id).map((m) => m.id),
+      (members ?? [])
+        .filter((m) => selected.has(m.id) && m.active && !m.user_id && !!m.email)
+        .map((m) => m.id),
     [members, selected],
   );
 
@@ -257,11 +271,12 @@ export default function MembersPage() {
       const res = await fetch("/api/payments/mark-paid", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Owners don't pay their own gym (Stage O6) — never record one.
+        // Only members who owe a monthly fee (isBillable) — never staff or casual.
         body: JSON.stringify({
-          member_ids: Array.from(selected).filter(
-            (id) => members?.find((m) => m.id === id)?.role !== "gym_owner",
-          ),
+          member_ids: Array.from(selected).filter((id) => {
+            const m = members?.find((x) => x.id === id);
+            return !!m && isBillable(m);
+          }),
         }),
       });
       const body = await res.json();
@@ -502,9 +517,9 @@ export default function MembersPage() {
                     {PLAN_LABELS[member.membership_plan]}
                   </TableCell>
                   <TableCell>
-                    {member.role === "gym_owner" ? (
-                      // Owners don't pay their own gym (Stage O6, matches
-                      // billableMembers in lib/payments/overdue).
+                    {!isBillable(member) ? (
+                      // Staff and casual members don't owe a monthly fee
+                      // (isBillable in lib/payments/overdue).
                       <span className="text-muted-foreground">—</span>
                     ) : (
                       <button

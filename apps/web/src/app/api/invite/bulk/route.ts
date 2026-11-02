@@ -41,6 +41,7 @@ export const POST = withAuth(
       (m) =>
         m.active &&
         !m.user_id &&
+        !!m.email &&
         m.gym_id === context.gymId &&
         (m.role === "athlete" || context.role === "gym_owner"),
     );

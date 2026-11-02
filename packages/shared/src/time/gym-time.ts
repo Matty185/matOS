@@ -64,3 +64,24 @@ export function isValidTimeZone(timeZone: string): boolean {
     return false;
   }
 }
+
+/**
+ * The instant at which the gym's wall clock reads `date` (YYYY-MM-DD) at
+ * `time` ("HH:MM[:SS]"). Used to stamp a coach-marked attendance at the
+ * class's real start time in the gym's zone, whatever the coach's device
+ * zone is. Two correction passes settle any DST offset; on a spring-forward
+ * gap (a wall time that doesn't exist) it lands within the hour, which is
+ * fine for attendance.
+ */
+export function gymLocalToInstant(date: string, time: string, timeZone: string): Date {
+  const [y, mo, d] = date.split("-").map(Number);
+  const target = Date.UTC(y ?? 1970, (mo ?? 1) - 1, d ?? 1) + timeStringToMinutes(time) * 60_000;
+  let guess = target;
+  for (let i = 0; i < 2; i++) {
+    const wall = gymWallClock(new Date(guess), timeZone);
+    const [wy, wmo, wd] = wall.date.split("-").map(Number);
+    const wallAsUtc = Date.UTC(wy ?? 1970, (wmo ?? 1) - 1, wd ?? 1) + wall.minutesOfDay * 60_000;
+    guess -= wallAsUtc - target;
+  }
+  return new Date(guess);
+}

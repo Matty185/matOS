@@ -41,7 +41,7 @@ async function getDashboardData() {
   ] = await Promise.all([
     supabase
       .from("members")
-      .select("id, first_name, last_name, join_date, role, user_id")
+      .select("id, first_name, last_name, email, join_date, role, membership_plan, user_id")
       .eq("active", true),
     supabase.from("classes").select("id").eq("active", true),
     supabase
@@ -130,7 +130,10 @@ async function getDashboardData() {
       .single();
     if (gymRow && !gymRow.onboarding_completed_at) {
       const athletes = activeMembers.filter((m) => m.role === "athlete");
-      const joined = athletes.filter((m) => m.user_id).length;
+      // Roster-only members (no email, e.g. kids) can't sign up, so they
+      // don't count towards "half signed up".
+      const canSignUp = athletes.filter((m) => m.email || m.user_id);
+      const joined = canSignUp.filter((m) => m.user_id).length;
       setup = [
         {
           label: "Add your gym's details",
@@ -150,7 +153,7 @@ async function getDashboardData() {
         { label: "Import your members", done: athletes.length > 0, href: "/members/import" },
         {
           label: "Get half your members signed up",
-          done: athletes.length > 0 && joined * 2 >= athletes.length,
+          done: athletes.length > 0 && joined * 2 >= canSignUp.length,
           href: "/members?invite=not_invited",
         },
       ];

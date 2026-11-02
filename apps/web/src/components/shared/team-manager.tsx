@@ -193,7 +193,7 @@ export function TeamManager({ currentMemberId }: { currentMemberId: string }) {
                       setInviteMember({
                         id: m.id,
                         first_name: m.first_name,
-                        email: m.email,
+                        email: m.email ?? null,
                         phone: m.phone,
                       })
                     }

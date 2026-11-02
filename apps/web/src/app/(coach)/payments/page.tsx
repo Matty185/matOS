@@ -30,7 +30,14 @@ import {
 } from "@/lib/payments/overdue";
 import { getPaymentsTrackedFrom } from "@/lib/payments/tracked-from";
 
-type MemberRow = { id: string; first_name: string; last_name: string; join_date: string };
+type MemberRow = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  join_date: string;
+  role: string;
+  membership_plan: string;
+};
 type PaymentRow = {
   member_id: string;
   period_month: number;
@@ -58,11 +65,11 @@ export default function PaymentsPage() {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("members")
-        .select("id, first_name, last_name, join_date, role")
+        .select("id, first_name, last_name, join_date, role, membership_plan")
         .eq("active", true)
         .order("last_name", { ascending: true });
       if (error) throw error;
-      // Owner excluded and each member's first billable month clamped to
+      // Staff and casual members excluded, and each member's first billable month clamped to
       // when MatOS started tracking this gym's payments (Stage O6) — the
       // grid renders "—" before that, exactly like before a member joined.
       return billableMembers(data as MemberRow[], await getPaymentsTrackedFrom(supabase));
@@ -136,8 +143,8 @@ export default function PaymentsPage() {
         <h1 className="font-heading text-3xl tracking-wide">Payments</h1>
         <EmptyState
           icon={CreditCard}
-          title="No members yet"
-          description="Once you add members, their monthly payment status will show up here."
+          title="No one on a monthly plan yet"
+          description="Athletes on the monthly or comp-team plan show up here. Coaches and casual (pay-per-class) members aren't tracked monthly."
           actionLabel="Add a member"
           actionHref="/members/new"
         />
@@ -147,7 +154,13 @@ export default function PaymentsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="font-heading text-3xl tracking-wide">Payments</h1>
+      <div className="flex flex-col gap-1">
+        <h1 className="font-heading text-3xl tracking-wide">Payments</h1>
+        <p className="text-sm text-muted-foreground">
+          Athletes on the monthly or comp-team plan. Coaches and casual members aren&apos;t tracked
+          monthly.
+        </p>
+      </div>
 
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">

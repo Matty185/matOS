@@ -95,7 +95,7 @@ export const POST = withAuth(
     const minYear = overdueWindow[0]!.year;
     const maxYear = overdueWindow[overdueWindow.length - 1]!.year;
     const [{ data: overdueMembers }, { data: overduePayments }] = await Promise.all([
-      supabase.from("members").select("id, join_date, role").eq("active", true),
+      supabase.from("members").select("id, join_date, role, membership_plan").eq("active", true),
       supabase
         .from("payments")
         .select("member_id, period_month, period_year, status")

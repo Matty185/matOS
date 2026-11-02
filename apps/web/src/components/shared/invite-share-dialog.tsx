@@ -17,7 +17,7 @@ import {
 export type InviteShareMember = {
   id: string;
   first_name: string;
-  email: string;
+  email: string | null;
   phone: string | null;
 };
 
@@ -134,7 +134,7 @@ export function InviteShareDialog({
   const smsNumber = member.phone?.replace(/[^\d+]/g, "") ?? "";
   const smsHref =
     smsNumber.length >= 6 ? `sms:${smsNumber}?&body=${encodeURIComponent(message)}` : null;
-  const mailHref = `mailto:${encodeURIComponent(member.email)}?subject=${encodeURIComponent(
+  const mailHref = `mailto:${encodeURIComponent(member.email ?? "")}?subject=${encodeURIComponent(
     `Join ${link?.gymName ?? "the gym"} on MatOS`,
   )}&body=${encodeURIComponent(message)}`;
   const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";

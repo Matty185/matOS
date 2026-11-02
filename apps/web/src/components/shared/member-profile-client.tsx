@@ -17,7 +17,7 @@ import { PasswordResetLinkDialog } from "@/components/shared/password-reset-link
 import { PaymentCellDialog } from "@/components/shared/payment-cell-dialog";
 import { ProfileView } from "@/components/shared/profile-view";
 import { PLAN_LABELS } from "@/lib/constants/member-labels";
-import { isOverdue, type PaymentStatus } from "@/lib/payments/overdue";
+import { isBillable, isOverdue, type PaymentStatus } from "@/lib/payments/overdue";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -60,7 +60,7 @@ export function MemberProfileClient({
   // ?invite=1 — set by the Add Member form so the coach lands straight on
   // "send them their link" after creating someone.
   const [inviteOpen, setInviteOpen] = useState(
-    () => searchParams.get("invite") === "1" && !member.user_id && member.active,
+    () => searchParams.get("invite") === "1" && !member.user_id && !!member.email && member.active,
   );
   const [resetOpen, setResetOpen] = useState(false);
   const [isMakingCoach, setIsMakingCoach] = useState(false);
@@ -90,6 +90,28 @@ export function MemberProfileClient({
       toast.error("Couldn't change their role — check your connection.");
     } finally {
       setIsMakingCoach(false);
+    }
+  }
+
+  async function handleReactivate() {
+    setIsDeactivating(true);
+    try {
+      const res = await fetch(`/api/members/${member.id}/reactivate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: true }),
+      });
+      const body = await res.json();
+      if (res.ok) {
+        toast.success(`${member.first_name} is active again.`);
+        router.refresh();
+      } else {
+        toast.error(body.error ?? "Couldn't reactivate this member.");
+      }
+    } catch {
+      toast.error("Couldn't reactivate — check your connection.");
+    } finally {
+      setIsDeactivating(false);
     }
   }
 
@@ -170,7 +192,7 @@ export function MemberProfileClient({
             currentBelt={member.belt}
             currentStripes={member.stripes}
           />
-          {!isClaimed && member.active && canManageAccess ? (
+          {!isClaimed && member.email && member.active && canManageAccess ? (
             <Button
               variant={latestInvite && !inviteExpired ? "outline" : "default"}
               className="h-11"
@@ -223,8 +245,8 @@ export function MemberProfileClient({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Deactivate {member.first_name}?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    They&apos;ll no longer be able to sign in or be marked present at classes. This
-                    can be undone later — members are deactivated, never deleted.
+                    They&apos;ll no longer be able to sign in or be marked present at classes. Their
+                    history is kept, and you can reactivate them from their profile later.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -239,7 +261,37 @@ export function MemberProfileClient({
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-          ) : null}
+          ) : (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button className="h-11">Reactivate</Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Reactivate {member.first_name}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    They&apos;ll be back on the active list with all their history.
+                    {member.user_id
+                      ? " They can sign in again with their existing password."
+                      : " They haven't signed up yet — send them an invite afterwards."}
+                    {isBillable(member)
+                      ? " Any months they didn't pay while away will show as overdue on Payments — waive the ones you don't want to chase."
+                      : ""}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="h-11">Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="h-11"
+                    onClick={handleReactivate}
+                    disabled={isDeactivating}
+                  >
+                    {isDeactivating ? "Reactivating..." : "Reactivate"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
       </div>
 
@@ -261,6 +313,7 @@ export function MemberProfileClient({
         </TabsContent>
         <TabsContent value="payments" className="pt-4">
           <PaymentsTab
+            billable={isBillable(member)}
             memberId={member.id}
             memberName={`${member.first_name} ${member.last_name}`}
             onPaymentChanged={() =>
@@ -295,7 +348,7 @@ function OverviewTab({
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <InfoCard label="Email" value={member.email} />
+      <InfoCard label="Email" value={member.email || "No email — no login"} />
       <InfoCard label="Phone" value={member.phone || "—"} />
       <InfoCard label="Emergency contact" value={member.emergency_contact_name || "—"} />
       <InfoCard label="Emergency phone" value={member.emergency_contact_phone || "—"} />
@@ -305,11 +358,13 @@ function OverviewTab({
         value={
           isClaimed
             ? "Claimed"
-            : latestInvite
-              ? new Date(latestInvite.expires_at) < new Date()
-                ? "Invite expired"
-                : "Invite sent, unclaimed"
-              : "No invite sent yet"
+            : !member.email
+              ? "No login (roster only)"
+              : latestInvite
+                ? new Date(latestInvite.expires_at) < new Date()
+                  ? "Invite expired"
+                  : "Invite sent, unclaimed"
+                : "No invite sent yet"
         }
       />
       <InfoCard
@@ -423,10 +478,12 @@ function AttendanceTab({ memberId, joinDate }: { memberId: string; joinDate: str
 }
 
 function PaymentsTab({
+  billable,
   memberId,
   memberName,
   onPaymentChanged,
 }: {
+  billable: boolean;
   memberId: string;
   memberName: string;
   onPaymentChanged: () => void;
@@ -475,14 +532,21 @@ function PaymentsTab({
 
   return (
     <div className="flex flex-col gap-4">
-      <Button
-        variant="outline"
-        className="h-11 w-fit"
-        onClick={markCurrentMonthPaid}
-        disabled={isMarking}
-      >
-        {isMarking ? "Marking..." : "Mark this month paid"}
-      </Button>
+      {billable ? (
+        <Button
+          variant="outline"
+          className="h-11 w-fit"
+          onClick={markCurrentMonthPaid}
+          disabled={isMarking}
+        >
+          {isMarking ? "Marking..." : "Mark this month paid"}
+        </Button>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Coaches and casual (pay-per-class) members don&apos;t owe a monthly fee, so they
+          aren&apos;t tracked here.
+        </p>
+      )}
       {!data || data.length === 0 ? (
         <EmptyState
           icon={CreditCard}

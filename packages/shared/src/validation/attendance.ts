@@ -12,6 +12,19 @@ export const markAttendanceSchema = z.object({
     .datetime()
     .refine((v) => new Date(v) <= new Date(), "checked_in_at cannot be in the future")
     .optional(),
+  // Flow audit 4.3: the coach's attendance page sends the class *date* (in
+  // the gym's calendar); the server stamps the class start time in the gym
+  // zone. Takes precedence over checked_in_at.
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2026-11-02.")
+    .refine((v) => {
+      // A real calendar date (rejects 2026-02-31), at most a year back.
+      const d = new Date(`${v}T00:00:00Z`);
+      if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== v) return false;
+      return Date.now() - d.getTime() <= 366 * 86_400_000;
+    }, "Pick a real date within the last year.")
+    .optional(),
   agent_query: agentQueryField,
 });
 

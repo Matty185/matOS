@@ -23,14 +23,14 @@ export const POST = withAuth(
     }
 
     const supabase = createClient();
-    const emails = input.members.map((m) => m.email);
+    const emails = input.members.flatMap((m) => (m.email ? [m.email] : []));
 
     // Friendly pre-check so the coach sees *which* rows clash, instead of a
     // single opaque unique-violation for the whole batch. The RPC's own
     // constraint still catches anything that races in between.
     // Chunked: 300 emails in one `in.(...)` filter makes a GET URL long
     // enough to risk header-size limits.
-    const existing: { email: string }[] = [];
+    const existing: { email: string | null }[] = [];
     for (let i = 0; i < emails.length; i += 50) {
       const { data, error: existingError } = await supabase
         .from("members")
@@ -43,8 +43,9 @@ export const POST = withAuth(
       existing.push(...(data ?? []));
     }
     if (existing.length > 0) {
-      const taken = new Set(existing.map((e) => e.email));
-      const rows = emails.flatMap((e, i) => (taken.has(e) ? [i + 1] : []));
+      const taken = new Set(existing.map((e) => e.email ?? ""));
+      // Row numbers refer to the submitted list, including email-less rows.
+      const rows = input.members.flatMap((m, i) => (m.email && taken.has(m.email) ? [i + 1] : []));
       return NextResponse.json(
         {
           error: `${rows.length} ${rows.length === 1 ? "person is" : "people are"} already in your gym (row ${rows.join(", ")}). Remove them and try again.`,

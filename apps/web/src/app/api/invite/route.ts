@@ -66,6 +66,14 @@ export const POST = withAuth(
       return apiError(500, "GYM_NOT_FOUND", "Something went wrong — the invite wasn't sent.");
     }
 
+    if (!member.email) {
+      return apiError(
+        409,
+        "MEMBER_NO_EMAIL",
+        "This member has no email, so they can't have a login. Add their email first.",
+      );
+    }
+
     const result = await createInvite({
       memberId: member.id,
       memberGymId: member.gym_id,

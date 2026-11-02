@@ -182,7 +182,8 @@ export function RosterImporter({
 
         <TabsContent value="paste" className="flex flex-col gap-3">
           <Label htmlFor="roster-paste">
-            One person per line — name, email, and belt if you have it.
+            One person per line — name, email, and belt if you have it. Kids without an email can be
+            added without one (no login).
           </Label>
           <Textarea
             id="roster-paste"
@@ -304,6 +305,7 @@ export function RosterImporter({
                   <Input
                     className="h-11"
                     type="email"
+                    placeholder="Optional for kids"
                     value={row.email}
                     onChange={(e) => updateRow(row.key, { email: e.target.value })}
                     aria-invalid={Boolean(errors.email)}

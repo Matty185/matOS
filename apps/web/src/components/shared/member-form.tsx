@@ -41,7 +41,14 @@ type MemberFormValues = {
 };
 
 type MemberFormProps =
-  { mode: "create" } | { mode: "edit"; memberId: string; defaultValues: MemberFormValues };
+  | { mode: "create" }
+  | {
+      mode: "edit";
+      memberId: string;
+      defaultValues: MemberFormValues;
+      // Signed-up members' email is their login and can't be edited here.
+      emailLocked: boolean;
+    };
 
 export function MemberForm(props: MemberFormProps) {
   const router = useRouter();
@@ -82,7 +89,7 @@ export function MemberForm(props: MemberFormProps) {
     if (isEdit) {
       toast.success("Member updated.");
       router.push(`/members/${props.memberId}`);
-    } else if (body.emailEnabled) {
+    } else if (body.emailEnabled && data.email) {
       if (body.inviteSent) {
         toast.success(`${data.first_name} added — invite email sent.`);
       } else {
@@ -91,6 +98,9 @@ export function MemberForm(props: MemberFormProps) {
         );
       }
       router.push(`/members/${body.memberId}${body.inviteSent ? "" : "?invite=1"}`);
+    } else if (!data.email) {
+      toast.success(`${data.first_name} added to the roster (no login).`);
+      router.push(`/members/${body.memberId}`);
     } else {
       // Stage O2 (no verified email domain): straight to the share dialog.
       toast.success(`${data.first_name} added.`);
@@ -118,16 +128,22 @@ export function MemberForm(props: MemberFormProps) {
         </div>
       </div>
 
-      {!isEdit ? (
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" className="h-11" {...register("email")} />
-          {errors.email ? <p className="text-sm text-destructive">{errors.email.message}</p> : null}
-          <p className="text-xs text-muted-foreground">
-            They&apos;ll sign in with this. You&apos;ll send them their sign-up link next.
-          </p>
-        </div>
-      ) : null}
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="email">Email</Label>
+        <Input
+          id="email"
+          type="email"
+          className="h-11"
+          disabled={isEdit && props.emailLocked}
+          {...register("email")}
+        />
+        {errors.email ? <p className="text-sm text-destructive">{errors.email.message}</p> : null}
+        <p className="text-xs text-muted-foreground">
+          {isEdit && props.emailLocked
+            ? "They sign in with this email, so it can't be changed here."
+            : "They'll sign in with this. Leave it blank for kids or anyone without their own email — they'll be on the roster without a login."}
+        </p>
+      </div>
 
       {!isEdit ? (
         <fieldset className="flex flex-col gap-3 rounded-md border p-4">
@@ -202,7 +218,7 @@ export function MemberForm(props: MemberFormProps) {
 
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="emergency_contact_name">Emergency contact name</Label>
+          <Label htmlFor="emergency_contact_name">Parent or emergency contact</Label>
           <Input
             id="emergency_contact_name"
             className="h-11"
@@ -213,7 +229,7 @@ export function MemberForm(props: MemberFormProps) {
           ) : null}
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="emergency_contact_phone">Emergency contact phone</Label>
+          <Label htmlFor="emergency_contact_phone">Parent or emergency contact phone</Label>
           <Input
             id="emergency_contact_phone"
             className="h-11"

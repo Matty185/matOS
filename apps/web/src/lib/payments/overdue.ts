@@ -121,9 +121,21 @@ export function getOverdueMemberIds(
   return overdue;
 }
 
+type BillingFields = { role: string; membership_plan: string };
+
+/**
+ * Who owes a monthly fee (2026-11-02, confirmed with the gym): athletes on
+ * the monthly or comp-team plan. Owners and coaches train free; casual
+ * members pay per class, so they never owe a month. Every payments surface
+ * goes through this, so they can't disagree.
+ */
+export function isBillable(member: BillingFields): boolean {
+  return member.role === "athlete" && member.membership_plan !== "casual";
+}
+
 /**
  * Stage O6: the members whose payment obligations are actually computed.
- * - The gym owner is excluded — they don't owe their own gym a fee.
+ * - Only billable members (see isBillable) — not staff, not casual.
  * - Each member's obligation starts at the later of their join date and
  *   the gym's `payments_tracked_from` (the month MatOS started tracking
  *   this gym's payments). Without this, a freshly onboarded gym whose
@@ -132,12 +144,12 @@ export function getOverdueMemberIds(
  * Callers pass the result anywhere they'd pass members to the overdue
  * helpers or render the payments grid, so every surface agrees.
  */
-export function billableMembers<T extends MemberForOverdue & { role?: string }>(
+export function billableMembers<T extends MemberForOverdue & BillingFields>(
   members: T[],
   paymentsTrackedFrom: string | null | undefined,
 ): T[] {
   return members
-    .filter((m) => m.role !== "gym_owner")
+    .filter(isBillable)
     .map((m) =>
       paymentsTrackedFrom && m.join_date < paymentsTrackedFrom
         ? { ...m, join_date: paymentsTrackedFrom }

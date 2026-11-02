@@ -64,12 +64,15 @@ function useSetupCounts() {
           .eq("active", true)
           .eq("role", "athlete")
           .not("user_id", "is", null),
+        // Not joined *and* able to: roster-only members (no email) can't
+        // be invited, so they aren't counted as waiting.
         supabase
           .from("members")
           .select("id")
           .eq("active", true)
           .eq("role", "athlete")
-          .is("user_id", null),
+          .is("user_id", null)
+          .not("email", "is", null),
         // Live, unused links — those members already have one in hand, and
         // minting again would silently kill it.
         supabase

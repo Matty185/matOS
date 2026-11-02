@@ -136,6 +136,8 @@ export function describeAuditEntry(row: AuditLogRow, ctx: AuditNameContext): str
     }
     case "member.deactivated":
       return `${actor} deactivated ${subjectNameFor(row, ctx)}.`;
+    case "member.reactivated":
+      return `${actor} reactivated ${subjectNameFor(row, ctx)}.`;
     case "member.self_updated_contact":
       return `${actor} updated their own contact details.`;
     case "member.data_exported":
@@ -156,6 +158,8 @@ export function describeAuditEntry(row: AuditLogRow, ctx: AuditNameContext): str
     }
     case "attendance.marked":
       return `${actor} marked ${subjectNameFor(row, ctx)} present at a class.`;
+    case "attendance.removed":
+      return `${actor} removed a check-in for ${subjectNameFor(row, ctx)}.`;
     case "attendance.self_checked_in":
       // Stage M7 gate fix (security-reviewer): offline_queued was being
       // written on every insert but had no read path anywhere — the

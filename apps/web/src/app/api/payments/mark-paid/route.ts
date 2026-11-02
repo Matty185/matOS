@@ -3,6 +3,7 @@ import { withAuth } from "@/lib/auth/withAuth";
 import { createClient } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/audit/log";
 import { markPaidSchema } from "@matos/shared";
+import { isBillable } from "@/lib/payments/overdue";
 
 // POST /api/payments/mark-paid — coach/owner only. Bulk-marks the *current*
 // calendar month paid for the given members, per plan §7's Member List
@@ -22,7 +23,19 @@ export const POST = withAuth(
     const succeeded: string[] = [];
     const failed: string[] = [];
 
+    // Only members who owe a monthly fee (isBillable). RLS scopes the read
+    // to the caller's gym, so other gyms' ids drop out as failed.
+    const { data: rows } = await supabase
+      .from("members")
+      .select("id, role, membership_plan")
+      .in("id", input.member_ids);
+    const billableIds = new Set((rows ?? []).filter(isBillable).map((m) => m.id));
+
     for (const memberId of input.member_ids) {
+      if (!billableIds.has(memberId)) {
+        failed.push(memberId);
+        continue;
+      }
       const { error } = await supabase.from("payments").upsert(
         {
           member_id: memberId,

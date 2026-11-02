@@ -1,18 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CalendarCheck, ChevronDown } from "lucide-react";
+import { CalendarCheck, ChevronDown, Search } from "lucide-react";
+import { DEFAULT_GYM_TIMEZONE, gymWallClock, type Database } from "@matos/shared";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import type { Database } from "@matos/shared";
 
 type ClassRow = Database["public"]["Tables"]["classes"]["Row"];
-type Member = Database["public"]["Tables"]["members"]["Row"];
+type Member = Pick<
+  Database["public"]["Tables"]["members"]["Row"],
+  "id" | "first_name" | "last_name" | "role" | "active"
+>;
+
+function roleBadge(role: Member["role"]) {
+  if (role === "athlete") return null;
+  return (
+    <Badge variant="secondary" className="ml-2">
+      {role === "gym_owner" ? "Owner" : "Coach"}
+    </Badge>
+  );
+}
 
 const CLASS_TYPE_LABELS: Record<ClassRow["class_type"], string> = {
   gi: "Gi",
@@ -30,30 +42,42 @@ function formatTime(time: string) {
   return `${h12}:${m} ${period}`;
 }
 
-function todayIsoDate() {
-  const now = new Date();
-  const offset = now.getTimezoneOffset();
-  const local = new Date(now.getTime() - offset * 60 * 1000);
-  return local.toISOString().slice(0, 10);
+/** 0 = Sunday for a plain YYYY-MM-DD calendar date, independent of device zone. */
+function dayOfWeekOf(date: string) {
+  return new Date(`${date}T00:00:00Z`).getUTCDay();
+}
+
+function useGymToday() {
+  const { data: timeZone } = useQuery({
+    queryKey: ["gym-timezone"],
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data } = await supabase.from("gyms").select("timezone").limit(1).maybeSingle();
+      return data?.timezone ?? DEFAULT_GYM_TIMEZONE;
+    },
+    staleTime: Infinity,
+  });
+  return timeZone ? gymWallClock(new Date(), timeZone).date : null;
 }
 
 export default function AttendancePage() {
-  const [selectedDate, setSelectedDate] = useState(todayIsoDate());
+  // "Today" is the gym's today (flow audit 4.3), not the coach's device date.
+  const gymToday = useGymToday();
+  const [pickedDate, setPickedDate] = useState<string | null>(null);
+  const selectedDate = pickedDate ?? gymToday;
   const queryClient = useQueryClient();
 
-  // dayOfWeek matches the DB convention (0=Sunday..6=Saturday, date-fns'
-  // getDay()) — parsed as a plain local date, not UTC, so the picker's date
-  // maps to the day a coach actually sees on their calendar.
-  const dayOfWeek = new Date(`${selectedDate}T00:00:00`).getDay();
+  const dayOfWeek = selectedDate ? dayOfWeekOf(selectedDate) : null;
 
   const { data: classes, isLoading } = useQuery({
     queryKey: ["classes", "by-day", dayOfWeek],
+    enabled: dayOfWeek !== null,
     queryFn: async () => {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("classes")
         .select("*")
-        .eq("day_of_week", dayOfWeek)
+        .eq("day_of_week", dayOfWeek!)
         .eq("active", true)
         .order("start_time", { ascending: true });
       if (error) throw error;
@@ -62,15 +86,13 @@ export default function AttendancePage() {
   });
 
   // Supabase Realtime — plan §7: "Attendance view uses Supabase realtime —
-  // check-ins appear live." One subscription for the page rather than one
-  // per class card; on any INSERT, invalidate every attendance query so
-  // whichever class card is expanded picks it up. RLS still scopes what
-  // this subscription can actually receive to the coach's own gym.
+  // check-ins appear live." One subscription for the page; RLS scopes what
+  // it can receive to the coach's own gym.
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
       .channel("attendance-live")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "attendance" }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "attendance" }, () => {
         queryClient.invalidateQueries({ queryKey: ["attendance-for-class"] });
       })
       .subscribe();
@@ -86,12 +108,14 @@ export default function AttendancePage() {
 
       <Input
         type="date"
-        value={selectedDate}
-        onChange={(e) => setSelectedDate(e.target.value)}
+        aria-label="Date"
+        value={selectedDate ?? ""}
+        max={gymToday ?? undefined}
+        onChange={(e) => setPickedDate(e.target.value || null)}
         className="h-11 w-48"
       />
 
-      {isLoading ? (
+      {!selectedDate || isLoading ? (
         <p className="text-sm text-muted-foreground">Loading classes...</p>
       ) : !classes || classes.length === 0 ? (
         <EmptyState
@@ -114,7 +138,8 @@ export default function AttendancePage() {
 
 function ClassAttendanceCard({ classRow, date }: { classRow: ClassRow; date: string }) {
   const [expanded, setExpanded] = useState(false);
-  const [markingId, setMarkingId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -122,10 +147,16 @@ function ClassAttendanceCard({ classRow, date }: { classRow: ClassRow; date: str
     queryFn: async () => {
       const supabase = createClient();
       const [membersRes, attendanceRes] = await Promise.all([
-        supabase.from("members").select("*").eq("active", true).order("last_name"),
+        // All members, not just active ones: a check-in by someone since
+        // deactivated must still be visible (and removable). Only active
+        // members are offered for marking.
+        supabase
+          .from("members")
+          .select("id, first_name, last_name, role, active")
+          .order("first_name"),
         supabase
           .from("attendance")
-          .select("member_id, checked_in_at, checked_in_by, offline_queued")
+          .select("id, member_id, checked_in_at, checked_in_by, offline_queued")
           .eq("class_id", classRow.id)
           .eq("checked_in_date", date),
       ]);
@@ -136,31 +167,70 @@ function ClassAttendanceCard({ classRow, date }: { classRow: ClassRow; date: str
     enabled: expanded,
   });
 
-  const attendanceByMember = new Map((data?.attendance ?? []).map((a) => [a.member_id, a]));
+  const attendanceByMember = useMemo(
+    () => new Map((data?.attendance ?? []).map((a) => [a.member_id, a])),
+    [data],
+  );
   const checkedIn = (data?.members ?? []).filter((m) => attendanceByMember.has(m.id));
-  const notCheckedIn = (data?.members ?? []).filter((m) => !attendanceByMember.has(m.id));
+  const notCheckedIn = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return (data?.members ?? []).filter(
+      (m) =>
+        m.active &&
+        !attendanceByMember.has(m.id) &&
+        (!q || `${m.first_name} ${m.last_name}`.toLowerCase().includes(q)),
+    );
+  }, [data, attendanceByMember, search]);
 
-  async function handleMark(memberId: string) {
-    setMarkingId(memberId);
+  function refresh() {
+    void queryClient.invalidateQueries({ queryKey: ["attendance-for-class", classRow.id, date] });
+  }
+
+  async function handleMark(member: Member) {
+    setBusyId(member.id);
     try {
       const res = await fetch("/api/attendance/mark", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          member_id: memberId,
-          class_id: classRow.id,
-          checked_in_at: new Date(`${date}T12:00:00`).toISOString(),
-        }),
+        body: JSON.stringify({ member_id: member.id, class_id: classRow.id, date }),
       });
       const body = await res.json();
       if (res.ok) {
-        toast.success("Marked present.");
-        queryClient.invalidateQueries({ queryKey: ["attendance-for-class", classRow.id, date] });
+        toast.success(`${member.first_name} marked present.`);
+        setSearch("");
+        refresh();
       } else {
         toast.error(body.error ?? "Couldn't mark attendance.");
       }
+    } catch {
+      toast.error("Couldn't mark attendance — check your connection.");
     } finally {
-      setMarkingId(null);
+      setBusyId(null);
+    }
+  }
+
+  async function handleRemove(member: Member, attendanceId: string) {
+    if (
+      !window.confirm(
+        `Remove ${member.first_name}'s check-in for ${classRow.name}? Marking them again later records the class start time.`,
+      )
+    ) {
+      return;
+    }
+    setBusyId(member.id);
+    try {
+      const res = await fetch(`/api/attendance/${attendanceId}`, { method: "DELETE" });
+      const body = await res.json();
+      if (res.ok) {
+        toast.success(`Removed ${member.first_name}'s check-in.`);
+        refresh();
+      } else {
+        toast.error(body.error ?? "Couldn't remove that check-in.");
+      }
+    } catch {
+      toast.error("Couldn't remove that check-in — check your connection.");
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -169,6 +239,7 @@ function ClassAttendanceCard({ classRow, date }: { classRow: ClassRow; date: str
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
         className="flex min-h-11 w-full items-center justify-between gap-3 p-3 text-left"
       >
         <div className="flex min-w-0 flex-col gap-1">
@@ -200,19 +271,36 @@ function ClassAttendanceCard({ classRow, date }: { classRow: ClassRow; date: str
                 ) : (
                   <ul className="flex flex-col gap-1">
                     {checkedIn.map((m) => {
-                      const record = attendanceByMember.get(m.id);
+                      const record = attendanceByMember.get(m.id)!;
                       return (
-                        <li key={m.id} className="flex items-center justify-between text-sm">
-                          <span>
-                            {m.first_name} {m.last_name}
+                        <li key={m.id} className="flex items-center justify-between gap-2 text-sm">
+                          <span className="flex min-w-0 flex-col">
+                            <span className="truncate">
+                              {m.first_name} {m.last_name}
+                              {roleBadge(m.role)}
+                              {!m.active ? (
+                                <Badge variant="outline" className="ml-2">
+                                  Inactive
+                                </Badge>
+                              ) : null}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {record.checked_in_by === "self"
+                                ? "Self check-in"
+                                : "Marked by coach"}
+                              {/* Stage M7: offline_queued's read path. */}
+                              {record.offline_queued ? " (reconciled offline)" : ""}
+                            </span>
                           </span>
-                          <span className="text-xs text-muted-foreground">
-                            {record?.checked_in_by === "self" ? "Self check-in" : "Marked by coach"}
-                            {/* Stage M7 gate fix (security-reviewer): offline_queued was
-                                written on every insert but had no read path anywhere in the
-                                app — this is that path. */}
-                            {record?.offline_queued ? " (reconciled offline)" : ""}
-                          </span>
+                          <Button
+                            variant="ghost"
+                            className="h-11 shrink-0"
+                            disabled={busyId === m.id}
+                            onClick={() => handleRemove(m, record.id)}
+                            aria-label={`Remove ${m.first_name} ${m.last_name}'s check-in`}
+                          >
+                            {busyId === m.id ? "Removing..." : "Remove"}
+                          </Button>
                         </li>
                       );
                     })}
@@ -220,27 +308,43 @@ function ClassAttendanceCard({ classRow, date }: { classRow: ClassRow; date: str
                 )}
               </div>
               <div className="flex flex-col gap-2">
-                <p className="text-sm font-medium">Not yet checked in ({notCheckedIn.length})</p>
+                <p className="text-sm font-medium">Mark someone present</p>
+                <div className="relative">
+                  <Search
+                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <Input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search by name"
+                    aria-label="Search members to mark present"
+                    className="h-11 pl-9"
+                  />
+                </div>
                 {notCheckedIn.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    {(data?.members.length ?? 0) === 0
+                    {!(data?.members ?? []).some((m) => m.active)
                       ? "No active members."
-                      : "Everyone's checked in."}
+                      : search
+                        ? "No one matches that name."
+                        : "Everyone's checked in."}
                   </p>
                 ) : (
-                  <ul className="flex flex-col gap-1">
+                  <ul className="flex max-h-96 flex-col gap-1 overflow-y-auto">
                     {notCheckedIn.map((m) => (
-                      <li key={m.id} className="flex items-center justify-between text-sm">
-                        <span>
+                      <li key={m.id} className="flex items-center justify-between gap-2 text-sm">
+                        <span className="truncate">
                           {m.first_name} {m.last_name}
+                          {roleBadge(m.role)}
                         </span>
                         <Button
                           variant="outline"
-                          className="h-11"
-                          onClick={() => handleMark(m.id)}
-                          disabled={markingId === m.id}
+                          className="h-11 shrink-0"
+                          onClick={() => handleMark(m)}
+                          disabled={busyId === m.id}
                         >
-                          {markingId === m.id ? "Marking..." : "Mark present"}
+                          {busyId === m.id ? "Marking..." : "Mark present"}
                         </Button>
                       </li>
                     ))}

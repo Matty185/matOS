@@ -4,6 +4,7 @@ import { apiError } from "@/lib/api/response";
 import { createClient } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/audit/log";
 import { recordPaymentSchema } from "@matos/shared";
+import { isBillable } from "@/lib/payments/overdue";
 
 // POST /api/payments/record — coach/owner only. Records or edits a single
 // member's payment for a single period (any status: paid/unpaid/waived),
@@ -16,6 +17,25 @@ import { recordPaymentSchema } from "@matos/shared";
 export const POST = withAuth(
   async (_request, context, input) => {
     const supabase = createClient();
+
+    // Only members who owe a monthly fee get payment rows (isBillable),
+    // the same rule every payments screen and the assistant use.
+    const { data: member } = await supabase
+      .from("members")
+      .select("role, membership_plan")
+      .eq("id", input.member_id)
+      .maybeSingle();
+    if (!member) {
+      return apiError(404, "MEMBER_NOT_FOUND", "No member found with that id in your gym.");
+    }
+    if (!isBillable(member)) {
+      return apiError(
+        409,
+        "NOT_BILLABLE",
+        "Coaches and casual members don't owe a monthly fee, so payments aren't tracked for them.",
+      );
+    }
+
     const paidAt = input.status === "paid" ? new Date().toISOString() : null;
 
     const { data: existing } = await supabase

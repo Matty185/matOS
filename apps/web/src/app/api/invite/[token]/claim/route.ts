@@ -118,6 +118,17 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     return apiError(409, "MEMBER_ALREADY_CLAIMED", "This account has already been claimed.");
   }
 
+  // Email-less (roster-only) members can't hold a login; no invite should
+  // exist for one, but never create an account without an email.
+  const memberEmail = member.email;
+  if (!memberEmail) {
+    return apiError(
+      409,
+      "MEMBER_NO_EMAIL",
+      "This invite can't be used. Ask your coach for a new one.",
+    );
+  }
+
   // Stage O4/O5 (defence in depth): a coach/owner login may only be claimed
   // from a link minted by an owner of that gym (or the operator's
   // provisioning script, created_by null). The role route already expires
@@ -144,7 +155,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
   // controlling the request body can't force either branch; which schema
   // validates the body and which auth operation runs both follow this
   // lookup alone.
-  const existingUser = await findUserByEmail(supabase, member.email);
+  const existingUser = await findUserByEmail(supabase, memberEmail);
 
   let newUserId: string;
   let previousCurrentGymId: string | null = null;
@@ -201,7 +212,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     );
     const { error: verifyError } = await verifyClient.auth.signInWithPassword({
-      email: member.email,
+      email: memberEmail,
       password: parsed.data.password,
     });
 
@@ -236,7 +247,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     }
 
     const { data: created, error: createUserError } = await supabase.auth.admin.createUser({
-      email: member.email,
+      email: memberEmail,
       password: parsed.data.password,
       email_confirm: true,
     });
@@ -321,5 +332,5 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     initiatedBy: "self_service",
   });
 
-  return NextResponse.json({ success: true, email: member.email });
+  return NextResponse.json({ success: true, email: memberEmail });
 }

@@ -174,7 +174,7 @@ export async function executeReadTool(
         await Promise.all([
           supabase
             .from("members")
-            .select("id, first_name, last_name, join_date, role")
+            .select("id, first_name, last_name, join_date, role, membership_plan")
             .eq("active", true),
           supabase
             .from("payments")
