@@ -20,6 +20,9 @@ import { fetchSessionChanges } from "@/lib/classes/session-changes";
 import { fetchLiveAnnouncements } from "@/lib/announcements/fetch";
 import { AnnouncementCard, type AnnouncementView } from "@/components/shared/announcement-card";
 import { getGymTimeZone } from "@/lib/time/gym-timezone";
+import { getPaymentsTrackedFrom } from "@/lib/payments/tracked-from";
+import { summariseAthletePayments } from "@/lib/payments/athlete-status";
+import { MembershipStatusCard } from "@/components/shared/membership-status-card";
 import type { Database } from "@matos/shared";
 
 type ClassRow = Database["public"]["Tables"]["classes"]["Row"];
@@ -37,10 +40,27 @@ export default async function AthleteHomePage() {
 
   const supabase = createClient();
 
-  const [{ data: memberRow }, { data: attendanceRows }, { data: classRows }] = await Promise.all([
-    supabase.from("members").select("belt, stripes").eq("id", member.memberId).single(),
+  const [
+    { data: memberRow },
+    { data: attendanceRows },
+    { data: classRows },
+    { data: paymentRows, error: paymentsError },
+    paymentsTrackedFrom,
+  ] = await Promise.all([
+    supabase
+      .from("members")
+      .select("id, belt, stripes, role, membership_plan, join_date")
+      .eq("id", member.memberId)
+      .single(),
     supabase.from("attendance").select("checked_in_date").eq("member_id", member.memberId),
     supabase.from("classes").select("*").eq("active", true),
+    // Flow audit 6.4: own payment statuses. Never select `amount` here
+    // (CLAUDE.md Rule 3: athletes don't see amounts, even their own).
+    supabase
+      .from("payments")
+      .select("period_month, period_year, status")
+      .eq("member_id", member.memberId),
+    getPaymentsTrackedFrom(supabase),
   ]);
 
   // Flow audit 3.2: list from the gym's today with one-off changes applied
@@ -69,6 +89,12 @@ export default async function AthleteHomePage() {
 
   const streak = computeAttendanceStreak((attendanceRows ?? []).map((a) => a.checked_in_date));
   const upcoming = computeUpcomingClasses(classRows ?? [], { fromDate: today, changes, cap: 6 });
+  // Never show a wrong "overdue": if payments can't be read, say so instead.
+  if (paymentsError) console.error("[home] couldn't load payments");
+  const paymentSummary =
+    memberRow && !paymentsError
+      ? summariseAthletePayments(memberRow, paymentRows ?? [], paymentsTrackedFrom, today)
+      : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -99,6 +125,14 @@ export default async function AthleteHomePage() {
           <p className="text-sm text-muted-foreground">Current attendance streak</p>
         </div>
       </div>
+
+      {paymentSummary && memberRow ? (
+        <MembershipStatusCard plan={memberRow.membership_plan} summary={paymentSummary} />
+      ) : paymentsError ? (
+        <p className="rounded-md border p-4 text-sm text-muted-foreground">
+          Couldn&apos;t load your membership status. Try refreshing.
+        </p>
+      ) : null}
 
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
