@@ -113,7 +113,11 @@ function AttendanceTab({ memberId, joinDate }: { memberId: string; joinDate: str
           <li key={i} className="flex justify-between rounded-md border p-3 text-sm">
             <span>{format(new Date(row.checked_in_at), "EEE, MMM d, yyyy 'at' h:mm a")}</span>
             <span className="text-muted-foreground">
-              {row.checked_in_by === "self" ? "Self check-in" : "Marked by coach"}
+              {row.checked_in_by === "self"
+                ? "Self check-in"
+                : row.checked_in_by === "kiosk"
+                  ? "Kiosk check-in"
+                  : "Marked by coach"}
             </span>
           </li>
         ))}

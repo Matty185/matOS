@@ -167,7 +167,11 @@ function AttendanceTab({ memberId }: { memberId?: string }) {
                   {format(new Date(row.checked_in_at), "EEE, MMM d, yyyy 'at' h:mm a")}
                 </Text>
                 <Text className="font-sans text-sm text-neutral-600">
-                  {row.checked_in_by === "self" ? "Self check-in" : "Marked by coach"}
+                  {row.checked_in_by === "self"
+                    ? "Self check-in"
+                    : row.checked_in_by === "kiosk"
+                      ? "Kiosk check-in"
+                      : "Marked by coach"}
                 </Text>
               </View>
             ))}

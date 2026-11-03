@@ -665,3 +665,46 @@ Accepted:
 - If a coach names a member in a post, that text stays in the immutable audit log and isn't reachable by the erasure sweep. This is the same as other coach-written free text.
 - No email or push delivery: email waits for a verified sending domain (audit 7.4), and mobile is parked.
 - No assistant tool for announcements.
+
+### 2026-11-03 — Front-desk kiosk check-in (flow audit 4.4)
+
+**Context.** Members without phones, especially kids, who are roster-only members with no login, had no way to check themselves in. Every BJJ gym system has a tablet at the door. Two choices were confirmed with the user. The tablet is a revocable **kiosk device registered by the owner**, not signed in as a coach, so leaving the kiosk page doesn't hand someone coach access. Members **tap their name, with no PIN**.
+
+**Decision.** Migration `20261102170000`:
+
+- **`kiosk_devices` table:** `name`, plus two secrets, each stored only as a sha256 hash:
+  - a one-time **activation** secret in the owner's setup link (24 hours, single use);
+  - a long-lived **device** key, minted at activation and kept in an httpOnly, SameSite=Strict cookie (`matos_kiosk`).
+- **Constraint:** a device is either waiting for setup or activated, never both.
+- **Access:** owners SELECT only the listing columns (a column grant, so never the hashes). There are no client write policies.
+- **Enums:** new `kiosk` values in `checked_in_by` and `initiated_by`.
+
+Flow:
+
+- **Setup:** Settings → Front-desk kiosk (owner) mints a link of the form `/kiosk/setup#<secret>`. The secret sits in the URL fragment, so it never reaches the server in the page request or a Referer header. The setup page posts it once to `/api/kiosk/activate`, which exchanges it for the device cookie in one conditional UPDATE (unused, not revoked, not expired), then strips the fragment.
+- **Using the kiosk:** `/kiosk` polls `/api/kiosk/today` for the gym name, today's sessions with check-in windows (3.2 changes applied), the active roster as "First L." plus belt only, and who is already in. `/api/kiosk/check-in` applies the same rules as self check-in. Both now share `checkInWindow()` in `packages/shared`. The member and class must be active and in the device's gym, and the attendance trigger re-checks that too. Check-ins are stored as `checked_in_by = 'kiosk'`, and the audit row has a null actor, `initiated_by = 'kiosk'` and the device id.
+- **Revoking:** revoke is owner-only and audit-first, and takes effect on the tablet's next request.
+- **Labels:** kiosk check-ins show as "Kiosk check-in" on coach and athlete screens.
+
+**Rule 4 addition.** The kiosk routes (`lib/kiosk/*`, `/api/kiosk/*`) use the service-role client, because the tablet has no auth user. This is the same category as invite claim and sign-up links. Every query is scoped by hand to the gym of the device row, never to anything from the request. Minting and revoking (`/api/kiosk-devices`) also use it, because there's no client write policy.
+
+**Gate.** security + database + code reviewers: no BLOCKED. Fixed from the gate:
+
+- A rate limit of 30 kiosk check-ins per gym per minute.
+- The device cookie now has a 90-day sliding expiry, renewed whenever the screen polls, instead of a fixed year.
+- Kiosk screen:
+  - A failed background refresh no longer wipes the screen.
+  - The chosen name is cleared when the class changes.
+  - Client clock drift and midnight are handled, and the screen refreshes after a refused check-in.
+  - The idle reset is armed by typing too.
+  - Accessible labels, and `min-h-dvh`.
+- Two more "Marked by coach" labels.
+
+Live testing then found what static review missed: Next's data cache was serving stale device rows on the GET route, so **a revoked kiosk kept working** and new check-ins didn't show. This is the same gap Stage S3 hit. Fixed with `unstable_noStore()` in `resolveKioskDevice` and `kioskSessionsOn`, and re-verified: a revoked kiosk gets 401 immediately.
+
+Accepted:
+
+- Anyone at the tablet can check in as anyone (the user's choice). The check-in is labelled as a kiosk check-in and coaches can remove it.
+- Anyone who can see the screen can read the roster's first names, last initials and belts. Staff are included, because they train too.
+- The kiosk check-in audit is best effort, as for self check-in.
+- `/api/kiosk/activate` isn't rate-limited (the secret is 256-bit).

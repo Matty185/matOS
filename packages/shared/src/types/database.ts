@@ -884,6 +884,56 @@ export type Database = {
           },
         ];
       };
+      kiosk_devices: {
+        Row: {
+          activated_at: string | null;
+          activation_expires_at: string | null;
+          activation_token_hash: string | null;
+          created_at: string;
+          created_by: string | null;
+          device_token_hash: string | null;
+          gym_id: string;
+          id: string;
+          last_seen_at: string | null;
+          name: string;
+          revoked_at: string | null;
+        };
+        Insert: {
+          activated_at?: string | null;
+          activation_expires_at?: string | null;
+          activation_token_hash?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          device_token_hash?: string | null;
+          gym_id: string;
+          id?: string;
+          last_seen_at?: string | null;
+          name: string;
+          revoked_at?: string | null;
+        };
+        Update: {
+          activated_at?: string | null;
+          activation_expires_at?: string | null;
+          activation_token_hash?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          device_token_hash?: string | null;
+          gym_id?: string;
+          id?: string;
+          last_seen_at?: string | null;
+          name?: string;
+          revoked_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "kiosk_devices_gym_id_fkey";
+            columns: ["gym_id"];
+            isOneToOne: false;
+            referencedRelation: "gyms";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       members: {
         Row: {
           active: boolean;
@@ -1364,14 +1414,14 @@ export type Database = {
       breakdown_result: "win" | "loss" | "draw";
       breakdown_status: "in_progress" | "complete";
       breakdown_visibility: "private" | "gym";
-      checked_in_by: "self" | "coach";
+      checked_in_by: "self" | "coach" | "kiosk";
       class_session_change_kind: "cancelled" | "moved";
       class_type: "gi" | "no_gi" | "comp" | "open_mat";
       entitlement_plan: "solo" | "gym";
       entitlement_source: "iap_apple" | "iap_google" | "stripe" | "manual";
       entitlement_status: "active" | "trialing" | "canceled" | "expired";
       gym_kind: "gym" | "personal";
-      initiated_by: "coach_manual" | "agent" | "self_service";
+      initiated_by: "coach_manual" | "agent" | "self_service" | "kiosk";
       member_role: "gym_owner" | "coach" | "athlete";
       membership_plan: "monthly" | "casual" | "comp_team";
       payment_status: "paid" | "unpaid" | "waived";
@@ -1525,14 +1575,14 @@ export const Constants = {
       breakdown_result: ["win", "loss", "draw"],
       breakdown_status: ["in_progress", "complete"],
       breakdown_visibility: ["private", "gym"],
-      checked_in_by: ["self", "coach"],
+      checked_in_by: ["self", "coach", "kiosk"],
       class_session_change_kind: ["cancelled", "moved"],
       class_type: ["gi", "no_gi", "comp", "open_mat"],
       entitlement_plan: ["solo", "gym"],
       entitlement_source: ["iap_apple", "iap_google", "stripe", "manual"],
       entitlement_status: ["active", "trialing", "canceled", "expired"],
       gym_kind: ["gym", "personal"],
-      initiated_by: ["coach_manual", "agent", "self_service"],
+      initiated_by: ["coach_manual", "agent", "self_service", "kiosk"],
       member_role: ["gym_owner", "coach", "athlete"],
       membership_plan: ["monthly", "casual", "comp_team"],
       payment_status: ["paid", "unpaid", "waived"],

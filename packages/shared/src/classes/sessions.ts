@@ -152,3 +152,17 @@ export function describeSessionChange(session: ClassSession): string | null {
   }
   return null;
 }
+
+/** Check-in opens this many minutes before a session starts (plan §7). */
+export const CHECK_IN_OPENS_MINUTES_BEFORE = 30;
+
+/**
+ * A session's check-in window in minutes of the gym's day: opens 30 minutes
+ * before the start, closes when the class ends. Shared by self check-in and
+ * the front-desk kiosk so both apply the same rule.
+ */
+export function checkInWindow(startTime: string, durationMinutes: number) {
+  const [h, m] = startTime.split(":");
+  const start = Number(h) * 60 + Number(m);
+  return { opens: start - CHECK_IN_OPENS_MINUTES_BEFORE, closes: start + durationMinutes };
+}

@@ -164,6 +164,16 @@ export function describeAuditEntry(row: AuditLogRow, ctx: AuditNameContext): str
     }
     case "attendance.marked":
       return `${actor} marked ${subjectNameFor(row, ctx)} present at a class.`;
+    case "attendance.kiosk_checked_in":
+      return `${subjectNameFor(row, ctx)} checked in at the front-desk kiosk.`;
+    case "kiosk_device.created":
+      return `${actor} added the kiosk "${typeof after.name === "string" ? after.name : "tablet"}".`;
+    case "kiosk_device.activated":
+      return `The kiosk "${typeof after.name === "string" ? after.name : "tablet"}" was set up on a tablet.`;
+    case "kiosk_device.revoked": {
+      const before = asRecord(row.before_state);
+      return `${actor} removed the kiosk "${typeof before.name === "string" ? before.name : "tablet"}".`;
+    }
     case "attendance.removed":
       return `${actor} removed a check-in for ${subjectNameFor(row, ctx)}.`;
     case "attendance.self_checked_in":

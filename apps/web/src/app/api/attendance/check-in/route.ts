@@ -5,8 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/audit/log";
 import {
   checkInSchema,
+  checkInWindow,
   gymWallClock,
-  timeStringToMinutes,
   DEFAULT_GYM_TIMEZONE,
   formatSessionDate,
   sessionRuns,
@@ -14,8 +14,6 @@ import {
   type SessionChange,
 } from "@matos/shared";
 import { fetchSessionChanges } from "@/lib/classes/session-changes";
-
-const CHECK_IN_OPENS_MINUTES_BEFORE = 30;
 
 // Stage M7: how long a queued-offline check-in stays eligible to
 // reconcile. Generous enough to cover a genuinely offline weekend at a
@@ -129,9 +127,10 @@ export const POST = withAuth(
       return apiError(400, "NOT_TODAY", "This class isn't scheduled for today.");
     }
 
-    const classStartMinutes = timeStringToMinutes(session.startTime);
-    const windowOpenMinutes = classStartMinutes - CHECK_IN_OPENS_MINUTES_BEFORE;
-    const windowCloseMinutes = classStartMinutes + classRow.duration_minutes;
+    const { opens: windowOpenMinutes, closes: windowCloseMinutes } = checkInWindow(
+      session.startTime,
+      classRow.duration_minutes,
+    );
 
     if (local.minutesOfDay < windowOpenMinutes) {
       return apiError(400, "TOO_EARLY", "Check-in opens 30 minutes before class starts.");

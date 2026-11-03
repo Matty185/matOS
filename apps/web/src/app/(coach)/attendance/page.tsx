@@ -314,7 +314,9 @@ function ClassAttendanceCard({ session, date }: { session: ClassSession<ClassRow
                             <span className="text-xs text-muted-foreground">
                               {record.checked_in_by === "self"
                                 ? "Self check-in"
-                                : "Marked by coach"}
+                                : record.checked_in_by === "kiosk"
+                                  ? "Kiosk check-in"
+                                  : "Marked by coach"}
                               {/* Stage M7: offline_queued's read path. */}
                               {record.offline_queued ? " (reconciled offline)" : ""}
                             </span>

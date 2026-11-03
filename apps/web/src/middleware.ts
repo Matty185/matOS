@@ -14,6 +14,9 @@ const PUBLIC_PATHS = [
   "/signup",
   "/invite",
   "/join",
+  // Flow audit 4.4: the front-desk kiosk has no user session; its API
+  // routes authenticate the device cookie themselves.
+  "/kiosk",
   "/share",
   "/forgot-password",
   "/reset-password",

@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { GdprSection } from "@/components/shared/gdpr-section";
 import { GymDetailsForm } from "@/components/shared/gym-details-form";
 import { TeamManager } from "@/components/shared/team-manager";
+import { KioskManager } from "@/components/shared/kiosk-manager";
 import { PromotionRulesForm } from "@/components/shared/promotion-rules-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -79,6 +80,18 @@ export default async function SettingsPage() {
         </CardHeader>
         <CardContent>
           <TeamManager currentMemberId={member.memberId} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Front-desk kiosk</CardTitle>
+          <CardDescription>
+            A tablet at the door where members tap their name to check in.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <KioskManager />
         </CardContent>
       </Card>
 
