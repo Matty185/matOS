@@ -233,6 +233,12 @@ async function getDashboardData() {
     }
   }
 
+  // Flow audit 9.1: trial requests nobody has picked up yet.
+  const { count: newTrials } = await supabase
+    .from("trial_leads")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "new");
+
   // Flow audit 9.3: active members (not owners) who haven't signed the
   // current waiver. Degrades to none if anything can't be read.
   let waiverMissing = 0;
@@ -260,6 +266,7 @@ async function getDashboardData() {
     todayStr,
     readyForPromotion,
     waiverMissing,
+    newTrials: newTrials ?? 0,
     teachingToday,
     activeMemberCount: activeMembers.length,
     classesThisWeekCount: (allClasses ?? []).length,
@@ -412,6 +419,19 @@ export default async function DashboardPage() {
             <span className="font-medium">{data.readyForPromotion}</span>{" "}
             {data.readyForPromotion === 1 ? "member is" : "members are"} ready for promotion. Review
             →
+          </span>
+        </Link>
+      ) : null}
+
+      {data.newTrials > 0 ? (
+        <Link
+          href="/trials"
+          className="flex min-h-11 items-center gap-2 rounded-md border border-primary/40 bg-primary/5 p-3 text-sm hover:bg-primary/10"
+        >
+          <UserPlus className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+          <span>
+            <span className="font-medium">{data.newTrials}</span> new trial{" "}
+            {data.newTrials === 1 ? "request" : "requests"}. Follow up →
           </span>
         </Link>
       ) : null}

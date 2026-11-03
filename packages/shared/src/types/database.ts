@@ -813,6 +813,7 @@ export type Database = {
           promotion_classes_per_stripe: number | null;
           promotion_months_per_stripe: number | null;
           timezone: string;
+          trial_code: string | null;
         };
         Insert: {
           active?: boolean;
@@ -828,6 +829,7 @@ export type Database = {
           promotion_classes_per_stripe?: number | null;
           promotion_months_per_stripe?: number | null;
           timezone?: string;
+          trial_code?: string | null;
         };
         Update: {
           active?: boolean;
@@ -843,6 +845,7 @@ export type Database = {
           promotion_classes_per_stripe?: number | null;
           promotion_months_per_stripe?: number | null;
           timezone?: string;
+          trial_code?: string | null;
         };
         Relationships: [];
       };
@@ -1366,6 +1369,97 @@ export type Database = {
           },
         ];
       };
+      trial_leads: {
+        Row: {
+          class_id: string | null;
+          coach_notes: string | null;
+          consented_at: string;
+          contact_key: string;
+          converted_member_id: string | null;
+          created_at: string;
+          email: string | null;
+          experience: Database["public"]["Enums"]["trial_experience"];
+          first_name: string;
+          for_child: boolean;
+          gym_id: string;
+          id: string;
+          last_name: string;
+          message: string | null;
+          parent_name: string | null;
+          phone: string | null;
+          session_date: string | null;
+          source_hash: string | null;
+          status: Database["public"]["Enums"]["trial_lead_status"];
+          updated_at: string;
+        };
+        Insert: {
+          class_id?: string | null;
+          coach_notes?: string | null;
+          consented_at?: string;
+          contact_key: string;
+          converted_member_id?: string | null;
+          created_at?: string;
+          email?: string | null;
+          experience: Database["public"]["Enums"]["trial_experience"];
+          first_name: string;
+          for_child?: boolean;
+          gym_id: string;
+          id?: string;
+          last_name: string;
+          message?: string | null;
+          parent_name?: string | null;
+          phone?: string | null;
+          session_date?: string | null;
+          source_hash?: string | null;
+          status?: Database["public"]["Enums"]["trial_lead_status"];
+          updated_at?: string;
+        };
+        Update: {
+          class_id?: string | null;
+          coach_notes?: string | null;
+          consented_at?: string;
+          contact_key?: string;
+          converted_member_id?: string | null;
+          created_at?: string;
+          email?: string | null;
+          experience?: Database["public"]["Enums"]["trial_experience"];
+          first_name?: string;
+          for_child?: boolean;
+          gym_id?: string;
+          id?: string;
+          last_name?: string;
+          message?: string | null;
+          parent_name?: string | null;
+          phone?: string | null;
+          session_date?: string | null;
+          source_hash?: string | null;
+          status?: Database["public"]["Enums"]["trial_lead_status"];
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "trial_leads_class_id_fkey";
+            columns: ["class_id"];
+            isOneToOne: false;
+            referencedRelation: "classes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "trial_leads_converted_member_id_fkey";
+            columns: ["converted_member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "trial_leads_gym_id_fkey";
+            columns: ["gym_id"];
+            isOneToOne: false;
+            referencedRelation: "gyms";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       waiver_signatures: {
         Row: {
           created_by: string | null;
@@ -1589,6 +1683,9 @@ export type Database = {
       payment_status: "paid" | "unpaid" | "waived";
       push_platform: "ios" | "android";
       share_link_type: "profile" | "breakdown";
+      trial_experience: "none" | "some" | "experienced";
+      trial_lead_status:
+        "new" | "contacted" | "booked" | "attended" | "converted" | "not_interested";
       waiver_signature_method: "self" | "guardian" | "paper";
     };
     CompositeTypes: {
@@ -1752,6 +1849,8 @@ export const Constants = {
       payment_status: ["paid", "unpaid", "waived"],
       push_platform: ["ios", "android"],
       share_link_type: ["profile", "breakdown"],
+      trial_experience: ["none", "some", "experienced"],
+      trial_lead_status: ["new", "contacted", "booked", "attended", "converted", "not_interested"],
       waiver_signature_method: ["self", "guardian", "paper"],
     },
   },

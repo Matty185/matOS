@@ -111,7 +111,7 @@ GoCardless). Vendor claims are marketing, not verified.
 
 | #   | Flow                                                            | Rating              | Notes                                                                                                    |
 | --- | --------------------------------------------------------------- | ------------------- | -------------------------------------------------------------------------------------------------------- |
-| 9.1 | Free-trial booking / lead capture (e.g. from the gym's website) | ⚪ P1               | Standard in competitors; the Northside website could feed it directly.                                   |
+| 9.1 | Free-trial booking / lead capture (e.g. from the gym's website) | ✅ built 2026-11-03 | Standard in competitors; the Northside website could feed it directly.                                   |
 | 9.2 | Trial → member conversion tracking                              | ⚪ P2               |                                                                                                          |
 | 9.3 | Liability waiver / medical info at sign-up                      | ✅ built 2026-11-03 | Only GDPR consent today. Waivers (parent-signed for minors) are near-universal in martial arts software. |
 

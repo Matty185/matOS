@@ -48,7 +48,7 @@ export const POST = withAuth(
 
     const { data: member, error: memberError } = await supabase
       .from("members")
-      .select("id, user_id, first_name, last_name")
+      .select("id, gym_id, user_id, first_name, last_name, email")
       .eq("id", deletionRequest.member_id)
       .single();
 
@@ -174,6 +174,8 @@ export const POST = withAuth(
       classCoachResult,
       holdsResult,
       waiverResult,
+      leadsByLinkResult,
+      leadsByEmailResult,
     ] = await Promise.all([
       serviceClient.from("attendance").delete().eq("member_id", member.id),
       serviceClient.from("athlete_logs").delete().eq("member_id", member.id),
@@ -209,6 +211,18 @@ export const POST = withAuth(
         .from("waiver_signatures")
         .update({ signer_name: null })
         .eq("member_id", member.id),
+      // Flow audit 9.1: the trial request they joined from (and any other
+      // from their email in this gym) holds their name and contact details.
+      // On a retry the email is already anonymised; the link still matches.
+      serviceClient.from("trial_leads").delete().eq("converted_member_id", member.id),
+      member.email && !/@anonymized\.invalid$/.test(member.email)
+        ? serviceClient
+            .from("trial_leads")
+            .delete()
+            .eq("gym_id", member.gym_id)
+            // Leads store emails lowercased; an exact match (no wildcards).
+            .eq("email", member.email.toLowerCase())
+        : Promise.resolve({ error: null }),
     ]);
 
     for (const [label, result] of [
@@ -222,6 +236,8 @@ export const POST = withAuth(
       ["classes.coach_member_id", classCoachResult],
       ["membership_holds", holdsResult],
       ["waiver_signatures", waiverResult],
+      ["trial_leads (converted)", leadsByLinkResult],
+      ["trial_leads (email)", leadsByEmailResult],
     ] as const) {
       if (result.error) {
         console.error(`[gdpr] failed to clean up ${label}`, result.error);

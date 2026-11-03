@@ -41,7 +41,13 @@ type MemberFormValues = {
 };
 
 type MemberFormProps =
-  | { mode: "create" }
+  | {
+      mode: "create";
+      // Flow audit 9.1: "Add as member" from a trial lead pre-fills the form
+      // and marks the lead converted once the member exists.
+      prefill?: Partial<MemberFormValues>;
+      leadId?: string;
+    }
   | {
       mode: "edit";
       memberId: string;
@@ -67,7 +73,13 @@ export function MemberForm(props: MemberFormProps) {
     resolver: zodResolver(isEdit ? editMemberSchema : createMemberSchema) as never,
     defaultValues: isEdit
       ? props.defaultValues
-      : { membership_plan: "monthly", belt: "white", stripes: 0, join_date: "" },
+      : {
+          membership_plan: "monthly",
+          belt: "white",
+          stripes: 0,
+          join_date: "",
+          ...(props.mode === "create" ? props.prefill : {}),
+        },
   });
 
   async function onSubmit(data: MemberFormValues) {
@@ -84,6 +96,17 @@ export function MemberForm(props: MemberFormProps) {
     if (!res.ok) {
       toast.error(body.error ?? "Something went wrong.");
       return;
+    }
+
+    if (props.mode === "create" && props.leadId) {
+      const conv = await fetch(`/api/trial-leads/${props.leadId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "converted", converted_member_id: body.memberId }),
+      }).catch(() => null);
+      if (!conv || !conv.ok) {
+        toast.warning("Member added, but the trial request couldn't be marked as joined.");
+      }
     }
 
     if (isEdit) {

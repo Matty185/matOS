@@ -222,6 +222,25 @@ export function describeAuditEntry(row: AuditLogRow, ctx: AuditNameContext): str
       const before = asRecord(row.before_state);
       return `${actor} undid the ${before.kind === "moved" ? "move" : "cancellation"} of ${className(row, ctx)} on ${sessionDateLabel(before.session_date)}.`;
     }
+    case "trial.requested":
+      return "Someone asked for a free trial through the trial link.";
+    case "trial.updated":
+      return `${actor} updated a trial request${typeof after.status === "string" ? ` (now ${after.status.replace("_", " ")})` : ""}.`;
+    case "trial.converted": {
+      const who =
+        typeof after.member_id === "string"
+          ? (ctx.byMemberId.get(after.member_id) ?? "a member")
+          : "a member";
+      return `${actor} added ${who} as a member from their trial request.`;
+    }
+    case "trial.deleted":
+      return `${actor} deleted a trial request.`;
+    case "trial_link.enabled":
+      return `${actor} turned on the free trial link.`;
+    case "trial_link.changed":
+      return `${actor} replaced the free trial link (the old one stopped working).`;
+    case "trial_link.disabled":
+      return `${actor} turned off the free trial link.`;
     case "waiver.published":
       return `${actor} published a new version of the gym's waiver.`;
     case "waiver.signed":

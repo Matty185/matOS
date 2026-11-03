@@ -24,6 +24,7 @@ export * from "./validation/kiosk";
 export * from "./validation/member";
 export * from "./validation/payment";
 export * from "./validation/share-link";
+export * from "./validation/trial";
 export * from "./validation/waiver";
 
 export * from "./attendance/home-summary";

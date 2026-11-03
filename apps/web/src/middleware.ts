@@ -18,6 +18,8 @@ const PUBLIC_PATHS = [
   // routes authenticate the device cookie themselves.
   "/kiosk",
   "/share",
+  // Flow audit 9.1: the public trial-request page (and its API route).
+  "/trial",
   "/forgot-password",
   "/reset-password",
 ];

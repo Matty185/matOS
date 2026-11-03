@@ -877,3 +877,78 @@ Accepted:
 - **Typed names are not verified** against the member (inherent to typed-name signing); coaches are trusted and every record is audited.
 - **Direct REST writes** by staff skip the route's audit row, as for other staff-writable tables.
 - **The rehearsal gym keeps a test waiver (version 1).** The live test recorded a paper waiver for the rehearsal owner, and that record is immutable by design.
+
+### 2026-11-03 — Free trial requests (flow audit 9.1)
+
+**Context.** Competitors capture trial requests from the gym's website, and MatOS had nothing for prospects. Three choices were confirmed with the user:
+
+- visitors **request** a trial class, and nothing is booked automatically;
+- there is **one public link per gym**;
+- **"Add as member"** converts a request, pre-filled.
+
+**Decision.** Migration `20261103150000`:
+
+- **`gyms.trial_code`:** the link's code. NULL means off. It is always server-generated (16 characters from a 32-letter alphabet, about 80 bits) and **not a secret**, because it is published and members can read it. It resolves only for active `kind = 'gym'` gyms.
+- **`trial_leads`:**
+  - **Contents:** name; email and/or phone; experience; `for_child` + `parent_name` (a parent asking for a child: the names are the child's, the contact details the parent's); an optional message; an optional class + date (the trigger checks it is the gym's class); a status (`new` → `contacted` → `booked` → `attended` → `converted`, or `not_interested`); coach notes; `converted_member_id`; and `consented_at`.
+  - **Rate-limit columns:** `contact_key` (the email without its +tag, or the phone's last 9 digits) and `source_hash`. `source_hash` is an HMAC of the sender's IP; the IP is never stored, and each new request clears hashes older than 2 days.
+  - **Access:** only the public route inserts (service role, Rule 4, same category as sign-up links). Staff of the gym select, update and delete; nobody else sees anything.
+  - **Edit guard:** a column grant (status, notes, converted member only) plus a SECURITY **INVOKER** guard trigger (immutable fields; a converted member must be in this gym).
+
+Routes:
+
+- **Public `/trial/<code>` and `POST /api/trial/[code]`:** the page shows the gym name and the next 14 days of class names and times (no coaches, no members). Abuse limits, cheapest first:
+  - a honeypot, named so autofill skips it, with hits logged;
+  - 5 per sender per day and 3 per contact per day;
+  - 30 per gym per hour and at most 200 unopened per gym.
+  - Every "link not usable" state gives the same message. "Change link" is the kill switch.
+- **`POST /api/gym/trial-link`:** owner-only on, change or off, strictly audited with revert.
+- **`PATCH`/`DELETE /api/trial-leads/[id]`:** "Joined" only through a member link; delete is audit-first.
+
+Where it shows:
+
+- **Settings → Free trial link:** copy and QR.
+- **Trials page (coach nav):** to follow up, Joined, Not interested; email and phone buttons, status, notes, delete.
+- **Add as member:** opens `/members/new?lead=` pre-filled. For a child the email is left blank and the parent goes in the parent/emergency fields. The request is then marked Joined and linked.
+- **Dashboard:** "N new trial requests".
+
+Audit rows never hold personal details.
+
+GDPR: erasing a member deletes the request they converted from and any request with their email in the gym. A coach can delete any request.
+
+**Gate.** database-reviewer (BLOCKING), three passes:
+
+1. **BLOCKED** the edit guard. As SECURITY DEFINER, `current_user` was the owner, so it never fired. Made SECURITY INVOKER; I had caught it in parallel.
+2. Passed after a class-in-gym trigger, the column grant and revoking anon.
+3. Passed the child and rate-limit columns.
+
+security + code reviewers: no BLOCKED. Fixed from them:
+
+- per-sender and normalised per-contact limits (a script could otherwise fill the gym cap and lock out real visitors), and the gym cap checked before any class lookup;
+- child requests: the parent's email no longer becomes the child's login;
+- the honeypot could be autofilled, silently dropping real leads;
+- "Joined" without a member;
+- the exact-match email in erasure;
+- the notes textarea after a refetch;
+- the class dropdown width on phones;
+- the phone needs 7 or more digits.
+
+Live-tested with 34 checks:
+
+- the public form and validation, the honeypot, the other gym's class refused;
+- all three rate limits, including +tag and phone-format variants; the sender stored only as a hash;
+- coach and athlete permissions, direct REST edits and inserts refused;
+- conversion, including another gym's member refused and a locked status;
+- link on, change (old link 404) and off;
+- audit rows without personal data.
+
+Browser-checked on an emulated iPhone: a parent requesting for a child, the dashboard count, the Trials page, Add as member pre-filled for a child, and Joined after creation. Hand-written types match `supabase gen types`.
+
+**Pre-existing bug found while testing:** since the P0 change that made member email optional (`f89076e`), **adding a member with the email left blank through the Add Member form always failed** ("Invalid request data"). The form's resolver turns `""` into `null` and sends that, and the server schema refused `null`. `createMemberSchema` now accepts `null`. The earlier testing had gone straight to the API.
+
+Accepted:
+
+- Requests stay until a coach deletes them (no automatic purge yet).
+- Erasing a member doesn't find a phone-only request they never converted from.
+- Rate-limit counts are check-then-insert (soft caps).
+- There's no email notification to the gym (no sending domain, audit 7.4), so new requests show on the dashboard and the Trials page.

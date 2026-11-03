@@ -67,7 +67,11 @@ export const createMemberSchema = memberFieldsSchema.extend({
     .toLowerCase()
     .email("Enter a valid email address, or leave it blank.")
     .optional()
+    // "" from a raw request, null once the form's own resolver has run this
+    // transform (the client then sends the parsed value). Both mean "no
+    // email": a roster-only member.
     .or(z.literal(""))
+    .or(z.null())
     .transform((v) => (v ? v : null)),
 });
 

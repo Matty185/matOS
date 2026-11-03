@@ -10,6 +10,7 @@ import { TeamManager } from "@/components/shared/team-manager";
 import { KioskManager } from "@/components/shared/kiosk-manager";
 import { PromotionRulesForm } from "@/components/shared/promotion-rules-form";
 import { WaiverManager } from "@/components/shared/waiver-manager";
+import { TrialLinkManager } from "@/components/shared/trial-link-manager";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -81,6 +82,16 @@ export default async function SettingsPage() {
         </CardHeader>
         <CardContent>
           <TeamManager currentMemberId={member.memberId} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Free trial link</CardTitle>
+          <CardDescription>A public link people use to ask for a trial class.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <TrialLinkManager gymId={member.gymId} />
         </CardContent>
       </Card>
 
