@@ -44,6 +44,11 @@ export const READ_TOOLS: Anthropic.Tool[] = [
           type: "boolean",
           description: "Filter to active (true) or deactivated (false) members.",
         },
+        role: {
+          type: "string",
+          enum: ["athlete", "coach", "gym_owner"],
+          description: "Filter by role, e.g. coach or gym_owner to find who can teach a class.",
+        },
       },
     },
   },
@@ -315,8 +320,43 @@ export const WRITE_TOOLS: Anthropic.Tool[] = [
           enum: [...CLASS_PROGRAM_VALUES],
           description: "Who the class is for. Defaults to all_levels.",
         },
+        coach_member_id: {
+          type: ["string", "null"],
+          description:
+            "Member id of the coach who teaches it: an active coach or owner (get_members with role coach or gym_owner). null removes the coach.",
+        },
       },
       required: ["name", "class_type", "day_of_week", "start_time", "duration_minutes"],
+    },
+  },
+  {
+    name: "update_class",
+    description:
+      "Change an existing class: its coach, programme, name, type, day, time, length, capacity, or active flag. Pass class_id (from get_classes) and ONLY the fields that change; everything else stays as it is. Requires coach confirmation before it takes effect.",
+    input_schema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID of the class, from get_classes." },
+        name: { type: "string" },
+        class_type: { type: "string", enum: CLASS_TYPE_VALUES },
+        day_of_week: {
+          type: "integer",
+          minimum: 0,
+          maximum: 6,
+          description: "0=Sunday..6=Saturday.",
+        },
+        start_time: { type: "string", description: "HH:MM, 24-hour." },
+        duration_minutes: { type: "integer", minimum: 1, maximum: 600 },
+        max_capacity: { type: ["integer", "null"] },
+        program: { type: "string", enum: [...CLASS_PROGRAM_VALUES] },
+        coach_member_id: {
+          type: ["string", "null"],
+          description:
+            "Member id of the coach who teaches it: an active coach or owner (get_members with role coach or gym_owner). null removes the coach.",
+        },
+        active: { type: "boolean", description: "false hides the class from the timetable." },
+      },
+      required: ["class_id"],
     },
   },
   {
@@ -408,6 +448,28 @@ export const WRITE_TOOL_ENDPOINTS: Record<
       duration_minutes: input.duration_minutes,
       max_capacity: input.max_capacity ?? null,
       ...(input.program ? { program: input.program } : {}),
+      ...(typeof input.coach_member_id === "string"
+        ? { coach_member_id: input.coach_member_id }
+        : {}),
+    }),
+  },
+  // The agent route merges the model's changes onto the current class row
+  // (mergeClassUpdate) before this runs, because PATCH /api/classes/[id]
+  // takes the full record. Coach and programme are only sent when changed,
+  // so the route leaves them as stored otherwise.
+  update_class: {
+    method: "PATCH",
+    path: (input) => `/api/classes/${input.class_id}`,
+    body: (input) => ({
+      name: input.name,
+      class_type: input.class_type,
+      day_of_week: input.day_of_week,
+      start_time: input.start_time,
+      duration_minutes: input.duration_minutes,
+      max_capacity: input.max_capacity ?? null,
+      active: input.active,
+      ...(input.program !== undefined ? { program: input.program } : {}),
+      ...(input.coach_member_id !== undefined ? { coach_member_id: input.coach_member_id } : {}),
     }),
   },
   deactivate_member: {

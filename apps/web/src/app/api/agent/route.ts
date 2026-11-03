@@ -13,6 +13,14 @@ import {
 } from "@/lib/agent/tools";
 import { executeReadTool } from "@/lib/agent/read-tools";
 import { buildSystemPrompt } from "@/lib/agent/system-prompt";
+import {
+  UUID_RE,
+  type ClassRow,
+  mergeClassUpdate,
+  describeClassUpdate,
+  describeClassCreate,
+  classUpdateChangesAnything,
+} from "@/lib/agent/class-proposals";
 import { trailingMonthWindow, getOverdueMemberIds, billableMembers } from "@/lib/payments/overdue";
 import { getPaymentsTrackedFrom } from "@/lib/payments/tracked-from";
 
@@ -26,6 +34,7 @@ type PendingWriteCall = {
   tool: string;
   label: string;
   memberName: string | null;
+  detail: string | null;
   endpoint: string;
   method: "POST" | "PATCH";
   body: Record<string, unknown>;
@@ -37,6 +46,7 @@ const TOOL_LABELS: Record<string, string> = {
   update_member: "Update member details",
   update_belt: "Promote belt",
   create_class: "Create class",
+  update_class: "Edit class",
   deactivate_member: "Deactivate member",
   create_attendance: "Mark attendance",
 };
@@ -220,11 +230,98 @@ export const POST = withAuth(
         namesById = new Map((members ?? []).map((m) => [m.id, `${m.first_name} ${m.last_name}`]));
       }
 
+      // Flow audit 3.3: class writes. update_class sends only the changed
+      // fields, but PATCH /api/classes/[id] takes the full record, so merge
+      // them onto the current row (RLS client: a class outside the caller's
+      // gym, or a malformed id, simply isn't found and the proposal is
+      // dropped). Coach ids are resolved to names for the confirmation card;
+      // the class trigger still decides whether the coach is valid.
+      const classBlocks = pendingToolUse.filter(
+        (b) => b.name === "update_class" || b.name === "create_class",
+      );
+      const classIds = classBlocks
+        .filter((b) => b.name === "update_class")
+        .map((b) => (b.input as Record<string, unknown>).class_id)
+        .filter((v): v is string => typeof v === "string" && UUID_RE.test(v));
+      const coachIds = classBlocks
+        .map((b) => (b.input as Record<string, unknown>).coach_member_id)
+        .filter((v): v is string => typeof v === "string" && UUID_RE.test(v));
+      const classesById = new Map<string, ClassRow>();
+      if (classIds.length > 0) {
+        const { data: rows } = await supabase
+          .from("classes")
+          .select(
+            "id, name, class_type, day_of_week, start_time, duration_minutes, max_capacity, active",
+          )
+          .in("id", classIds);
+        for (const r of rows ?? []) classesById.set(r.id, r);
+      }
+      const coachNames = new Map<string, string>();
+      // Only active coaches/owners can teach (the class trigger enforces it on
+      // confirm); refuse anyone else here so the card never shows an
+      // assignment that will fail.
+      const validCoachIds = new Set<string>();
+      if (coachIds.length > 0) {
+        const { data: staff } = await supabase
+          .from("members")
+          .select("id, first_name, last_name, role, active")
+          .in("id", coachIds);
+        for (const m of staff ?? []) {
+          coachNames.set(m.id, `${m.first_name} ${m.last_name}`);
+          if (m.active && (m.role === "coach" || m.role === "gym_owner")) validCoachIds.add(m.id);
+        }
+      }
+      const notes: string[] = [];
+      const updatedClassIds = new Set<string>();
+      const coachProblem = (id: unknown): string | null => {
+        if (typeof id !== "string") return null;
+        if (validCoachIds.has(id)) return null;
+        const name = coachNames.get(id);
+        return name
+          ? `${name} isn't an active coach or owner, so they can't be assigned to a class.`
+          : "Couldn't find that coach in your gym.";
+      };
+
       const pending: PendingWriteCall[] = [];
       for (const block of pendingToolUse) {
         const endpoint = WRITE_TOOL_ENDPOINTS[block.name];
         if (!endpoint) continue;
-        const rawInput = block.input as Record<string, unknown>;
+        let rawInput = block.input as Record<string, unknown>;
+        let detail: string | null = null;
+        if (block.name === "update_class") {
+          const current =
+            typeof rawInput.class_id === "string" ? classesById.get(rawInput.class_id) : undefined;
+          if (!current) {
+            notes.push("Couldn't find that class — check its name with get_classes.");
+            continue;
+          }
+          // One edit per class per turn: each is merged from the same
+          // snapshot, so a second would write back the first one's fields.
+          if (updatedClassIds.has(current.id)) {
+            notes.push(`Only one change to ${current.name} at a time — ask again for the rest.`);
+            continue;
+          }
+          const problem = coachProblem(rawInput.coach_member_id);
+          if (problem) {
+            notes.push(problem);
+            continue;
+          }
+          const changes = rawInput;
+          if (!classUpdateChangesAnything(current, changes)) {
+            notes.push(`Nothing to change on ${current.name}.`);
+            continue;
+          }
+          updatedClassIds.add(current.id);
+          rawInput = mergeClassUpdate(current, changes);
+          detail = describeClassUpdate(current, changes, coachNames);
+        } else if (block.name === "create_class") {
+          const problem = coachProblem(rawInput.coach_member_id);
+          if (problem) {
+            notes.push(problem);
+            continue;
+          }
+          detail = describeClassCreate(rawInput, coachNames);
+        }
         try {
           pending.push({
             tool: block.name,
@@ -233,6 +330,7 @@ export const POST = withAuth(
               typeof rawInput.member_id === "string"
                 ? (namesById.get(rawInput.member_id) ?? null)
                 : null,
+            detail,
             endpoint: endpoint.path(rawInput),
             method: endpoint.method,
             body: endpoint.body(rawInput),
@@ -244,11 +342,14 @@ export const POST = withAuth(
       }
 
       if (pending.length === 0) {
-        body = { type: "error", content: "Something went wrong — try rephrasing your question." };
+        body =
+          notes.length > 0
+            ? { type: "answer", content: notes.join(" ") }
+            : { type: "error", content: "Something went wrong — try rephrasing your question." };
       } else {
         body = {
           type: "confirmation",
-          content: finalAnswerText || "Here's what I'll do:",
+          content: [finalAnswerText || "Here's what I'll do:", ...notes].join("\n\n"),
           tool_call: pending,
         };
       }

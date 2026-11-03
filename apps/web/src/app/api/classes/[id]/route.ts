@@ -3,7 +3,7 @@ import { withAuth } from "@/lib/auth/withAuth";
 import { apiError } from "@/lib/api/response";
 import { createClient } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/audit/log";
-import { editClassSchema } from "@matos/shared";
+import { editClassSchema, type Json } from "@matos/shared";
 
 export const PATCH = withAuth(
   async (_request: NextRequest, context, input, params) => {
@@ -43,6 +43,9 @@ export const PATCH = withAuth(
       );
     }
 
+    // The assistant's query goes in agentQuery, not in the row's after state.
+    const auditInput: Record<string, Json> = { ...input };
+    delete auditInput.agent_query;
     await writeAuditLog({
       gymId: context.gymId,
       actorId: context.userId,
@@ -50,8 +53,9 @@ export const PATCH = withAuth(
       entityType: "classes",
       entityId: id,
       beforeState: before,
-      afterState: { ...input },
-      initiatedBy: "coach_manual",
+      afterState: auditInput,
+      initiatedBy: input.agent_query ? "agent" : "coach_manual",
+      agentQuery: input.agent_query ?? null,
     });
 
     return NextResponse.json({ success: true });

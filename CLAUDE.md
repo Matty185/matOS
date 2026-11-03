@@ -733,5 +733,8 @@ Where it shows:
 Accepted:
 
 - A class keeps its coach when that person is deactivated or demoted. It isn't shown to athletes while they're inactive, coaches see "(no longer active)", and reactivation restores it.
-- The assistant can set a programme but not a coach (no name-to-member resolution for it yet).
 - The GDPR export doesn't list classes a member taught (it's gym timetable data, not data about them).
+
+**Follow-up (same day): the assistant assigns coaches.** `create_class` takes an optional `coach_member_id`, and a new `update_class` write tool edits an existing class (coach, programme, name, type, day, time, length, capacity, active). `get_members` returns `role` and filters by it, so the model finds coaches the same way it finds members for other write tools. The model sends only the fields that change; `/api/agent` reads the class through the RLS client and merges them into the full record `PATCH /api/classes/[id]` needs (`lib/agent/class-proposals.ts`). The confirmation card gains a detail line ("Kids BJJ (Tue 18:00): coach → Sam Coach, programme → Kids") built from the same fields the body writes. Agent-initiated class edits are now audited as `initiated_by = agent` with the query (previously always `coach_manual`).
+
+Gate (security + code, no BLOCKED). Fixed: a proposal is dropped with a plain-language note, rather than a generic error, when the class isn't found, the coach isn't an active coach or owner, nothing would change, or a second edit targets the same class in one turn (both would merge from the same snapshot); model text on the card is capped at 100 characters. Accepted: the merged record is captured at proposal time, so an edit another coach makes before you confirm is overwritten, the same as an open edit form.

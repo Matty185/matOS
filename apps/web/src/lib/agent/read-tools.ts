@@ -84,9 +84,12 @@ export async function executeReadTool(
     case "get_members": {
       let query = supabase
         .from("members")
-        .select("id, first_name, last_name, belt, stripes, membership_plan, active, join_date")
+        .select(
+          "id, first_name, last_name, role, belt, stripes, membership_plan, active, join_date",
+        )
         .order("last_name", { ascending: true });
       if (typeof input.belt === "string") query = query.eq("belt", input.belt as never);
+      if (typeof input.role === "string") query = query.eq("role", input.role as never);
       if (typeof input.active === "boolean") query = query.eq("active", input.active);
       const { data, error } = await query;
       if (error) throw error;
@@ -103,7 +106,7 @@ export async function executeReadTool(
       const { data, error } = await supabase
         .from("members")
         .select(
-          "id, first_name, last_name, email, phone, belt, stripes, membership_plan, active, join_date",
+          "id, first_name, last_name, role, email, phone, belt, stripes, membership_plan, active, join_date",
         );
       if (error) throw error;
       return matchByName(data ?? [], name).slice(0, 10);

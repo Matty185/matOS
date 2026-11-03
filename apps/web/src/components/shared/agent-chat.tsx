@@ -21,6 +21,7 @@ type PendingAction = {
   tool: string;
   label: string;
   memberName: string | null;
+  detail?: string | null;
   endpoint: string;
   method: "POST" | "PATCH";
   body: Record<string, unknown>;
@@ -297,6 +298,11 @@ export function AgentChat() {
                               <span>
                                 {action.label}
                                 {action.memberName ? ` — ${action.memberName}` : ""}
+                                {action.detail ? (
+                                  <span className="block text-muted-foreground">
+                                    {action.detail}
+                                  </span>
+                                ) : null}
                               </span>
                               {action.requiresTypedConfirmation ? (
                                 <Badge variant="destructive">destructive</Badge>
