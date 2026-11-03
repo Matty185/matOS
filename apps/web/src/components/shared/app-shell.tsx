@@ -20,6 +20,7 @@ import {
   Megaphone,
   UserPlus,
   Baby,
+  BarChart3,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@matos/shared";
@@ -45,6 +46,7 @@ const COACH_NAV: NavItem[] = [
   { label: "Announcements", href: "/announcements", icon: Megaphone },
   { label: "Trials", href: "/trials", icon: UserPlus },
   { label: "Payments", href: "/payments", icon: CreditCard },
+  { label: "Reports", href: "/reports", icon: BarChart3 },
   { label: "Analysis", href: "/analysis", icon: Swords },
   { label: "Audit Log", href: "/audit-log", icon: ScrollText },
 ];

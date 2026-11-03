@@ -19,6 +19,7 @@ import { ProfileView } from "@/components/shared/profile-view";
 import { MembershipHolds, useMemberHolds } from "@/components/shared/membership-holds";
 import { MemberWaiver } from "@/components/shared/member-waiver";
 import { MemberGuardians } from "@/components/shared/member-guardians";
+import { MessageMember } from "@/components/shared/message-member";
 import { holdCovering, holdMonths } from "@/lib/payments/holds";
 import { useGymToday } from "@/hooks/use-gym-today";
 import { PLAN_LABELS } from "@/lib/constants/member-labels";
@@ -208,6 +209,14 @@ export function MemberProfileClient({
           <Button asChild variant="outline" className="h-11">
             <Link href={`/members/${member.id}/edit`}>Edit</Link>
           </Button>
+          {member.active && (member.phone || member.email) ? (
+            <MessageMember
+              firstName={member.first_name}
+              phone={member.phone}
+              email={member.email}
+              kind="general"
+            />
+          ) : null}
           {member.role !== "guardian" ? (
             <PromoteBeltDialog
               memberId={member.id}
@@ -358,6 +367,7 @@ export function MemberProfileClient({
             active={member.active}
             memberId={member.id}
             memberName={`${member.first_name} ${member.last_name}`}
+            contact={{ firstName: member.first_name, phone: member.phone, email: member.email }}
             onPaymentChanged={() =>
               queryClient.invalidateQueries({ queryKey: ["member-payments", member.id] })
             }
@@ -562,12 +572,14 @@ function PaymentsTab({
   active,
   memberId,
   memberName,
+  contact,
   onPaymentChanged,
 }: {
   billable: boolean;
   active: boolean;
   memberId: string;
   memberName: string;
+  contact: { firstName: string; phone: string | null; email: string | null };
   onPaymentChanged: () => void;
 }) {
   // Flow audit 2.4: unpaid rows in a frozen month read "frozen", not overdue.
@@ -622,14 +634,24 @@ function PaymentsTab({
         <MembershipHolds memberId={memberId} memberName={memberName} canEdit={active} />
       ) : null}
       {billable ? (
-        <Button
-          variant="outline"
-          className="h-11 w-fit"
-          onClick={markCurrentMonthPaid}
-          disabled={isMarking}
-        >
-          {isMarking ? "Marking..." : "Mark this month paid"}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            className="h-11 w-fit"
+            onClick={markCurrentMonthPaid}
+            disabled={isMarking}
+          >
+            {isMarking ? "Marking..." : "Mark this month paid"}
+          </Button>
+          {active ? (
+            <MessageMember
+              firstName={contact.firstName}
+              phone={contact.phone}
+              email={contact.email}
+              kind="payment"
+            />
+          ) : null}
+        </div>
       ) : (
         <p className="text-sm text-muted-foreground">
           Coaches and casual (pay-per-class) members don&apos;t owe a monthly fee, so they

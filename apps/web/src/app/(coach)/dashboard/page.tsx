@@ -30,6 +30,7 @@ import { trailingMonthWindow, getOverdueMemberIds, billableMembers } from "@/lib
 import { fetchHoldsForWindow } from "@/lib/payments/holds";
 import { getPaymentsTrackedFrom } from "@/lib/payments/tracked-from";
 import { fetchLiveAnnouncements } from "@/lib/announcements/fetch";
+import { MessageMember } from "@/components/shared/message-member";
 import { fetchCurrentWaiver, fetchSignedMemberIds, needsWaiver } from "@/lib/waivers";
 import { AnnouncementCard, type AnnouncementView } from "@/components/shared/announcement-card";
 import { resolveAuditNames, describeAuditEntry, type AuditLogRow } from "@/lib/audit/format";
@@ -56,7 +57,7 @@ async function getDashboardData() {
     supabase
       .from("members")
       .select(
-        "id, first_name, last_name, email, join_date, role, membership_plan, user_id, belt, stripes",
+        "id, first_name, last_name, email, phone, join_date, role, membership_plan, user_id, belt, stripes",
       )
       .eq("active", true)
       // Parent accounts (flow audit 8.2) aren't training members.
@@ -140,6 +141,11 @@ async function getDashboardData() {
     id: row.id,
     description: describeAuditEntry(row, names),
   }));
+
+  // Flow audit 6.5/7.3: the gym's name for the ready-written messages.
+  const { data: gymName } = member
+    ? await supabase.from("gyms").select("name").eq("id", member.gymId).maybeSingle()
+    : { data: null };
 
   // Stage O4: setup checklist, shown to owners until the gym's onboarding
   // is marked complete (in /setup, or once everything below is done).
@@ -276,6 +282,7 @@ async function getDashboardData() {
     overdueCount: overdueIds.size,
     overdueMembers,
     notSeenMembers,
+    gymName: gymName?.name ?? "the gym",
     recentActivity,
   };
 }
@@ -468,6 +475,17 @@ export default async function DashboardPage() {
                   </Link>{" "}
                   has an overdue payment.
                 </span>
+                <span className="ml-auto shrink-0">
+                  <MessageMember
+                    firstName={m.first_name}
+                    phone={m.phone}
+                    email={m.email}
+                    gymName={data.gymName}
+                    kind="payment"
+                    label="Remind"
+                    variant="ghost"
+                  />
+                </span>
               </li>
             ))}
             {data.notSeenMembers.map((m) => (
@@ -481,6 +499,16 @@ export default async function DashboardPage() {
                     {m.first_name} {m.last_name}
                   </Link>{" "}
                   hasn&apos;t been seen in {NOT_SEEN_DAYS}+ days.
+                </span>
+                <span className="ml-auto shrink-0">
+                  <MessageMember
+                    firstName={m.first_name}
+                    phone={m.phone}
+                    email={m.email}
+                    gymName={data.gymName}
+                    kind="missed"
+                    variant="ghost"
+                  />
                 </span>
               </li>
             ))}

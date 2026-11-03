@@ -259,6 +259,8 @@ export function describeAuditEntry(row: AuditLogRow, ctx: AuditNameContext): str
           : "their child";
       return `${actor} signed the waiver for ${child} as their parent.`;
     }
+    case "promotion.grading_day":
+      return `${actor} promoted ${typeof after.promoted === "number" ? after.promoted : "several"} members on grading day.`;
     case "waiver.published":
       return `${actor} published a new version of the gym's waiver.`;
     case "waiver.signed":

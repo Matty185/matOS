@@ -93,7 +93,12 @@ export function PromotionsList({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <h1 className="font-heading text-3xl tracking-wide">Promotions</h1>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h1 className="font-heading text-3xl tracking-wide">Promotions</h1>
+          <Button asChild variant="outline" className="h-11">
+            <Link href="/promotions/grading">Grading day</Link>
+          </Button>
+        </div>
         <p className="text-sm text-muted-foreground">
           Ready for the next stripe: {ruleSummary(rule)}. Belt changes are always your call.
           {canEditRule && !editingRule ? (

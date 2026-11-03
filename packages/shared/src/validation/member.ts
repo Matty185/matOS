@@ -135,6 +135,30 @@ export const promoteBeltSchema = z.object({
 
 export type PromoteBeltInput = z.infer<typeof promoteBeltSchema>;
 
+// Flow audit 5.4: grading day — promote several members at once, with one
+// shared note. Each member at most once; capped so one request stays quick.
+export const MAX_GRADING_PROMOTIONS = 50;
+export const gradingDaySchema = z
+  .object({
+    promotions: z
+      .array(
+        z.object({
+          member_id: z.string().uuid(),
+          belt: z.enum(BELT_VALUES),
+          stripes: z.number().int().min(0).max(4),
+        }),
+      )
+      .min(1, "Pick at least one member.")
+      .max(MAX_GRADING_PROMOTIONS, `At most ${MAX_GRADING_PROMOTIONS} at a time.`),
+    notes: z.string().trim().max(1000).optional().or(z.literal("")),
+  })
+  .refine((v) => new Set(v.promotions.map((p) => p.member_id)).size === v.promotions.length, {
+    message: "Each member can only be promoted once per grading.",
+    path: ["promotions"],
+  });
+
+export type GradingDayInput = z.infer<typeof gradingDaySchema>;
+
 export const deactivateMemberSchema = z.object({
   confirm: z.literal(true, { message: "Confirmation is required." }),
   agent_query: agentQueryField,
