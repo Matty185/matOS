@@ -971,9 +971,9 @@ Accepted:
 
 New and off until the same switch is on: a **"New trial request" email** to the gym's contact email (`lib/email/trial-notification.ts`, called by `POST /api/trial/[code]`). It carries only the visitor's first name and the class they asked for, never their contact details, and it never blocks or fails the request. Not done, because it can't be tested without a real inbox: the Forgot-password page sending reset emails, and the email-confirmation tightening. Both are listed in the checklist.
 
-### 2026-11-04 — Parent accounts managing children (flow audit 8.2) — BUILT, NOT YET MIGRATED
+### 2026-11-04 — Parent accounts managing children (flow audit 8.2)
 
-**Status.** Built on branch `p1-parent-accounts`. It needs migrations `20261104120000_guardian_enums.sql` then `20261104120100_guardian_accounts.sql` applied **before** the branch is merged, because the code depends on the new tables, enum values and policies. The user asked for the remaining P1 items to be built in one go without their input, with migrations applied in a batch later, so the defaults below were chosen without them.
+**Status.** Built on branch `p1-parent-accounts` while the user was away (they asked for the remaining P1 items in one go, with migrations batched), so the defaults below were chosen without them. The user applied migrations `20261104120000` and `20261104120100`. After that the branch was live-tested and merged to main.
 
 **Decision (defaults chosen autonomously).**
 
@@ -1020,4 +1020,16 @@ Accepted:
 - Guardian check-ins via REST skip the window, like athletes' self check-ins.
 - Self check-in now reports a bad offline timestamp before a bad class (error order only).
 
-**To finish after the migrations:** regenerate and compare `database.ts`, run the parent-account live test and a browser check (parent signs up from the invite, sees Family, checks a child in, signs the waiver), then merge to main and deploy.
+**Verified after the migrations.** Hand-written types match `supabase gen types`.
+
+The live test passed 32/32 (the one miss was a wrong path in the test itself):
+
+- add, link a sibling, refusals for duplicates, non-athletes and athletes;
+- the parent's reads limited to their children;
+- child check-in, with refusals for a non-child, self check-in by route or REST, an inactive child, and coach marking of a parent;
+- signing the waiver for a child, with forgery refused;
+- the edit limits, and coach routes and invites refused;
+- a child made a coach loses the link, and unlinking ends access;
+- audit rows.
+
+The browser check on emulated iPhones ran the owner adding a parent and getting the invite, then the parent claiming it on the real claim page and landing on Family (Family and Account nav). There the parent checked the child in, signed the waiver, and was sent back to Family from Dashboard, Analysis and Home. On the coach view the parent showed as "Signed up" and the waiver as "Signed by parent or guardian", with a Parent badge on the members list.

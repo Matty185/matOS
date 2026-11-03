@@ -101,11 +101,11 @@ GoCardless). Vendor claims are marketing, not verified.
 
 ## 8. Families & kids
 
-| #   | Flow                                                            | Rating                                                              | Notes                                                                                                                                                                    |
-| --- | --------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 8.1 | **Kids without their own email / siblings under one parent**    | ✅ fixed 2026-11-02 (roster-only members; parent accounts are 8.2)  | `members.email` is required and unique per gym, so two siblings can't share a parent's email and a child can't be added without one. Deferred in the onboarding plan §5. |
-| 8.2 | Parent account managing children (check-in, progress, payments) | 🟡 built 2026-11-04 on branch p1-parent-accounts — needs migrations | Standard (Wodify, Zipper, PushPress).                                                                                                                                    |
-| 8.3 | Family / sibling pricing                                        | ⚪ P2                                                               |                                                                                                                                                                          |
+| #   | Flow                                                            | Rating                                                             | Notes                                                                                                                                                                    |
+| --- | --------------------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 8.1 | **Kids without their own email / siblings under one parent**    | ✅ fixed 2026-11-02 (roster-only members; parent accounts are 8.2) | `members.email` is required and unique per gym, so two siblings can't share a parent's email and a child can't be added without one. Deferred in the onboarding plan §5. |
+| 8.2 | Parent account managing children (check-in, progress, payments) | ✅ built 2026-11-04                                                | Standard (Wodify, Zipper, PushPress).                                                                                                                                    |
+| 8.3 | Family / sibling pricing                                        | ⚪ P2                                                              |                                                                                                                                                                          |
 
 ## 9. Sales, trials & waivers
 
