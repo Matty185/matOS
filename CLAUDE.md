@@ -956,3 +956,17 @@ Accepted:
 ### 2026-11-03 — Payments grid on a phone (flow audit 6.3)
 
 **Decision.** Below the `md` breakpoint the six-month table (about 700px wide, so it scrolled sideways at 390px) is replaced by one card per member. Each card has the member's name, an Overdue badge when any month in the window is overdue, and the six months as a 3×2 grid of 44px+ buttons that open the same payment dialog. From `md` up the table is unchanged. Both layouts take each month's status from one `cellFor()`, so they can't disagree. No schema change. code-reviewer: no BLOCKED; fixed the screen-reader text for months before joining, plus `role="list"` for VoiceOver. Checked on an emulated iPhone (no overflow, 56px targets, dialog opens) and at 1280px (table only).
+
+### 2026-11-04 — Email, ready to switch on (flow audit 7.4)
+
+**Context.** Email needs a verified sending domain, which only the user can set up (DNS plus Resend). The invite email path has existed since Stage O2 behind `INVITE_EMAIL_ENABLED` and `INVITE_FROM_ADDRESS`.
+
+**Decision.** `matos_email_setup.md` (repo root) is the user's checklist:
+
+- verify a domain in Resend;
+- set the Vercel env vars and redeploy;
+- what then switches on;
+- optional Supabase custom SMTP for password-reset emails, plus the follow-up code change;
+- then require email confirmation for invite and sign-up-link accounts, closing the O2/O7 accepted risk.
+
+New and off until the same switch is on: a **"New trial request" email** to the gym's contact email (`lib/email/trial-notification.ts`, called by `POST /api/trial/[code]`). It carries only the visitor's first name and the class they asked for, never their contact details, and it never blocks or fails the request. Not done, because it can't be tested without a real inbox: the Forgot-password page sending reset emails, and the email-confirmation tightening. Both are listed in the checklist.

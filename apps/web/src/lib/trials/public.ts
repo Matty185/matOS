@@ -20,7 +20,13 @@ import {
 export const TRIAL_DAYS_AHEAD = 14;
 const CODE_RE = /^[a-z0-9]{12,32}$/;
 
-export type TrialGym = { id: string; name: string; timeZone: string };
+export type TrialGym = {
+  id: string;
+  name: string;
+  timeZone: string;
+  /** Where new-request emails go (flow audit 7.4), when email is switched on. */
+  contactEmail: string | null;
+};
 
 /** The gym behind a public trial code, or null (off, unknown, inactive, personal). */
 export async function resolveTrialGym(rawCode: string): Promise<TrialGym | null> {
@@ -29,11 +35,16 @@ export async function resolveTrialGym(rawCode: string): Promise<TrialGym | null>
   if (!CODE_RE.test(code)) return null;
   const { data } = await createServiceRoleClient()
     .from("gyms")
-    .select("id, name, timezone, kind, active")
+    .select("id, name, timezone, kind, active, contact_email")
     .eq("trial_code", code)
     .maybeSingle();
   if (!data || data.kind !== "gym" || !data.active) return null;
-  return { id: data.id, name: data.name, timeZone: data.timezone ?? DEFAULT_GYM_TIMEZONE };
+  return {
+    id: data.id,
+    name: data.name,
+    timeZone: data.timezone ?? DEFAULT_GYM_TIMEZONE,
+    contactEmail: data.contact_email ?? null,
+  };
 }
 
 export type TrialSession = {

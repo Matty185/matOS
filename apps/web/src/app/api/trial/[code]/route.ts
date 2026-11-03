@@ -4,6 +4,7 @@ import { apiError } from "@/lib/api/response";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { writeAuditLog } from "@/lib/audit/log";
 import { resolveTrialGym, trialSessions } from "@/lib/trials/public";
+import { notifyGymOfTrialRequest } from "@/lib/email/trial-notification";
 import { trialRequestSchema } from "@matos/shared";
 
 // POST /api/trial/[code] — PUBLIC (no session). Flow audit 9.1: a visitor
@@ -170,6 +171,27 @@ export async function POST(request: NextRequest, { params }: { params: { code: s
     .eq("gym_id", gym.id)
     .lt("created_at", new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString())
     .not("source_hash", "is", null);
+
+  // Flow audit 7.4: email the gym, once a sending domain is switched on.
+  // Never blocks or fails the request.
+  let wantsLabel = "not sure yet";
+  if (input.class_id && input.session_date) {
+    const { data: cls } = await supabase
+      .from("classes")
+      .select("name")
+      .eq("id", input.class_id)
+      .eq("gym_id", gym.id)
+      .maybeSingle();
+    wantsLabel = `${cls?.name ?? "a class"} on ${input.session_date}`;
+  }
+  await notifyGymOfTrialRequest({
+    to: gym.contactEmail,
+    gymName: gym.name,
+    visitorFirstName: input.first_name,
+    forChild: input.for_child,
+    wantsLabel,
+    trialsUrl: `${process.env.NEXT_PUBLIC_APP_URL}/trials`,
+  });
 
   // Best effort, like other self-service writes: the lead row is the record.
   // No personal details in the audit row.
