@@ -222,6 +222,27 @@ export function describeAuditEntry(row: AuditLogRow, ctx: AuditNameContext): str
       const before = asRecord(row.before_state);
       return `${actor} undid the ${before.kind === "moved" ? "move" : "cancellation"} of ${className(row, ctx)} on ${sessionDateLabel(before.session_date)}.`;
     }
+    case "waiver.published":
+      return `${actor} published a new version of the gym's waiver.`;
+    case "waiver.signed":
+      return `${actor} signed the gym's waiver.`;
+    case "waiver.recorded": {
+      const who =
+        typeof after.member_id === "string"
+          ? (ctx.byMemberId.get(after.member_id) ?? "a member")
+          : "a member";
+      return after.method === "paper"
+        ? `${actor} recorded a paper waiver for ${who}.`
+        : `${actor} recorded a parent or guardian signing the waiver for ${who}.`;
+    }
+    case "waiver.voided": {
+      const before = asRecord(row.before_state);
+      const who =
+        typeof before.member_id === "string"
+          ? (ctx.byMemberId.get(before.member_id) ?? "a member")
+          : "a member";
+      return `${actor} voided a waiver signature for ${who}.`;
+    }
     case "announcement.posted":
       return `${actor} posted the announcement "${typeof after.title === "string" ? after.title : "untitled"}".`;
     case "announcement.deleted": {

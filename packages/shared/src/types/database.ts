@@ -1366,6 +1366,102 @@ export type Database = {
           },
         ];
       };
+      waiver_signatures: {
+        Row: {
+          created_by: string | null;
+          gym_id: string;
+          id: string;
+          member_id: string;
+          method: Database["public"]["Enums"]["waiver_signature_method"];
+          signed_at: string;
+          signer_name: string | null;
+          voided_at: string | null;
+          voided_by: string | null;
+          waiver_version_id: string;
+        };
+        Insert: {
+          created_by?: string | null;
+          gym_id: string;
+          id?: string;
+          member_id: string;
+          method: Database["public"]["Enums"]["waiver_signature_method"];
+          signed_at?: string;
+          signer_name?: string | null;
+          voided_at?: string | null;
+          voided_by?: string | null;
+          waiver_version_id: string;
+        };
+        Update: {
+          created_by?: string | null;
+          gym_id?: string;
+          id?: string;
+          member_id?: string;
+          method?: Database["public"]["Enums"]["waiver_signature_method"];
+          signed_at?: string;
+          signer_name?: string | null;
+          voided_at?: string | null;
+          voided_by?: string | null;
+          waiver_version_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "waiver_signatures_gym_id_fkey";
+            columns: ["gym_id"];
+            isOneToOne: false;
+            referencedRelation: "gyms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "waiver_signatures_member_id_fkey";
+            columns: ["member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "waiver_signatures_waiver_version_id_fkey";
+            columns: ["waiver_version_id"];
+            isOneToOne: false;
+            referencedRelation: "waiver_versions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      waiver_versions: {
+        Row: {
+          body: string;
+          created_at: string;
+          created_by: string | null;
+          gym_id: string;
+          id: string;
+          version: number;
+        };
+        Insert: {
+          body: string;
+          created_at?: string;
+          created_by?: string | null;
+          gym_id: string;
+          id?: string;
+          version: number;
+        };
+        Update: {
+          body?: string;
+          created_at?: string;
+          created_by?: string | null;
+          gym_id?: string;
+          id?: string;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "waiver_versions_gym_id_fkey";
+            columns: ["gym_id"];
+            isOneToOne: false;
+            referencedRelation: "gyms";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -1493,6 +1589,7 @@ export type Database = {
       payment_status: "paid" | "unpaid" | "waived";
       push_platform: "ios" | "android";
       share_link_type: "profile" | "breakdown";
+      waiver_signature_method: "self" | "guardian" | "paper";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -1655,6 +1752,7 @@ export const Constants = {
       payment_status: ["paid", "unpaid", "waived"],
       push_platform: ["ios", "android"],
       share_link_type: ["profile", "breakdown"],
+      waiver_signature_method: ["self", "guardian", "paper"],
     },
   },
 } as const;

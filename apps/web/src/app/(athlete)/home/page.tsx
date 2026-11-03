@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { CalendarDays, Flame } from "lucide-react";
+import { CalendarDays, FileSignature, Flame } from "lucide-react";
+import { fetchCurrentWaiver } from "@/lib/waivers";
+import { Button } from "@/components/ui/button";
 import { getCurrentMember } from "@/lib/auth/current-member";
 import { createClient } from "@/lib/supabase/server";
 import { BeltDisplay } from "@/components/shared/belt-display";
@@ -89,6 +91,26 @@ export default async function AthleteHomePage() {
     console.error("[home] couldn't load announcements");
   }
 
+  // Flow audit 9.3: prompt to sign the gym's current waiver. Degrades to no
+  // prompt on error (signing is never required to train).
+  let waiverToSign = false;
+  try {
+    const waiver = await fetchCurrentWaiver(supabase);
+    if (waiver) {
+      const { data: sig, error: sigError } = await supabase
+        .from("waiver_signatures")
+        .select("id")
+        .eq("member_id", member.memberId)
+        .eq("waiver_version_id", waiver.id)
+        .is("voided_at", null)
+        .maybeSingle();
+      if (sigError) throw sigError;
+      waiverToSign = !sig;
+    }
+  } catch {
+    console.error("[home] couldn't load waiver status");
+  }
+
   // Flow audit 3.3: coach names (athletes can't read staff rows directly).
   const { data: coachRows } = await supabase.rpc("class_coach_names");
   const coachByClass = new Map((coachRows ?? []).map((r) => [r.class_id, r.coach_name]));
@@ -118,6 +140,26 @@ export default async function AthleteHomePage() {
           <BeltDisplay belt={memberRow.belt} stripes={memberRow.stripes} size="lg" showLabel />
         ) : null}
       </div>
+
+      {waiverToSign ? (
+        <section
+          className="flex flex-col gap-3 rounded-md border border-primary/40 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between"
+          aria-labelledby="waiver-prompt-heading"
+        >
+          <div className="flex items-start gap-3">
+            <FileSignature className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden />
+            <div className="flex flex-col gap-1">
+              <h2 id="waiver-prompt-heading" className="font-medium">
+                Please sign the gym&apos;s waiver
+              </h2>
+              <p className="text-sm text-muted-foreground">It takes a minute.</p>
+            </div>
+          </div>
+          <Button asChild className="h-11">
+            <Link href="/waiver">Read and sign</Link>
+          </Button>
+        </section>
+      ) : null}
 
       {announcements.length > 0 ? (
         <section className="flex flex-col gap-2" aria-labelledby="announcements-heading">

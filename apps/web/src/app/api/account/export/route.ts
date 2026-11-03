@@ -49,6 +49,7 @@ export const GET = withAuth(async (_request, context) => {
     entitlements,
     shareLinks,
     holds,
+    waiverSignatures,
   ] = await Promise.all([
     supabase.from("members").select("*").eq("id", context.memberId).single(),
     supabase.from("attendance").select("*").eq("member_id", context.memberId),
@@ -72,6 +73,14 @@ export const GET = withAuth(async (_request, context) => {
     supabase.from("share_links").select("*").eq("created_by", context.userId),
     // Flow audit 2.4 (membership_holds_select_self).
     supabase.from("membership_holds").select("*").eq("member_id", context.memberId),
+    // Flow audit 9.3, with the version signed and its text
+    // (waiver_signatures_select_self + waiver_versions_select_gym).
+    supabase
+      .from("waiver_signatures")
+      .select(
+        "method, signer_name, signed_at, voided_at, waiver_versions(version, body, created_at)",
+      )
+      .eq("member_id", context.memberId),
   ]);
 
   const breakdownIds = (breakdowns.data ?? []).map((b) => b.id);
@@ -99,6 +108,7 @@ export const GET = withAuth(async (_request, context) => {
     entitlements: entitlements.data ?? [],
     share_links: shareLinks.data ?? [],
     membership_holds: holds.data ?? [],
+    waiver_signatures: waiverSignatures.data ?? [],
   };
 
   await writeAuditLog({

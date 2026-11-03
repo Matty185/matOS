@@ -18,6 +18,7 @@ import {
 import { useGymToday } from "@/hooks/use-gym-today";
 import { useGymStaff } from "@/hooks/use-gym-staff";
 import { useMembersOnHold } from "@/hooks/use-members-on-hold";
+import { useWaiverStatus } from "@/hooks/use-waiver-status";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
@@ -188,6 +189,7 @@ function ClassAttendanceCard({
   const queryClient = useQueryClient();
   // Flow audit 2.4: a hint only; check-in still works during a hold.
   const { ids: onHold } = useMembersOnHold();
+  const waiverStatus = useWaiverStatus();
 
   const { data, isLoading } = useQuery({
     queryKey: ["attendance-for-class", classRow.id, date],
@@ -337,6 +339,11 @@ function ClassAttendanceCard({
                                   On hold
                                 </Badge>
                               ) : null}
+                              {waiverStatus.missing(m) ? (
+                                <Badge variant="destructive" className="ml-2">
+                                  No waiver
+                                </Badge>
+                              ) : null}
                               {!m.active ? (
                                 <Badge variant="outline" className="ml-2">
                                   Inactive
@@ -401,6 +408,11 @@ function ClassAttendanceCard({
                           {onHold.has(m.id) ? (
                             <Badge variant="secondary" className="ml-2">
                               On hold
+                            </Badge>
+                          ) : null}
+                          {waiverStatus.missing(m) ? (
+                            <Badge variant="destructive" className="ml-2">
+                              No waiver
                             </Badge>
                           ) : null}
                         </span>

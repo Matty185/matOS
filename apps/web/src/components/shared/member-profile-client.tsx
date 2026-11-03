@@ -17,6 +17,7 @@ import { PasswordResetLinkDialog } from "@/components/shared/password-reset-link
 import { PaymentCellDialog } from "@/components/shared/payment-cell-dialog";
 import { ProfileView } from "@/components/shared/profile-view";
 import { MembershipHolds, useMemberHolds } from "@/components/shared/membership-holds";
+import { MemberWaiver } from "@/components/shared/member-waiver";
 import { holdCovering, holdMonths } from "@/lib/payments/holds";
 import { useGymToday } from "@/hooks/use-gym-today";
 import { PLAN_LABELS } from "@/lib/constants/member-labels";
@@ -317,7 +318,14 @@ export function MemberProfileClient({
           <TabsTrigger value="logs">Logs</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="pt-4">
+        <TabsContent value="overview" className="flex flex-col gap-4 pt-4">
+          <MemberWaiver
+            memberId={member.id}
+            memberName={`${member.first_name} ${member.last_name}`}
+            active={member.active}
+            role={member.role}
+            hasLogin={!!member.user_id}
+          />
           <OverviewTab
             member={member}
             latestInvite={latestInvite}

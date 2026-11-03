@@ -129,6 +129,19 @@ export const POST = withAuth(async (_request, context) => {
     return apiError(500, "INTERNAL_ERROR", "Something went wrong — nothing was deleted.");
   }
 
+  // Flow audit 9.3: the waiver routes refuse personal workspaces, but RLS
+  // would let the workspace owner publish one directly. Its signatures went
+  // with the member row above (cascade), so any versions are now unsigned
+  // and can be deleted.
+  const { error: waiverVersionsError } = await supabase
+    .from("waiver_versions")
+    .delete()
+    .eq("gym_id", personalGymId);
+  if (waiverVersionsError) {
+    console.error("[delete-solo] failed to delete waiver versions", waiverVersionsError);
+    return apiError(500, "INTERNAL_ERROR", "Something went wrong — nothing was deleted.");
+  }
+
   const { error: gymAnonymiseError } = await supabase
     .from("gyms")
     .update({

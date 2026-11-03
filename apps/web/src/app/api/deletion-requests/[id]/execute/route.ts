@@ -173,6 +173,7 @@ export const POST = withAuth(
       notificationsResult,
       classCoachResult,
       holdsResult,
+      waiverResult,
     ] = await Promise.all([
       serviceClient.from("attendance").delete().eq("member_id", member.id),
       serviceClient.from("athlete_logs").delete().eq("member_id", member.id),
@@ -201,6 +202,13 @@ export const POST = withAuth(
       // Flow audit 2.4: membership_holds cascades on member delete, but this
       // route anonymises the member instead, so the cascade never fires.
       serviceClient.from("membership_holds").delete().eq("member_id", member.id),
+      // Flow audit 9.3: waiver signatures are kept (they show a waiver was
+      // agreed, which the gym may need to show later) but the typed name,
+      // the member's or a parent's, is cleared.
+      serviceClient
+        .from("waiver_signatures")
+        .update({ signer_name: null })
+        .eq("member_id", member.id),
     ]);
 
     for (const [label, result] of [
@@ -213,6 +221,7 @@ export const POST = withAuth(
       ["notifications", notificationsResult],
       ["classes.coach_member_id", classCoachResult],
       ["membership_holds", holdsResult],
+      ["waiver_signatures", waiverResult],
     ] as const) {
       if (result.error) {
         console.error(`[gdpr] failed to clean up ${label}`, result.error);

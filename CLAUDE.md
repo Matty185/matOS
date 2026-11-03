@@ -811,3 +811,69 @@ Accepted:
 - PATCH doesn't re-check that the member is still active and billable; it's harmless, because `billableMembers` filters them out anyway.
 - No assistant tool for holds.
 - The athlete card names only the hold covering this month, not one that follows straight after.
+
+### 2026-11-03 — Liability waivers (flow audit 9.3)
+
+**Context.** Only a GDPR consent existed. Waivers, parent-signed for minors, are near-universal in martial-arts software. Three choices were confirmed with the user:
+
+- signing is **in the app, or recorded by a coach** (paper, or a parent signing on the coach's device);
+- there is **no medical information**, because it's special-category health data;
+- unsigned members are **flagged, never blocked**.
+
+**Decision.** Migration `20261103140000`:
+
+- **`waiver_versions`:** the owner's text, numbered per gym by an advisory-locked trigger.
+  - The text can never be edited, by any role. The one allowed update is `created_by` being cleared by its FK.
+  - An unsigned version can be deleted by the service role (delete-solo); a signed one can't (FK restrict).
+  - Every gym member can read it; only the owner can insert.
+- **`waiver_signatures`:**
+  - **Method:** `self` (the member's own login, typed name), `guardian` (a parent types their name on a coach's device) or `paper` (on file, name optional).
+  - **Database checks:** the version must be the gym's **current** one, `gym_id` is derived from the member, and `signed_at` is always `now()`.
+  - **RLS:** members insert `self` for themselves only; staff insert `guardian`/`paper` only, so a coach can't forge "signed in the app".
+  - **Immutable:** a coach can void a mistaken record once (stamped, never restored), and a partial unique index on live rows lets the member sign again. Rows are never deleted while their member exists. The only other changes allowed are clearing `signer_name` (GDPR) and the FK clearing `created_by`/`voided_by`.
+
+Routes:
+
+- `POST /api/waiver` (owner only, audit-first);
+- `POST /api/waiver/sign` (self, audit best effort, like self check-in);
+- `POST /api/members/[id]/waiver` (coach records, audit-first);
+- `POST /api/waiver-signatures/[id]/void` (audit-first).
+
+All refuse personal workspaces. **Only athletes need to sign**; coaches and owners are exempt, as with fees, because they have no athlete pages to sign from.
+
+Where it shows:
+
+- **Settings → Waiver:** write and publish, with a confirm that everyone re-signs.
+- **Athlete Home:** a prompt leading to `/waiver` (read, type your name, tick).
+- **Member profile → Overview → Waiver:** status, "Parent or guardian signs now", "Record paper waiver", Void.
+- **Flags:** "No waiver" badges on the members list and attendance, a "Waiver not signed" filter (also `/members?waiver=missing`), and a dashboard count linking to it.
+
+GDPR:
+
+- **Erasure:** keeps the signature rows (they show a waiver was agreed, which the gym may need to show later) but clears `signer_name`.
+- **Export:** includes signatures with the version text.
+- **Delete-solo:** deletes a personal workspace's versions after the member cascade.
+
+**Gate.** database-reviewer (BLOCKING): first pass no BLOCKED, and its suggestions were taken: current-version-only signing, void instead of delete, hard immutability triggers, and the name rule moved into the insert trigger so erasure can clear it. The re-check then **BLOCKED** one thing: the new immutability triggers would have rejected the UPDATE that `on delete set null` performs. GDPR erasure deletes the member's auth user after keeping their self-signed signature, so erasure would have failed. Fixed to allow only those FK nullings, and verified live. security + code reviewers: no BLOCKED. Fixed from them:
+
+- coaches were flagged with no way to sign (now exempt);
+- `signed_at` is forced by the DB;
+- Home and the dashboard refresh after sign/publish;
+- `?waiver=missing` waits for the status to load;
+- stable memo dependencies;
+- a short paper-waiver name is validated inline;
+- the no-login copy on the profile.
+
+Live-tested with 28 checks, all using throwaway members:
+
+- publish and refuse, immutability, sign, double-sign, forging (`self` by staff, others by an athlete), guardian/paper, own-only reads;
+- void (stamped, once, can't be undone, re-record afterwards), the superseded-version refusal, audit rows;
+- the erasure path: clear the name, delete the signer's auth user, row kept.
+
+Browser-checked on an emulated iPhone: the athlete prompt, signing and the prompt clearing; the dashboard count, the filtered list, the guardian dialog, Void, and the Settings card. Hand-written types match `supabase gen types`.
+
+Accepted:
+
+- **Typed names are not verified** against the member (inherent to typed-name signing); coaches are trusted and every record is audited.
+- **Direct REST writes** by staff skip the route's audit row, as for other staff-writable tables.
+- **The rehearsal gym keeps a test waiver (version 1).** The live test recorded a paper waiver for the rehearsal owner, and that record is immutable by design.

@@ -9,6 +9,7 @@ import { GymDetailsForm } from "@/components/shared/gym-details-form";
 import { TeamManager } from "@/components/shared/team-manager";
 import { KioskManager } from "@/components/shared/kiosk-manager";
 import { PromotionRulesForm } from "@/components/shared/promotion-rules-form";
+import { WaiverManager } from "@/components/shared/waiver-manager";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -80,6 +81,16 @@ export default async function SettingsPage() {
         </CardHeader>
         <CardContent>
           <TeamManager currentMemberId={member.memberId} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Waiver</CardTitle>
+          <CardDescription>The liability waiver members sign before training.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <WaiverManager />
         </CardContent>
       </Card>
 

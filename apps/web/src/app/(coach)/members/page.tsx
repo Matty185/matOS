@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/table";
 import type { Database } from "@matos/shared";
 import { useMembersOnHold } from "@/hooks/use-members-on-hold";
+import { useWaiverStatus } from "@/hooks/use-waiver-status";
 
 type PaymentStatus = Database["public"]["Enums"]["payment_status"];
 type MembershipPlan = Database["public"]["Enums"]["membership_plan"];
@@ -184,6 +185,8 @@ function PaymentBadge({
 
 export default function MembersPage() {
   const { ids: onHold, isLoading: holdsLoading } = useMembersOnHold();
+  // Flow audit 9.3.
+  const waiverStatus = useWaiverStatus();
   const { data: members, isLoading, error } = useMembers();
   const {
     data: payments,
@@ -195,6 +198,9 @@ export default function MembersPage() {
   const searchParams = useSearchParams();
 
   const [search, setSearch] = useState("");
+  const [waiverMissingOnly, setWaiverMissingOnly] = useState(
+    () => searchParams.get("waiver") === "missing",
+  );
   const [signupFilter, setSignupFilter] = useState<"all" | SignupStatus>(() => {
     const fromUrl = searchParams.get("invite");
     return SIGNUP_FILTER_OPTIONS.some((o) => o.value === fromUrl)
@@ -222,6 +228,16 @@ export default function MembersPage() {
     if (!members) return [];
     return members.filter((m) => {
       if (!showInactive && !m.active) return false;
+      // Applied once the status is known (and only if the gym has a waiver),
+      // so ?waiver=missing never shows an empty list while loading.
+      if (
+        waiverMissingOnly &&
+        !waiverStatus.isLoading &&
+        waiverStatus.waiver &&
+        !waiverStatus.missing(m)
+      ) {
+        return false;
+      }
       if (beltFilter !== "all" && !m.belt.startsWith(beltFilter)) return false;
       if (planFilter !== "all" && m.membership_plan !== planFilter) return false;
       if (signupFilter !== "all" && signupStatus(m, invites?.get(m.id)) !== signupFilter) {
@@ -244,6 +260,8 @@ export default function MembersPage() {
   }, [
     members,
     onHold,
+    waiverMissingOnly,
+    waiverStatus,
     search,
     beltFilter,
     planFilter,
@@ -434,6 +452,15 @@ export default function MembersPage() {
           <Checkbox checked={showInactive} onCheckedChange={(c) => setShowInactive(c === true)} />
           Show inactive
         </label>
+        {waiverStatus.waiver ? (
+          <label className="flex h-11 items-center gap-2 text-sm">
+            <Checkbox
+              checked={waiverMissingOnly}
+              onCheckedChange={(c) => setWaiverMissingOnly(c === true)}
+            />
+            Waiver not signed
+          </label>
+        ) : null}
         {selected.size > 0 ? (
           <Button
             variant="secondary"
@@ -558,6 +585,11 @@ export default function MembersPage() {
                     <SignupBadge status={signupStatus(member, invites?.get(member.id))} />
                   </TableCell>
                   <TableCell>
+                    {waiverStatus.missing(member) ? (
+                      <Badge variant="destructive" className="mb-1 mr-1">
+                        No waiver
+                      </Badge>
+                    ) : null}
                     {member.active ? (
                       onHold.has(member.id) ? (
                         // Flow audit 2.4.

@@ -11,6 +11,7 @@ import {
   Circle,
   CreditCard,
   UserPlus,
+  FileSignature,
 } from "lucide-react";
 import {
   computeReadiness,
@@ -29,6 +30,7 @@ import { trailingMonthWindow, getOverdueMemberIds, billableMembers } from "@/lib
 import { fetchHoldsForWindow } from "@/lib/payments/holds";
 import { getPaymentsTrackedFrom } from "@/lib/payments/tracked-from";
 import { fetchLiveAnnouncements } from "@/lib/announcements/fetch";
+import { fetchCurrentWaiver, fetchSignedMemberIds, needsWaiver } from "@/lib/waivers";
 import { AnnouncementCard, type AnnouncementView } from "@/components/shared/announcement-card";
 import { resolveAuditNames, describeAuditEntry, type AuditLogRow } from "@/lib/audit/format";
 
@@ -231,6 +233,19 @@ async function getDashboardData() {
     }
   }
 
+  // Flow audit 9.3: active members (not owners) who haven't signed the
+  // current waiver. Degrades to none if anything can't be read.
+  let waiverMissing = 0;
+  try {
+    const waiver = await fetchCurrentWaiver(supabase);
+    if (waiver) {
+      const signed = await fetchSignedMemberIds(supabase, waiver.id);
+      waiverMissing = activeMembers.filter((m) => needsWaiver(m) && !signed.has(m.id)).length;
+    }
+  } catch {
+    console.error("[dashboard] couldn't load waiver status");
+  }
+
   // Flow audit 7.1: what members currently see on Home.
   let announcements: AnnouncementView[] = [];
   try {
@@ -244,6 +259,7 @@ async function getDashboardData() {
     announcements,
     todayStr,
     readyForPromotion,
+    waiverMissing,
     teachingToday,
     activeMemberCount: activeMembers.length,
     classesThisWeekCount: (allClasses ?? []).length,
@@ -396,6 +412,20 @@ export default async function DashboardPage() {
             <span className="font-medium">{data.readyForPromotion}</span>{" "}
             {data.readyForPromotion === 1 ? "member is" : "members are"} ready for promotion. Review
             →
+          </span>
+        </Link>
+      ) : null}
+
+      {data.waiverMissing > 0 ? (
+        <Link
+          href="/members?waiver=missing"
+          className="flex min-h-11 items-center gap-2 rounded-md border border-primary/40 bg-primary/5 p-3 text-sm hover:bg-primary/10"
+        >
+          <FileSignature className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+          <span>
+            <span className="font-medium">{data.waiverMissing}</span>{" "}
+            {data.waiverMissing === 1 ? "member hasn't" : "members haven't"} signed the waiver. See
+            who →
           </span>
         </Link>
       ) : null}
