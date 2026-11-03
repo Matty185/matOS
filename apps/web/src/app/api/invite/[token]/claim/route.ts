@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { isStaffRole } from "@/lib/auth/roles";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { apiError } from "@/lib/api/response";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -133,7 +134,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
   // from a link minted by an owner of that gym (or the operator's
   // provisioning script, created_by null). The role route already expires
   // older links on promotion; this catches any path that misses it.
-  if (member.role !== "athlete" && invite.created_by) {
+  if (isStaffRole(member.role) && invite.created_by) {
     const { data: issuer } = await supabase
       .from("members")
       .select("id")

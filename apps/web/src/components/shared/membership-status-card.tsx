@@ -37,10 +37,15 @@ function joinNames(names: string[]): string {
 export function MembershipStatusCard({
   plan,
   summary,
+  childName,
 }: {
   plan: string;
   summary: AthletePaymentSummary;
+  /** A parent viewing a child's card (flow audit 8.2): "Saoirse's" not "Your". */
+  childName?: string;
 }) {
+  const whose = childName ? `${childName}'s` : "Your";
+  const upToDate = childName ? "All up to date." : "You're all up to date.";
   const planLabel = PLAN_LABELS[plan] ?? plan;
 
   if (summary.kind === "not_billable") {
@@ -73,14 +78,14 @@ export function MembershipStatusCard({
         ? `Overdue for ${overdue.length} months, since ${monthName(overdue[overdue.length - 1]!.month, overdue[overdue.length - 1]!.year, true)}. Please talk to your coach.`
         : `Overdue for ${joinNames(overdue.map((m) => monthName(m.month, m.year)))}. Please talk to your coach.`
       : hold?.active
-        ? `Your membership is on hold (${describeHold(hold)}). No fee is due for those months.`
+        ? `${whose} membership is on hold (${describeHold(hold)}). No fee is due for those months.`
         : current?.status === "paid"
-          ? `Paid for ${monthName(current.month, current.year)}. You're all up to date.`
+          ? `Paid for ${monthName(current.month, current.year)}. ${upToDate}`
           : current?.status === "waived"
-            ? `${monthName(current.month, current.year)} is waived. You're all up to date.`
+            ? `${monthName(current.month, current.year)} is waived. ${upToDate}`
             : current
               ? `${monthName(current.month, current.year)} isn't paid yet.`
-              : "You're all up to date.";
+              : upToDate;
 
   return (
     <section

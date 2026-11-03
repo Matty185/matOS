@@ -176,6 +176,7 @@ export const POST = withAuth(
       waiverResult,
       leadsByLinkResult,
       leadsByEmailResult,
+      guardianLinksResult,
     ] = await Promise.all([
       serviceClient.from("attendance").delete().eq("member_id", member.id),
       serviceClient.from("athlete_logs").delete().eq("member_id", member.id),
@@ -223,6 +224,12 @@ export const POST = withAuth(
             // Leads store emails lowercased; an exact match (no wildcards).
             .eq("email", member.email.toLowerCase())
         : Promise.resolve({ error: null }),
+      // Flow audit 8.2: parent links in either direction (the member row is
+      // anonymised, so the cascade never fires).
+      serviceClient
+        .from("member_guardians")
+        .delete()
+        .or(`guardian_member_id.eq.${member.id},child_member_id.eq.${member.id}`),
     ]);
 
     for (const [label, result] of [
@@ -238,6 +245,7 @@ export const POST = withAuth(
       ["waiver_signatures", waiverResult],
       ["trial_leads (converted)", leadsByLinkResult],
       ["trial_leads (email)", leadsByEmailResult],
+      ["member_guardians", guardianLinksResult],
     ] as const) {
       if (result.error) {
         console.error(`[gdpr] failed to clean up ${label}`, result.error);

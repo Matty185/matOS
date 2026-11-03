@@ -241,6 +241,24 @@ export function describeAuditEntry(row: AuditLogRow, ctx: AuditNameContext): str
       return `${actor} replaced the free trial link (the old one stopped working).`;
     case "trial_link.disabled":
       return `${actor} turned off the free trial link.`;
+    case "member.guardian_linked":
+      return `${actor} linked a parent account to ${subjectNameFor(row, ctx)}.`;
+    case "member.guardian_unlinked":
+      return `${actor} removed a parent link from ${subjectNameFor(row, ctx)}.`;
+    case "attendance.guardian_checked_in": {
+      const child =
+        typeof after.member_id === "string"
+          ? (ctx.byMemberId.get(after.member_id) ?? "their child")
+          : "their child";
+      return `${actor} checked ${child} in as their parent.`;
+    }
+    case "waiver.signed_by_guardian": {
+      const child =
+        typeof after.member_id === "string"
+          ? (ctx.byMemberId.get(after.member_id) ?? "their child")
+          : "their child";
+      return `${actor} signed the waiver for ${child} as their parent.`;
+    }
     case "waiver.published":
       return `${actor} published a new version of the gym's waiver.`;
     case "waiver.signed":
@@ -298,7 +316,14 @@ export function describeAuditEntry(row: AuditLogRow, ctx: AuditNameContext): str
       return `${actor} added ${subjectNameFor(row, ctx)} as a coach.`;
     case "team.role_changed": {
       const role = typeof after.role === "string" ? after.role : "";
-      const label = role === "gym_owner" ? "an owner" : role === "coach" ? "a coach" : "an athlete";
+      const label =
+        role === "gym_owner"
+          ? "an owner"
+          : role === "coach"
+            ? "a coach"
+            : role === "guardian"
+              ? "a parent account"
+              : "an athlete";
       return `${actor} made ${subjectNameFor(row, ctx)} ${label}.`;
     }
     case "signup_link.created":

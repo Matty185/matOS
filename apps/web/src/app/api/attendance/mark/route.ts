@@ -25,6 +25,16 @@ import { getGymTimeZone } from "@/lib/time/gym-timezone";
 export const POST = withAuth(
   async (_request, context, input) => {
     const supabase = createClient();
+    // Flow audit 8.2: parent accounts don't train, so they're never marked.
+    const { data: target } = await supabase
+      .from("members")
+      .select("role")
+      .eq("id", input.member_id)
+      .maybeSingle();
+    if (target?.role === "guardian") {
+      return apiError(400, "NOT_A_TRAINING_MEMBER", "Parent accounts can't be marked present.");
+    }
+
     const now = new Date();
     let checkedInAt = input.checked_in_at ?? now.toISOString();
 

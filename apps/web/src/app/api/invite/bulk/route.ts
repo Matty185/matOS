@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isStaffRole } from "@/lib/auth/roles";
 import { withAuth } from "@/lib/auth/withAuth";
 import { apiError } from "@/lib/api/response";
 import { createClient } from "@/lib/supabase/server";
@@ -43,7 +44,7 @@ export const POST = withAuth(
         !m.user_id &&
         !!m.email &&
         m.gym_id === context.gymId &&
-        (m.role === "athlete" || context.role === "gym_owner"),
+        (!isStaffRole(m.role) || context.role === "gym_owner"),
     );
     const skipped = input.member_ids.length - eligible.length;
 

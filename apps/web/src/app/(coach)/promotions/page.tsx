@@ -1,4 +1,5 @@
 import { computeReadiness } from "@matos/shared";
+import { isStaffRole } from "@/lib/auth/roles";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/auth/current-member";
 import {
@@ -22,6 +23,8 @@ export default async function PromotionsPage() {
       .from("members")
       .select("id, first_name, last_name, belt, stripes, role")
       .eq("active", true)
+      // Parent accounts (flow audit 8.2) aren't training members.
+      .neq("role", "guardian")
       .order("first_name"),
     fetchPromotionRule(supabase),
     fetchPromotionProgress(supabase).then(
@@ -53,7 +56,7 @@ export default async function PromotionsPage() {
       name: `${m.first_name} ${m.last_name}`,
       belt: m.belt,
       stripes: m.stripes,
-      isStaff: m.role !== "athlete",
+      isStaff: isStaffRole(m.role),
       sinceLabel: p ? formatGymDate(p.lastPromotedAt, timeZone) : null,
       lastIsInitial: p?.lastIsInitial ?? true,
       readiness,

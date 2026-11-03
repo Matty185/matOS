@@ -115,9 +115,11 @@ function AttendanceTab({ memberId, joinDate }: { memberId: string; joinDate: str
             <span className="text-muted-foreground">
               {row.checked_in_by === "self"
                 ? "Self check-in"
-                : row.checked_in_by === "kiosk"
-                  ? "Kiosk check-in"
-                  : "Marked by coach"}
+                : row.checked_in_by === "guardian"
+                  ? "Checked in by a parent"
+                  : row.checked_in_by === "kiosk"
+                    ? "Kiosk check-in"
+                    : "Marked by coach"}
             </span>
           </li>
         ))}

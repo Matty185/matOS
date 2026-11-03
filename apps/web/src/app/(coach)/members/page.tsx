@@ -547,10 +547,15 @@ export default function MembersPage() {
                     </Link>
                   </TableCell>
                   <TableCell>
-                    <BeltDisplay belt={member.belt} stripes={member.stripes} size="sm" />
+                    {member.role === "guardian" ? (
+                      // Flow audit 8.2: a parent account, not a training member.
+                      <Badge variant="outline">Parent</Badge>
+                    ) : (
+                      <BeltDisplay belt={member.belt} stripes={member.stripes} size="sm" />
+                    )}
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
-                    {PLAN_LABELS[member.membership_plan]}
+                    {member.role === "guardian" ? "—" : PLAN_LABELS[member.membership_plan]}
                   </TableCell>
                   <TableCell>
                     {!isBillable(member) ? (

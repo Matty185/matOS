@@ -3,17 +3,8 @@ import { withAuth } from "@/lib/auth/withAuth";
 import { apiError } from "@/lib/api/response";
 import { createClient } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/audit/log";
-import {
-  checkInSchema,
-  checkInWindow,
-  gymWallClock,
-  DEFAULT_GYM_TIMEZONE,
-  formatSessionDate,
-  sessionRuns,
-  sessionsOnDate,
-  type SessionChange,
-} from "@matos/shared";
-import { fetchSessionChanges } from "@/lib/classes/session-changes";
+import { checkInSchema } from "@matos/shared";
+import { resolveCheckInSession } from "@/lib/attendance/check-in-session";
 
 // Stage M7: how long a queued-offline check-in stays eligible to
 // reconcile. Generous enough to cover a genuinely offline weekend at a
@@ -57,28 +48,13 @@ const CLOCK_SKEW_TOLERANCE_MINUTES = 5;
 // trigger in the same zone, so the route and the stored date always agree.
 export const POST = withAuth(
   async (_request, context, input) => {
+    // Parent accounts (flow audit 8.2) check their children in from Family,
+    // not themselves.
+    if (context.role === "guardian") {
+      return apiError(403, "FORBIDDEN", "Parent accounts check their children in from Family.");
+    }
+
     const supabase = createClient();
-
-    const { data: classRow, error: classError } = await supabase
-      .from("classes")
-      .select("id, day_of_week, start_time, duration_minutes, active")
-      .eq("id", input.class_id)
-      .single();
-
-    if (classError || !classRow) {
-      return apiError(404, "CLASS_NOT_FOUND", "That class doesn't exist.");
-    }
-
-    if (!classRow.active) {
-      return apiError(409, "CLASS_INACTIVE", "This class is no longer active.");
-    }
-
-    const { data: gym } = await supabase
-      .from("gyms")
-      .select("timezone")
-      .eq("id", context.gymId)
-      .single();
-    const timeZone = gym?.timezone ?? DEFAULT_GYM_TIMEZONE;
 
     const receivedAt = new Date();
     let effectiveTime = receivedAt;
@@ -99,45 +75,16 @@ export const POST = withAuth(
       effectiveTime = attempted;
     }
 
-    const local = gymWallClock(effectiveTime, timeZone);
-
-    // Flow audit 3.2: apply one-off changes (cancelled / moved sessions).
-    // Fail closed: if the changes can't be read, don't accept a check-in for
-    // a session that may have been cancelled.
-    let changes: SessionChange[];
-    try {
-      changes = await fetchSessionChanges(supabase, local.date, local.date, classRow.id);
-    } catch {
-      return apiError(500, "CHECK_IN_FAILED", "Something went wrong — check-in wasn't saved.");
-    }
-    const listed = sessionsOnDate([classRow], changes, local.date);
-    const session = listed.find((s) => sessionRuns(s.status));
-    if (!session) {
-      const today = listed[0];
-      if (today?.status === "cancelled") {
-        return apiError(409, "SESSION_CANCELLED", "This class is cancelled today.");
-      }
-      if (today?.status === "moved_away" && today.change?.new_date) {
-        return apiError(
-          409,
-          "SESSION_MOVED",
-          `This class was moved to ${formatSessionDate(today.change.new_date)}.`,
-        );
-      }
-      return apiError(400, "NOT_TODAY", "This class isn't scheduled for today.");
-    }
-
-    const { opens: windowOpenMinutes, closes: windowCloseMinutes } = checkInWindow(
-      session.startTime,
-      classRow.duration_minutes,
+    // Class, today's session (one-off changes applied) and the window, in the
+    // gym's zone — shared with a parent checking a child in (flow audit 8.2).
+    const resolved = await resolveCheckInSession(
+      supabase,
+      context.gymId,
+      input.class_id,
+      effectiveTime,
     );
-
-    if (local.minutesOfDay < windowOpenMinutes) {
-      return apiError(400, "TOO_EARLY", "Check-in opens 30 minutes before class starts.");
-    }
-    if (local.minutesOfDay > windowCloseMinutes) {
-      return apiError(400, "TOO_LATE", "Check-in has closed for this class.");
-    }
+    if (!resolved.ok) return resolved.response;
+    const local = { date: resolved.localDate };
 
     const checkedInAt = effectiveTime.toISOString();
     const { data: created, error: insertError } = await supabase

@@ -16,15 +16,16 @@ export default async function AccountLayout({ children }: { children: React.Reac
   if (!member) redirect("/login");
 
   const isSolo = member.gymKind === "personal";
-  if (member.role !== "athlete" && !isSolo) redirect("/dashboard");
+  const isGuardian = member.role === "guardian";
+  if (member.role !== "athlete" && !isGuardian && !isSolo) redirect("/dashboard");
 
   const memberships = await getUserGymMemberships();
 
   return (
     <AppShell
-      variant={isSolo ? "solo" : "athlete"}
+      variant={isSolo ? "solo" : isGuardian ? "family" : "athlete"}
       memberName={`${member.firstName} ${member.lastName}`}
-      roleLabel={isSolo ? "Personal workspace" : "Athlete"}
+      roleLabel={isSolo ? "Personal workspace" : isGuardian ? "Parent" : "Athlete"}
       memberships={memberships}
     >
       {children}

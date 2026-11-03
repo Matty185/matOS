@@ -15,4 +15,5 @@ export const ROLE_LABEL: Record<Database["public"]["Enums"]["member_role"], stri
   gym_owner: "Owner",
   coach: "Coach",
   athlete: "Athlete",
+  guardian: "Parent",
 };

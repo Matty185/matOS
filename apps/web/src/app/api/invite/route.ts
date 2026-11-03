@@ -1,4 +1,5 @@
 import { withAuth } from "@/lib/auth/withAuth";
+import { isStaffRole } from "@/lib/auth/roles";
 import { apiError } from "@/lib/api/response";
 import { createClient } from "@/lib/supabase/server";
 import { createInvite } from "@/lib/auth/create-invite";
@@ -44,7 +45,7 @@ export const POST = withAuth(
     // Staff invites are owner-only (team management, plan §4) — the DB
     // already blocks a coach *creating* a staff row; this stops a coach
     // minting a claim link for an existing coach/owner row and claiming it.
-    if (member.role !== "athlete" && context.role !== "gym_owner") {
+    if (isStaffRole(member.role) && context.role !== "gym_owner") {
       return apiError(403, "FORBIDDEN", "Only the gym owner can invite coaches.");
     }
 

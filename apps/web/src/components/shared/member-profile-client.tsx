@@ -18,6 +18,7 @@ import { PaymentCellDialog } from "@/components/shared/payment-cell-dialog";
 import { ProfileView } from "@/components/shared/profile-view";
 import { MembershipHolds, useMemberHolds } from "@/components/shared/membership-holds";
 import { MemberWaiver } from "@/components/shared/member-waiver";
+import { MemberGuardians } from "@/components/shared/member-guardians";
 import { holdCovering, holdMonths } from "@/lib/payments/holds";
 import { useGymToday } from "@/hooks/use-gym-today";
 import { PLAN_LABELS } from "@/lib/constants/member-labels";
@@ -184,8 +185,15 @@ export function MemberProfileClient({
               {member.first_name} {member.last_name}
             </h1>
             <div className="flex flex-wrap items-center gap-2">
-              <BeltDisplay belt={member.belt} stripes={member.stripes} size="sm" showLabel />
-              <Badge variant="outline">{PLAN_LABELS[member.membership_plan]}</Badge>
+              {member.role === "guardian" ? (
+                // Flow audit 8.2: a parent account — no belt, no plan.
+                <Badge variant="outline">Parent account</Badge>
+              ) : (
+                <>
+                  <BeltDisplay belt={member.belt} stripes={member.stripes} size="sm" showLabel />
+                  <Badge variant="outline">{PLAN_LABELS[member.membership_plan]}</Badge>
+                </>
+              )}
               {member.active ? (
                 <Badge variant="outline">Active</Badge>
               ) : (
@@ -200,11 +208,13 @@ export function MemberProfileClient({
           <Button asChild variant="outline" className="h-11">
             <Link href={`/members/${member.id}/edit`}>Edit</Link>
           </Button>
-          <PromoteBeltDialog
-            memberId={member.id}
-            currentBelt={member.belt}
-            currentStripes={member.stripes}
-          />
+          {member.role !== "guardian" ? (
+            <PromoteBeltDialog
+              memberId={member.id}
+              currentBelt={member.belt}
+              currentStripes={member.stripes}
+            />
+          ) : null}
           {!isClaimed && member.email && member.active && canManageAccess ? (
             <Button
               variant={latestInvite && !inviteExpired ? "outline" : "default"}
@@ -319,6 +329,12 @@ export function MemberProfileClient({
         </TabsList>
 
         <TabsContent value="overview" className="flex flex-col gap-4 pt-4">
+          <MemberGuardians
+            memberId={member.id}
+            memberName={`${member.first_name} ${member.last_name}`}
+            role={member.role}
+            active={member.active}
+          />
           <MemberWaiver
             memberId={member.id}
             memberName={`${member.first_name} ${member.last_name}`}
@@ -527,9 +543,11 @@ function AttendanceTab({ memberId, joinDate }: { memberId: string; joinDate: str
               <span className="text-muted-foreground">
                 {row.checked_in_by === "self"
                   ? "Self check-in"
-                  : row.checked_in_by === "kiosk"
-                    ? "Kiosk check-in"
-                    : "Marked by coach"}
+                  : row.checked_in_by === "guardian"
+                    ? "Checked in by a parent"
+                    : row.checked_in_by === "kiosk"
+                      ? "Kiosk check-in"
+                      : "Marked by coach"}
               </span>
             </li>
           ))}

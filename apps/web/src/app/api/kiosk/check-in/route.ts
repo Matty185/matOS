@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
     .eq("id", memberId)
     .eq("gym_id", device.gymId)
     .eq("active", true)
+    .neq("role", "guardian")
     .maybeSingle();
   if (!member) return apiError(404, "MEMBER_NOT_FOUND", "That name isn't on the list.");
 

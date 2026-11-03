@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { homePathFor } from "@/lib/auth/roles";
 import { DEFAULT_GYM_TIMEZONE } from "@matos/shared";
 import { getCurrentMember } from "@/lib/auth/current-member";
 import { createClient } from "@/lib/supabase/server";
@@ -13,7 +14,7 @@ export default async function SetupPage() {
   const member = await getCurrentMember();
   if (!member) redirect("/login");
   if (member.gymKind === "personal") redirect("/analysis");
-  if (member.role !== "gym_owner") redirect(member.role === "athlete" ? "/home" : "/dashboard");
+  if (member.role !== "gym_owner") redirect(homePathFor(member.role));
 
   const supabase = createClient();
   const { data: gym } = await supabase

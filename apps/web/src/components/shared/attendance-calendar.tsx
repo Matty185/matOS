@@ -18,7 +18,10 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@matos/shared";
 
-export type AttendanceEntry = { checkedInAt: string; checkedInBy: "self" | "coach" | "kiosk" };
+export type AttendanceEntry = {
+  checkedInAt: string;
+  checkedInBy: "self" | "coach" | "kiosk" | "guardian";
+};
 
 const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -145,9 +148,11 @@ export function AttendanceCalendar({ entries }: { entries: AttendanceEntry[] }) 
                   <span>
                     {entry.checkedInBy === "self"
                       ? "Self check-in"
-                      : entry.checkedInBy === "kiosk"
-                        ? "Kiosk check-in"
-                        : "Marked by coach"}
+                      : entry.checkedInBy === "guardian"
+                        ? "Checked in by a parent"
+                        : entry.checkedInBy === "kiosk"
+                          ? "Kiosk check-in"
+                          : "Marked by coach"}
                   </span>
                 </li>
               ))}

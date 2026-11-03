@@ -202,6 +202,8 @@ function ClassAttendanceCard({
         supabase
           .from("members")
           .select("id, first_name, last_name, role, active")
+          // Parent accounts (flow audit 8.2) don't train.
+          .neq("role", "guardian")
           .order("first_name"),
         supabase
           .from("attendance")
@@ -353,9 +355,11 @@ function ClassAttendanceCard({
                             <span className="text-xs text-muted-foreground">
                               {record.checked_in_by === "self"
                                 ? "Self check-in"
-                                : record.checked_in_by === "kiosk"
-                                  ? "Kiosk check-in"
-                                  : "Marked by coach"}
+                                : record.checked_in_by === "guardian"
+                                  ? "Checked in by a parent"
+                                  : record.checked_in_by === "kiosk"
+                                    ? "Kiosk check-in"
+                                    : "Marked by coach"}
                               {/* Stage M7: offline_queued's read path. */}
                               {record.offline_queued ? " (reconciled offline)" : ""}
                             </span>

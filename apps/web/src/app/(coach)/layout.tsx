@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
+import { homePathFor, isStaffRole } from "@/lib/auth/roles";
 import { getCurrentMember, getUserGymMemberships } from "@/lib/auth/current-member";
 import { AppShell } from "@/components/shared/app-shell";
+import { createClient } from "@/lib/supabase/server";
 import { AgentChat } from "@/components/shared/agent-chat";
 import { ROLE_LABEL } from "@/lib/constants/member-labels";
 
@@ -17,15 +19,22 @@ export default async function CoachLayout({ children }: { children: React.ReactN
   // Log all meaningless for a gym of one. Solo users belong at /analysis
   // (their functional home, per the confirmed S2 scope), not here.
   if (!member) redirect("/login");
-  if (member.role === "athlete") redirect("/home");
+  // Staff only: athletes and parents (guardian role) have their own areas.
+  if (!isStaffRole(member.role)) redirect(homePathFor(member.role));
   if (member.gymKind === "personal") redirect("/analysis");
 
   const memberships = await getUserGymMemberships();
+  // Flow audit 8.2: staff who are also a child's parent get Family too.
+  const { count: childCount } = await createClient()
+    .from("member_guardians")
+    .select("id", { count: "exact", head: true })
+    .eq("guardian_member_id", member.memberId);
 
   return (
     <AppShell
       variant="coach"
       isOwner={member.role === "gym_owner"}
+      hasFamily={(childCount ?? 0) > 0}
       memberName={`${member.firstName} ${member.lastName}`}
       roleLabel={ROLE_LABEL[member.role]}
       memberships={memberships}

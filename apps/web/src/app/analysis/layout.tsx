@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { homePathFor } from "@/lib/auth/roles";
 import { getCurrentMember, getUserGymMemberships } from "@/lib/auth/current-member";
 import { AppShell } from "@/components/shared/app-shell";
 import { AgentChat } from "@/components/shared/agent-chat";
@@ -22,6 +23,8 @@ export default async function AnalysisLayout({ children }: { children: React.Rea
   const member = await getCurrentMember();
 
   if (!member) redirect("/login");
+  // Parents (guardian role) don't use Analysis.
+  if (member.role === "guardian") redirect(homePathFor(member.role));
 
   const isAthlete = member.role === "athlete";
   const isSolo = member.gymKind === "personal";

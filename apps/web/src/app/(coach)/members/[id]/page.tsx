@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { isStaffRole } from "@/lib/auth/roles";
 import { createClient } from "@/lib/supabase/server";
 import { MemberProfileClient } from "@/components/shared/member-profile-client";
 import { getCurrentMember } from "@/lib/auth/current-member";
@@ -55,7 +56,7 @@ export default async function MemberProfilePage({ params }: { params: { id: stri
   const canManageAccess =
     viewer !== null &&
     viewer.memberId !== member.id &&
-    (member.role === "athlete" || viewer.role === "gym_owner");
+    (!isStaffRole(member.role) || viewer.role === "gym_owner");
 
   return (
     <MemberProfileClient

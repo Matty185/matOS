@@ -35,6 +35,8 @@ export async function GET(request: NextRequest) {
         .select("id, first_name, last_name, belt, stripes")
         .eq("gym_id", device.gymId)
         .eq("active", true)
+        // Parent accounts (flow audit 8.2) aren't on the check-in list.
+        .neq("role", "guardian")
         .order("first_name"),
       supabase
         .from("attendance")

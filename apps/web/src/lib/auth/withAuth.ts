@@ -10,9 +10,11 @@ type Role = Database["public"]["Enums"]["member_role"];
 type GymKind = Database["public"]["Enums"]["gym_kind"];
 
 // gym_owner > coach > athlete per CLAUDE.md Rule 3 — a requiredRole of
-// 'coach' also admits 'gym_owner'.
+// 'coach' also admits 'gym_owner'. A guardian (parent account, flow audit
+// 8.2) ranks with athletes: never staff.
 const ROLE_RANK: Record<Role, number> = {
   athlete: 0,
+  guardian: 0,
   coach: 1,
   gym_owner: 2,
 };

@@ -58,7 +58,9 @@ async function getDashboardData() {
       .select(
         "id, first_name, last_name, email, join_date, role, membership_plan, user_id, belt, stripes",
       )
-      .eq("active", true),
+      .eq("active", true)
+      // Parent accounts (flow audit 8.2) aren't training members.
+      .neq("role", "guardian"),
     supabase.from("classes").select("id").eq("active", true),
     supabase
       .from("attendance")

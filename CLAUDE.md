@@ -970,3 +970,54 @@ Accepted:
 - then require email confirmation for invite and sign-up-link accounts, closing the O2/O7 accepted risk.
 
 New and off until the same switch is on: a **"New trial request" email** to the gym's contact email (`lib/email/trial-notification.ts`, called by `POST /api/trial/[code]`). It carries only the visitor's first name and the class they asked for, never their contact details, and it never blocks or fails the request. Not done, because it can't be tested without a real inbox: the Forgot-password page sending reset emails, and the email-confirmation tightening. Both are listed in the checklist.
+
+### 2026-11-04 — Parent accounts managing children (flow audit 8.2) — BUILT, NOT YET MIGRATED
+
+**Status.** Built on branch `p1-parent-accounts`. It needs migrations `20261104120000_guardian_enums.sql` then `20261104120100_guardian_accounts.sql` applied **before** the branch is merged, because the code depends on the new tables, enum values and policies. The user asked for the remaining P1 items to be built in one go without their input, with migrations applied in a batch later, so the defaults below were chosen without them.
+
+**Decision (defaults chosen autonomously).**
+
+- **A parent is a member of the gym.** Either a new member with the new role `guardian` (no training, no fees, no waiver, not on the kiosk or attendance or promotion lists), or an existing member (a parent who trains, a coach, a sibling's parent) linked as a guardian.
+- **`member_guardians`:** links a guardian member to an **athlete** child in the same gym. Many-to-many; coaches and owners create and remove links. Links are deleted automatically when the child stops being an athlete (an AFTER UPDATE OF role trigger) and, on GDPR erasure, in both directions.
+- **What a parent can do, under RLS:**
+  - read their children's member row, attendance, belt history, payments (the app never selects `amount`), holds and waiver signatures;
+  - check a child in (`checked_in_by 'guardian'`, same window and session rules as self check-in through the shared `resolveCheckInSession`);
+  - sign the gym's current waiver for a child (`method 'guardian'`).
+  - Nothing else: no edits to the child, no other members, no staff data.
+  - All guardian policies use `private.my_child_ids()` once per query, and access follows the parent's own active membership.
+- **Parent accounts never check themselves in.** `attendance_insert_self` excludes guardians, and so do the self check-in, kiosk and coach mark routes. Their own row is self-editable only like an athlete's (contact fields). Coaches can (de)activate them.
+- **Staff checks are explicit.** The app had several `role !== "athlete"` tests meaning "staff". They were replaced by `isStaffRole()` (coach or owner): coach layout, root redirect, analysis, setup, invite, bulk invite, claim, reset link, profile access and promotions. withAuth ranks guardian with athletes, so `requiredRole: "coach"` never admits a parent.
+
+Where it shows:
+
+- **`/family`** for parent accounts (Family + Account nav), and as a Family nav item for athletes or staff who are also linked parents. Per child: belt, classes in the last 30 days, today's classes with Check in, the waiver to sign on their behalf, and the Membership card ("Saoirse's membership…").
+- **Member profile → Overview:** "Parents" on an athlete (Add a parent through the `add_guardian` RPC, which atomically reuses an existing member with that email or creates a guardian-role member, then links; Invite to sign up; Remove). "Children" on a parent account.
+- **Members list and profile:** "Parent" instead of belt and plan; no Promote.
+- **Labels:** attendance shows "Checked in by a parent".
+
+Audited: link (audit-first), unlink (audit-first), parent check-in and parent waiver signing (best effort, like self check-in). GDPR export: `guardian_of` and `guardians`.
+
+**Gate.** database + security + code reviewers: no BLOCKED. Fixed from them:
+
+- a parent could edit their own row freely (now the athlete scope);
+- links survived a child being made staff (trigger);
+- parents could check in or sign for a deactivated child via REST (policy);
+- a parent account could check itself in via REST (policy);
+- coaches could mark a parent present (route);
+- per-row `is_guardian_of` became a once-per-query `my_child_ids()`;
+- `add_guardian` input checks and deterministic match;
+- coaches can (de)activate parent accounts;
+- duplicate-link vs duplicate-email errors told apart;
+- the child's export lists their parents;
+- the Family page loads shared data once instead of once per child;
+- staff who are parents get the Family item.
+
+The self check-in refactor was regression-tested live (6/6). Nothing guardian-specific could be run live before the migrations.
+
+Accepted:
+
+- Parents can read their child's full member row (including coach `notes`) and payment `amount` via a direct REST call, the same as athletes reading their own row (Rule 3's amount filter is app-layer). A column grant or view would close it.
+- Guardian check-ins via REST skip the window, like athletes' self check-ins.
+- Self check-in now reports a bad offline timestamp before a bad class (error order only).
+
+**To finish after the migrations:** regenerate and compare `database.ts`, run the parent-account live test and a browser check (parent signs up from the invite, sees Family, checks a child in, signs the waiver), then merge to main and deploy.

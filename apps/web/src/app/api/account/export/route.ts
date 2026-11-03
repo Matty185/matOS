@@ -50,6 +50,8 @@ export const GET = withAuth(async (_request, context) => {
     shareLinks,
     holds,
     waiverSignatures,
+    guardianLinks,
+    myGuardians,
   ] = await Promise.all([
     supabase.from("members").select("*").eq("id", context.memberId).single(),
     supabase.from("attendance").select("*").eq("member_id", context.memberId),
@@ -81,6 +83,16 @@ export const GET = withAuth(async (_request, context) => {
         "method, signer_name, signed_at, voided_at, waiver_versions(version, body, created_at)",
       )
       .eq("member_id", context.memberId),
+    // Flow audit 8.2: the children this account is a parent for.
+    supabase
+      .from("member_guardians")
+      .select("child_member_id, created_at")
+      .eq("guardian_member_id", context.memberId),
+    // ...and this member's own parents (member_guardians_select_child).
+    supabase
+      .from("member_guardians")
+      .select("guardian_member_id, created_at")
+      .eq("child_member_id", context.memberId),
   ]);
 
   const breakdownIds = (breakdowns.data ?? []).map((b) => b.id);
@@ -109,6 +121,8 @@ export const GET = withAuth(async (_request, context) => {
     share_links: shareLinks.data ?? [],
     membership_holds: holds.data ?? [],
     waiver_signatures: waiverSignatures.data ?? [],
+    guardian_of: guardianLinks.data ?? [],
+    guardians: myGuardians.data ?? [],
   };
 
   await writeAuditLog({

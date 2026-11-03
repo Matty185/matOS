@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { isStaffRole } from "@/lib/auth/roles";
 import { withAuth } from "@/lib/auth/withAuth";
 import { apiError } from "@/lib/api/response";
 import { createClient } from "@/lib/supabase/server";
@@ -58,7 +59,7 @@ export const POST = withAuth(
         "This member hasn't set up their account yet — send them an invite link instead.",
       );
     }
-    if (member.role !== "athlete" && context.role !== "gym_owner") {
+    if (isStaffRole(member.role) && context.role !== "gym_owner") {
       return apiError(403, "FORBIDDEN", "Only the gym owner can reset a coach's password.");
     }
 

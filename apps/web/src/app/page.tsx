@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { homePathFor } from "@/lib/auth/roles";
 import { getCurrentMember } from "@/lib/auth/current-member";
 import { createClient } from "@/lib/supabase/server";
 
@@ -32,5 +33,5 @@ export default async function RootPage() {
     if (gym && !gym.onboarding_completed_at && fresh) redirect("/setup");
   }
 
-  redirect(member.role === "athlete" ? "/home" : "/dashboard");
+  redirect(homePathFor(member.role));
 }

@@ -950,6 +950,55 @@ export type Database = {
           },
         ];
       };
+      member_guardians: {
+        Row: {
+          child_member_id: string;
+          created_at: string;
+          created_by: string | null;
+          guardian_member_id: string;
+          gym_id: string;
+          id: string;
+        };
+        Insert: {
+          child_member_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          guardian_member_id: string;
+          gym_id: string;
+          id?: string;
+        };
+        Update: {
+          child_member_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          guardian_member_id?: string;
+          gym_id?: string;
+          id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "member_guardians_child_member_id_fkey";
+            columns: ["child_member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "member_guardians_guardian_member_id_fkey";
+            columns: ["guardian_member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "member_guardians_gym_id_fkey";
+            columns: ["gym_id"];
+            isOneToOne: false;
+            referencedRelation: "gyms";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       members: {
         Row: {
           active: boolean;
@@ -1561,6 +1610,18 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      add_guardian: {
+        Args: {
+          p_child_member_id: string;
+          p_email: string;
+          p_first_name: string;
+          p_last_name: string;
+        };
+        Returns: {
+          created: boolean;
+          guardian_member_id: string;
+        }[];
+      };
       class_coach_names: {
         Args: never;
         Returns: {
@@ -1669,7 +1730,7 @@ export type Database = {
       breakdown_result: "win" | "loss" | "draw";
       breakdown_status: "in_progress" | "complete";
       breakdown_visibility: "private" | "gym";
-      checked_in_by: "self" | "coach" | "kiosk";
+      checked_in_by: "self" | "coach" | "kiosk" | "guardian";
       class_program: "all_levels" | "fundamentals" | "advanced" | "kids" | "teens" | "womens";
       class_session_change_kind: "cancelled" | "moved";
       class_type: "gi" | "no_gi" | "comp" | "open_mat";
@@ -1678,7 +1739,7 @@ export type Database = {
       entitlement_status: "active" | "trialing" | "canceled" | "expired";
       gym_kind: "gym" | "personal";
       initiated_by: "coach_manual" | "agent" | "self_service" | "kiosk";
-      member_role: "gym_owner" | "coach" | "athlete";
+      member_role: "gym_owner" | "coach" | "athlete" | "guardian";
       membership_plan: "monthly" | "casual" | "comp_team";
       payment_status: "paid" | "unpaid" | "waived";
       push_platform: "ios" | "android";
@@ -1835,7 +1896,7 @@ export const Constants = {
       breakdown_result: ["win", "loss", "draw"],
       breakdown_status: ["in_progress", "complete"],
       breakdown_visibility: ["private", "gym"],
-      checked_in_by: ["self", "coach", "kiosk"],
+      checked_in_by: ["self", "coach", "kiosk", "guardian"],
       class_program: ["all_levels", "fundamentals", "advanced", "kids", "teens", "womens"],
       class_session_change_kind: ["cancelled", "moved"],
       class_type: ["gi", "no_gi", "comp", "open_mat"],
@@ -1844,7 +1905,7 @@ export const Constants = {
       entitlement_status: ["active", "trialing", "canceled", "expired"],
       gym_kind: ["gym", "personal"],
       initiated_by: ["coach_manual", "agent", "self_service", "kiosk"],
-      member_role: ["gym_owner", "coach", "athlete"],
+      member_role: ["gym_owner", "coach", "athlete", "guardian"],
       membership_plan: ["monthly", "casual", "comp_team"],
       payment_status: ["paid", "unpaid", "waived"],
       push_platform: ["ios", "android"],

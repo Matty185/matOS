@@ -19,6 +19,7 @@ import {
   Award,
   Megaphone,
   UserPlus,
+  Baby,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@matos/shared";
@@ -63,13 +64,20 @@ const ATHLETE_NAV: NavItem[] = [
 // stays on web for v1" — mobile is the primary solo product; web stays
 // minimal). No Home/Check-In/Attendance/Progress — none of those apply
 // without a real gym to check into or a class schedule to attend.
+// Flow audit 8.2: parent accounts (guardian role) — their children, and
+// their own account. Athletes who are also parents get FAMILY_ITEM added.
+const FAMILY_ITEM: NavItem = { label: "Family", href: "/family", icon: Baby };
+const FAMILY_NAV: NavItem[] = [FAMILY_ITEM, { label: "Account", href: "/account", icon: UserCog }];
+
 const SOLO_NAV: NavItem[] = [
   { label: "Analysis", href: "/analysis", icon: Swords },
   { label: "Account", href: "/account", icon: UserCog },
 ];
 
 type AppShellProps = {
-  variant: "coach" | "athlete" | "solo";
+  variant: "coach" | "athlete" | "solo" | "family";
+  /** A member (athlete or staff) who is also a linked parent: show Family. */
+  hasFamily?: boolean;
   isOwner?: boolean;
   memberName: string;
   roleLabel: string;
@@ -89,6 +97,7 @@ export function AppShell({
   memberName,
   roleLabel,
   memberships,
+  hasFamily,
   children,
 }: AppShellProps) {
   const pathname = usePathname();
@@ -96,12 +105,14 @@ export function AppShell({
 
   const navItems =
     variant === "coach"
-      ? isOwner
-        ? [...COACH_NAV, OWNER_NAV_ITEM]
-        : COACH_NAV
+      ? [...COACH_NAV, ...(hasFamily ? [FAMILY_ITEM] : []), ...(isOwner ? [OWNER_NAV_ITEM] : [])]
       : variant === "solo"
         ? SOLO_NAV
-        : ATHLETE_NAV;
+        : variant === "family"
+          ? FAMILY_NAV
+          : hasFamily
+            ? [...ATHLETE_NAV.slice(0, 1), FAMILY_ITEM, ...ATHLETE_NAV.slice(1)]
+            : ATHLETE_NAV;
 
   function isActive(href: string) {
     return pathname === href || pathname.startsWith(`${href}/`);
