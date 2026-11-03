@@ -952,3 +952,7 @@ Accepted:
 - Erasing a member doesn't find a phone-only request they never converted from.
 - Rate-limit counts are check-then-insert (soft caps).
 - There's no email notification to the gym (no sending domain, audit 7.4), so new requests show on the dashboard and the Trials page.
+
+### 2026-11-03 — Payments grid on a phone (flow audit 6.3)
+
+**Decision.** Below the `md` breakpoint the six-month table (about 700px wide, so it scrolled sideways at 390px) is replaced by one card per member. Each card has the member's name, an Overdue badge when any month in the window is overdue, and the six months as a 3×2 grid of 44px+ buttons that open the same payment dialog. From `md` up the table is unchanged. Both layouts take each month's status from one `cellFor()`, so they can't disagree. No schema change. code-reviewer: no BLOCKED; fixed the screen-reader text for months before joining, plus `role="list"` for VoiceOver. Checked on an emulated iPhone (no overflow, 56px targets, dialog opens) and at 1280px (table only).

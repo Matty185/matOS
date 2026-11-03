@@ -151,6 +151,38 @@ export default function PaymentsPage() {
     queryClient.invalidateQueries({ queryKey: ["payments-grid"] });
   }
 
+  // One month's status for a member, shared by the phone cards and the
+  // desktop table so they can't disagree. null = before they owed anything.
+  function cellFor(member: NonNullable<typeof members>[number], period: MonthPeriod) {
+    const joinMonth = startOfMonth(parseISO(member.join_date));
+    if (new Date(period.year, period.month - 1, 1) < joinMonth) return null;
+    const row = paymentsByKey.get(periodKey(member.id, period));
+    const status: PaymentStatus = row?.status ?? "unpaid";
+    // On hold and not paid: never owed (a payment still wins).
+    const frozenUnpaid = status === "unpaid" && isFrozenMonth(member, period);
+    const overdue = !frozenUnpaid && isOverdue(status, period);
+    const label = frozenUnpaid
+      ? "Frozen"
+      : overdue
+        ? "Overdue"
+        : status === "paid"
+          ? "Paid"
+          : status === "waived"
+            ? "Waived"
+            : "Unpaid";
+    const variant = frozenUnpaid
+      ? ("secondary" as const)
+      : overdue
+        ? ("destructive" as const)
+        : status === "paid"
+          ? ("default" as const)
+          : status === "waived"
+            ? ("secondary" as const)
+            : ("outline" as const);
+    const periodLabel = format(new Date(period.year, period.month - 1), "MMMM yyyy");
+    return { label, variant, periodLabel };
+  }
+
   const isLoading = membersLoading || paymentsLoading || holdsLoading;
   const existingForSelected = selected
     ? (paymentsByKey.get(periodKey(selected.member.id, selected.period)) ?? null)
@@ -256,85 +288,102 @@ export default function PaymentsPage() {
           description="Every active member is paid up or waived for this window."
         />
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Member</TableHead>
-              {monthWindow.map((period) => (
-                <TableHead key={`${period.year}-${period.month}`} className="text-center">
-                  {format(new Date(period.year, period.month - 1), "MMM yyyy")}
-                </TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {visibleMembers.map((member) => {
-              const joinMonth = startOfMonth(parseISO(member.join_date));
-              return (
-                <TableRow key={member.id}>
-                  <TableCell className="whitespace-nowrap font-medium">
+        <>
+          {/* Phones (flow audit 6.3): one card per member with the six months
+              as a 3×2 grid of tap targets — no sideways scrolling at 390px. */}
+          <ul className="flex flex-col gap-3 md:hidden" aria-label="Payments by member" role="list">
+            {visibleMembers.map((member) => (
+              <li key={member.id} className="flex flex-col gap-2 rounded-md border p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium">
                     {member.first_name} {member.last_name}
-                  </TableCell>
+                  </span>
+                  {overdueMemberIds.has(member.id) ? (
+                    <Badge variant="destructive">Overdue</Badge>
+                  ) : null}
+                </div>
+                <div className="grid grid-cols-3 gap-2">
                   {monthWindow.map((period) => {
-                    const periodStart = new Date(period.year, period.month - 1, 1);
-                    const notYetMember = periodStart < joinMonth;
+                    const cell = cellFor(member, period);
+                    const short = format(new Date(period.year, period.month - 1), "MMM");
                     const key = `${member.id}-${period.year}-${period.month}`;
-
-                    if (notYetMember) {
+                    if (!cell) {
                       return (
-                        <TableCell key={key} className="text-center text-muted-foreground">
-                          —
-                        </TableCell>
+                        <div
+                          key={key}
+                          className="flex min-h-11 flex-col items-center justify-center rounded-md bg-muted/40 text-xs text-muted-foreground"
+                        >
+                          <span>{short}</span>
+                          <span aria-hidden="true">—</span>
+                          <span className="sr-only">Not a member yet</span>
+                        </div>
                       );
                     }
-
-                    const row = paymentsByKey.get(periodKey(member.id, period));
-                    const status: PaymentStatus = row?.status ?? "unpaid";
-                    // On hold and not paid: never owed (a payment still wins).
-                    const frozenUnpaid = status === "unpaid" && isFrozenMonth(member, period);
-                    const overdue = !frozenUnpaid && isOverdue(status, period);
-                    const label = frozenUnpaid
-                      ? "Frozen"
-                      : overdue
-                        ? "Overdue"
-                        : status === "paid"
-                          ? "Paid"
-                          : status === "waived"
-                            ? "Waived"
-                            : "Unpaid";
-                    const variant = frozenUnpaid
-                      ? "secondary"
-                      : overdue
-                        ? "destructive"
-                        : status === "paid"
-                          ? "default"
-                          : status === "waived"
-                            ? "secondary"
-                            : "outline";
-
-                    const periodLabel = format(
-                      new Date(period.year, period.month - 1),
-                      "MMMM yyyy",
-                    );
-
                     return (
-                      <TableCell key={key} className="text-center">
-                        <button
-                          type="button"
-                          className="flex h-11 w-full items-center justify-center rounded-md"
-                          aria-label={`${member.first_name} ${member.last_name}, ${periodLabel}: ${label}`}
-                          onClick={() => setSelected({ member, period })}
-                        >
-                          <Badge variant={variant}>{label}</Badge>
-                        </button>
-                      </TableCell>
+                      <button
+                        key={key}
+                        type="button"
+                        className="flex min-h-11 flex-col items-center justify-center gap-1 rounded-md border px-1 py-1.5"
+                        aria-label={`${member.first_name} ${member.last_name}, ${cell.periodLabel}: ${cell.label}`}
+                        onClick={() => setSelected({ member, period })}
+                      >
+                        <span className="text-xs text-muted-foreground">{short}</span>
+                        <Badge variant={cell.variant}>{cell.label}</Badge>
+                      </button>
                     );
                   })}
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Member</TableHead>
+                  {monthWindow.map((period) => (
+                    <TableHead key={`${period.year}-${period.month}`} className="text-center">
+                      {format(new Date(period.year, period.month - 1), "MMM yyyy")}
+                    </TableHead>
+                  ))}
                 </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+              </TableHeader>
+              <TableBody>
+                {visibleMembers.map((member) => (
+                  <TableRow key={member.id}>
+                    <TableCell className="whitespace-nowrap font-medium">
+                      {member.first_name} {member.last_name}
+                    </TableCell>
+                    {monthWindow.map((period) => {
+                      const cell = cellFor(member, period);
+                      const key = `${member.id}-${period.year}-${period.month}`;
+                      if (!cell) {
+                        return (
+                          <TableCell key={key} className="text-center text-muted-foreground">
+                            —
+                          </TableCell>
+                        );
+                      }
+                      return (
+                        <TableCell key={key} className="text-center">
+                          <button
+                            type="button"
+                            className="flex h-11 w-full items-center justify-center rounded-md"
+                            aria-label={`${member.first_name} ${member.last_name}, ${cell.periodLabel}: ${cell.label}`}
+                            onClick={() => setSelected({ member, period })}
+                          >
+                            <Badge variant={cell.variant}>{cell.label}</Badge>
+                          </button>
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
       )}
 
       <PaymentCellDialog
