@@ -145,7 +145,7 @@ export async function executeReadTool(
       let query = supabase
         .from("classes")
         .select(
-          "id, name, class_type, day_of_week, start_time, duration_minutes, max_capacity, active",
+          "id, name, class_type, program, coach_member_id, day_of_week, start_time, duration_minutes, max_capacity, active",
         )
         .order("day_of_week", { ascending: true })
         .order("start_time", { ascending: true });
@@ -182,7 +182,14 @@ export async function executeReadTool(
           (c) => c.classes?.active && dayOfWeekOfDate(c.session_date) === c.classes.day_of_week,
         )
         .map(({ classes, ...rest }) => ({ ...rest, class_name: classes?.name }));
-      return { today, classes: data, one_off_changes_next_14_days: changes };
+      // Flow audit 3.3: the coach's name (active coaches/owners only).
+      const { data: coachNames } = await supabase.rpc("class_coach_names");
+      const coachByClass = new Map((coachNames ?? []).map((c) => [c.class_id, c.coach_name]));
+      const classes = (data ?? []).map((c) => {
+        const { coach_member_id: coachId, ...rest } = c;
+        return { ...rest, coach_name: coachId ? (coachByClass.get(c.id) ?? null) : null };
+      });
+      return { today, classes, one_off_changes_next_14_days: changes };
     }
 
     case "get_belt_history": {

@@ -1,5 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { METRIC_NAMES } from "@matos/shared";
+import { CLASS_PROGRAM_VALUES, METRIC_NAMES } from "@matos/shared";
 
 const BELT_VALUES = [
   "white",
@@ -87,7 +87,7 @@ export const READ_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_classes",
     description:
-      "List the gym's recurring weekly classes, plus any one-off cancelled or moved sessions in the next 14 days (a cancelled session does not run that date).",
+      "List the gym's recurring weekly classes (with programme, e.g. kids or fundamentals, and coach name when set), plus any one-off cancelled or moved sessions in the next 14 days (a cancelled session does not run that date).",
     input_schema: {
       type: "object",
       properties: {
@@ -310,6 +310,11 @@ export const WRITE_TOOLS: Anthropic.Tool[] = [
         start_time: { type: "string", description: "HH:MM, 24-hour." },
         duration_minutes: { type: "integer", minimum: 1, maximum: 600 },
         max_capacity: { type: "integer" },
+        program: {
+          type: "string",
+          enum: [...CLASS_PROGRAM_VALUES],
+          description: "Who the class is for. Defaults to all_levels.",
+        },
       },
       required: ["name", "class_type", "day_of_week", "start_time", "duration_minutes"],
     },
@@ -402,6 +407,7 @@ export const WRITE_TOOL_ENDPOINTS: Record<
       start_time: input.start_time,
       duration_minutes: input.duration_minutes,
       max_capacity: input.max_capacity ?? null,
+      ...(input.program ? { program: input.program } : {}),
     }),
   },
   deactivate_member: {

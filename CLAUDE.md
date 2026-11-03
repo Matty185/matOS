@@ -708,3 +708,30 @@ Accepted:
 - Anyone who can see the screen can read the roster's first names, last initials and belts. Staff are included, because they train too.
 - The kiosk check-in audit is best effort, as for self check-in.
 - `/api/kiosk/activate` isn't rate-limited (the secret is 256-bit).
+
+### 2026-11-03 — Coach and programme on classes (flow audit 3.3, 3.4)
+
+**Context.** A class had no instructor, and kids, fundamentals and advanced classes could only be told apart by their name. `class_type` (gi / no-gi / comp / open mat) says what is trained, not who it is for.
+
+**Decision.** Migration `20261103120000`:
+
+- `classes.coach_member_id`: optional, `on delete set null`. A trigger (`classes_check_coach`, SECURITY DEFINER) requires an active coach or owner of the same gym whenever the coach or the gym changes, locking the coach's row (`for share`) so a deactivation can't commit in between. RLS alone can't enforce this, because `classes_update_staff` lets a coach write any column. The routes map the trigger's 22023 to `400 INVALID_COACH`.
+- `classes.program`: a fixed enum (`all_levels`, `fundamentals`, `advanced`, `kids`, `teens`, `womens`), default `all_levels`. It is not per-gym; the class name still carries the gym's own wording.
+- `class_coach_names()` (SECURITY DEFINER, authenticated only): class id → coach's name for the caller's gym, active coaches and owners only. Athletes can't read other members' rows, so this is how they see who teaches, without gaining any access to staff records.
+
+Where it shows:
+
+- **Class form:** Programme and Coach pickers.
+- **Classes list and coach Attendance:** a programme badge (unless All levels) and the coach's name.
+- **Athlete Home and Check-in:** the same.
+- **Coach Dashboard:** "You're teaching today", from the classes the signed-in member coaches, with one-off changes (3.2) applied, linking to Attendance.
+- **Assistant:** `get_classes` returns programme and coach name; `create_class` accepts a programme.
+- **GDPR erasure** clears the erased member from any class they coached.
+
+**Gate.** security + database + code reviewers: no BLOCKED. Fixed: the row lock in the trigger, badge rows wrap on phones, the class form scrolls in short viewports, the coach picker shows "Loading coaches..." until staff arrive (an assigned coach would otherwise look unset), "No coach set" only once the gym has assigned any coach, labelled pickers, staff list refetched on every mount. Live-tested (16 checks: invalid coaches refused through the route and direct REST, defaults, PATCH preserving and clearing, RPC scoping, anonymous refused, a deactivated coach hidden) and checked in an emulated iPhone on every screen above.
+
+Accepted:
+
+- A class keeps its coach when that person is deactivated or demoted. It isn't shown to athletes while they're inactive, coaches see "(no longer active)", and reactivation restores it.
+- The assistant can set a programme but not a coach (no name-to-member resolution for it yet).
+- The GDPR export doesn't list classes a member taught (it's gym timetable data, not data about them).

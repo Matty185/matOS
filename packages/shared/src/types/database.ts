@@ -563,37 +563,50 @@ export type Database = {
         Row: {
           active: boolean;
           class_type: Database["public"]["Enums"]["class_type"];
+          coach_member_id: string | null;
           day_of_week: number;
           duration_minutes: number;
           gym_id: string;
           id: string;
           max_capacity: number | null;
           name: string;
+          program: Database["public"]["Enums"]["class_program"];
           start_time: string;
         };
         Insert: {
           active?: boolean;
           class_type: Database["public"]["Enums"]["class_type"];
+          coach_member_id?: string | null;
           day_of_week: number;
           duration_minutes: number;
           gym_id: string;
           id?: string;
           max_capacity?: number | null;
           name: string;
+          program?: Database["public"]["Enums"]["class_program"];
           start_time: string;
         };
         Update: {
           active?: boolean;
           class_type?: Database["public"]["Enums"]["class_type"];
+          coach_member_id?: string | null;
           day_of_week?: number;
           duration_minutes?: number;
           gym_id?: string;
           id?: string;
           max_capacity?: number | null;
           name?: string;
+          program?: Database["public"]["Enums"]["class_program"];
           start_time?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "classes_coach_member_id_fkey";
+            columns: ["coach_member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "classes_gym_id_fkey";
             columns: ["gym_id"];
@@ -1313,6 +1326,13 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      class_coach_names: {
+        Args: never;
+        Returns: {
+          class_id: string;
+          coach_name: string;
+        }[];
+      };
       current_member: {
         Args: never;
         Returns: {
@@ -1415,6 +1435,7 @@ export type Database = {
       breakdown_status: "in_progress" | "complete";
       breakdown_visibility: "private" | "gym";
       checked_in_by: "self" | "coach" | "kiosk";
+      class_program: "all_levels" | "fundamentals" | "advanced" | "kids" | "teens" | "womens";
       class_session_change_kind: "cancelled" | "moved";
       class_type: "gi" | "no_gi" | "comp" | "open_mat";
       entitlement_plan: "solo" | "gym";
@@ -1576,6 +1597,7 @@ export const Constants = {
       breakdown_status: ["in_progress", "complete"],
       breakdown_visibility: ["private", "gym"],
       checked_in_by: ["self", "coach", "kiosk"],
+      class_program: ["all_levels", "fundamentals", "advanced", "kids", "teens", "womens"],
       class_session_change_kind: ["cancelled", "moved"],
       class_type: ["gi", "no_gi", "comp", "open_mat"],
       entitlement_plan: ["solo", "gym"],

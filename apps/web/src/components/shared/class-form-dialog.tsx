@@ -4,7 +4,13 @@ import { useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { createClassSchema, editClassSchema } from "@matos/shared";
+import {
+  CLASS_PROGRAM_LABELS,
+  createClassSchema,
+  editClassSchema,
+  type ClassProgram,
+} from "@matos/shared";
+import { useGymStaff } from "@/hooks/use-gym-staff";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,7 +43,12 @@ type ClassFormValues = {
   duration_minutes: number;
   max_capacity?: number | null;
   active?: boolean;
+  coach_member_id?: string | null;
+  program?: ClassProgram;
 };
+
+/** Radix Select can't use "" as a value. */
+const NO_COACH = "none";
 
 type ClassFormDialogProps =
   | { mode: "create"; onSaved: () => void; trigger?: never }
@@ -46,6 +57,7 @@ type ClassFormDialogProps =
 export function ClassFormDialog(props: ClassFormDialogProps) {
   const isEdit = props.mode === "edit";
   const [open, setOpen] = useState(false);
+  const { data: staff, isPending: staffPending } = useGymStaff();
 
   const {
     register,
@@ -57,7 +69,13 @@ export function ClassFormDialog(props: ClassFormDialogProps) {
     resolver: zodResolver(isEdit ? editClassSchema : createClassSchema) as never,
     defaultValues: isEdit
       ? props.defaultValues
-      : { class_type: "gi", day_of_week: 1, duration_minutes: 60 },
+      : {
+          class_type: "gi",
+          day_of_week: 1,
+          duration_minutes: 60,
+          coach_member_id: null,
+          program: "all_levels",
+        },
   });
 
   async function onSubmit(data: ClassFormValues) {
@@ -94,7 +112,7 @@ export function ClassFormDialog(props: ClassFormDialogProps) {
           <Button className="h-11">Add class</Button>
         )}
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit class" : "Add class"}</DialogTitle>
           <DialogDescription>
@@ -128,6 +146,67 @@ export function ClassFormDialog(props: ClassFormDialogProps) {
                 </Select>
               )}
             />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="class-program">Programme</Label>
+            <Controller
+              name="program"
+              control={control}
+              render={({ field }) => (
+                <Select value={field.value ?? "all_levels"} onValueChange={field.onChange}>
+                  <SelectTrigger id="class-program" className="h-11">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(CLASS_PROGRAM_LABELS).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="class-coach">Coach (optional)</Label>
+            <Controller
+              name="coach_member_id"
+              control={control}
+              render={({ field }) => {
+                // Active coaches and owners, plus whoever is assigned now, so
+                // an edit doesn't silently show "No coach" for someone who
+                // has since left.
+                const options = (staff ?? []).filter((s) => s.active || s.id === field.value);
+                return (
+                  <Select
+                    value={field.value ?? NO_COACH}
+                    onValueChange={(v) => field.onChange(v === NO_COACH ? null : v)}
+                    // Until the staff list arrives an assigned coach has no
+                    // matching option and the trigger would look empty.
+                    disabled={staffPending}
+                  >
+                    <SelectTrigger id="class-coach" className="h-11">
+                      {staffPending ? <span>Loading coaches...</span> : <SelectValue />}
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_COACH}>No coach</SelectItem>
+                      {options.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.first_name} {s.last_name}
+                          {!s.active ? " (no longer active)" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                );
+              }}
+            />
+            {errors.coach_member_id ? (
+              <p className="text-sm text-destructive">{errors.coach_member_id.message}</p>
+            ) : null}
           </div>
 
           <div className="flex flex-col gap-1.5">

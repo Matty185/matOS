@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { BeltDisplay } from "@/components/shared/belt-display";
 import { EmptyState } from "@/components/shared/empty-state";
 import {
+  CLASS_PROGRAM_LABELS,
   addDaysToDate,
   computeAttendanceStreak,
   computeUpcomingClasses,
@@ -60,6 +61,10 @@ export default async function AthleteHomePage() {
   } catch {
     console.error("[home] couldn't load announcements");
   }
+
+  // Flow audit 3.3: coach names (athletes can't read staff rows directly).
+  const { data: coachRows } = await supabase.rpc("class_coach_names");
+  const coachByClass = new Map((coachRows ?? []).map((r) => [r.class_id, r.coach_name]));
 
   const streak = computeAttendanceStreak((attendanceRows ?? []).map((a) => a.checked_in_date));
   const upcoming = computeUpcomingClasses(classRows ?? [], { fromDate: today, changes, cap: 6 });
@@ -122,6 +127,10 @@ export default async function AthleteHomePage() {
                     <span className="text-muted-foreground">
                       {date === today ? "Today" : formatSessionDate(date)} ·{" "}
                       {formatClassTime(startTime)} · {CLASS_TYPE_LABELS[classRow.class_type]}
+                      {classRow.program !== "all_levels"
+                        ? ` · ${CLASS_PROGRAM_LABELS[classRow.program]}`
+                        : ""}
+                      {coachByClass.get(classRow.id) ? ` · ${coachByClass.get(classRow.id)}` : ""}
                     </span>
                     {label ? (
                       <span className="text-muted-foreground">

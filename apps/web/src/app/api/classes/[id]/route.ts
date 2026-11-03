@@ -26,9 +26,15 @@ export const PATCH = withAuth(
         duration_minutes: input.duration_minutes,
         max_capacity: input.max_capacity ?? null,
         active: input.active,
+        // Flow audit 3.3/3.4: left as stored when the caller omits them.
+        ...(input.coach_member_id !== undefined ? { coach_member_id: input.coach_member_id } : {}),
+        ...(input.program !== undefined ? { program: input.program } : {}),
       })
       .eq("id", id);
 
+    if (updateError?.code === "22023") {
+      return apiError(400, "INVALID_COACH", "Pick an active coach or owner from your gym.");
+    }
     if (updateError) {
       return apiError(
         500,

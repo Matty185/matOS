@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
+  CLASS_PROGRAM_LABELS,
   addDaysToDate,
   describeSessionChange,
   formatClassTime,
@@ -87,7 +88,7 @@ export default function CheckInPage() {
       // All active classes, not just today's weekday: a session moved onto
       // today (flow audit 3.2) can belong to a class that usually runs on
       // another day.
-      const [classesRes, attendanceRes, changesRes] = await Promise.all([
+      const [classesRes, attendanceRes, changesRes, coachRes] = await Promise.all([
         supabase.from("classes").select("*").eq("active", true),
         supabase
           .from("attendance")
@@ -99,6 +100,8 @@ export default function CheckInPage() {
           .select("id, class_id, session_date, kind, new_date, new_start_time, note")
           .gte("session_date", addDaysToDate(date, -6))
           .lte("session_date", addDaysToDate(date, 6)),
+        // Flow audit 3.3: coach names (athletes can't read staff rows).
+        supabase.rpc("class_coach_names"),
       ]);
       if (classesRes.error) throw classesRes.error;
       if (attendanceRes.error) throw attendanceRes.error;
@@ -107,6 +110,9 @@ export default function CheckInPage() {
       return {
         sessions: sessionsOnDate(classesRes.data, changesRes.data as SessionChange[], date),
         checkedInClassIds: new Set(attendanceRes.data.map((a) => a.class_id)),
+        coachByClass: new Map(
+          (coachRes.data ?? []).map((row) => [row.class_id, row.coach_name] as const),
+        ),
       };
     },
   });
@@ -188,9 +194,13 @@ export default function CheckInPage() {
                     {c.name}
                   </span>
                   <Badge variant="outline">{CLASS_TYPE_LABELS[c.class_type]}</Badge>
+                  {c.program !== "all_levels" ? (
+                    <Badge variant="secondary">{CLASS_PROGRAM_LABELS[c.program]}</Badge>
+                  ) : null}
                 </div>
                 <span className="text-sm text-muted-foreground">
                   {formatClassTime(session.startTime)} · {c.duration_minutes} min
+                  {data.coachByClass.get(c.id) ? ` · ${data.coachByClass.get(c.id)}` : ""}
                 </span>
                 {changeLabel ? (
                   <span className="text-sm text-muted-foreground">

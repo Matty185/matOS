@@ -3,6 +3,26 @@ import { agentQueryField } from "./agent";
 
 const CLASS_TYPE_VALUES = ["gi", "no_gi", "comp", "open_mat"] as const;
 
+// Flow audit 3.4: which group a class is for. Fixed list; the class name
+// carries the gym's own wording.
+export const CLASS_PROGRAM_VALUES = [
+  "all_levels",
+  "fundamentals",
+  "advanced",
+  "kids",
+  "teens",
+  "womens",
+] as const;
+export type ClassProgram = (typeof CLASS_PROGRAM_VALUES)[number];
+export const CLASS_PROGRAM_LABELS: Record<ClassProgram, string> = {
+  all_levels: "All levels",
+  fundamentals: "Fundamentals",
+  advanced: "Advanced",
+  kids: "Kids",
+  teens: "Teens",
+  womens: "Women's",
+};
+
 export const createClassSchema = z.object({
   name: z.string().trim().min(1, "Class name is required.").max(100),
   class_type: z.enum(CLASS_TYPE_VALUES),
@@ -10,6 +30,11 @@ export const createClassSchema = z.object({
   start_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Enter a valid time (HH:MM)."),
   duration_minutes: z.number().int().min(1).max(600),
   max_capacity: z.number().int().min(1).max(500).nullable().optional(),
+  // Flow audit 3.3/3.4. Optional so older callers (setup wizard, assistant)
+  // keep working: omitted on create means no coach / all levels; omitted on
+  // edit leaves the stored value alone.
+  coach_member_id: z.string().uuid().nullable().optional(),
+  program: z.enum(CLASS_PROGRAM_VALUES).optional(),
   agent_query: agentQueryField,
 });
 

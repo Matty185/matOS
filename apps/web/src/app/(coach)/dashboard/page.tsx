@@ -12,7 +12,14 @@ import {
   CreditCard,
   UserPlus,
 } from "lucide-react";
-import { computeReadiness, gymWallClock } from "@matos/shared";
+import {
+  computeReadiness,
+  formatClassTime,
+  gymWallClock,
+  sessionRuns,
+  sessionsOnDate,
+} from "@matos/shared";
+import { fetchSessionChanges } from "@/lib/classes/session-changes";
 import { fetchPromotionProgress, fetchPromotionRule } from "@/lib/promotions/readiness";
 import { createClient } from "@/lib/supabase/server";
 import { DismissSetupButton } from "@/components/shared/dismiss-setup-button";
@@ -198,6 +205,27 @@ async function getDashboardData() {
     );
   }).length;
 
+  // Flow audit 3.3: the signed-in coach's own classes today (one-off
+  // changes applied). Degrades to none if anything can't be read.
+  let teachingToday: { id: string; name: string; startTime: string }[] = [];
+  if (member) {
+    try {
+      const { data: mine } = await supabase
+        .from("classes")
+        .select("*")
+        .eq("active", true)
+        .eq("coach_member_id", member.memberId);
+      if (mine && mine.length > 0) {
+        const changes = await fetchSessionChanges(supabase, todayStr, todayStr);
+        teachingToday = sessionsOnDate(mine, changes, todayStr)
+          .filter((s) => sessionRuns(s.status))
+          .map((s) => ({ id: s.classRow.id, name: s.classRow.name, startTime: s.startTime }));
+      }
+    } catch {
+      console.error("[dashboard] couldn't load the coach's classes");
+    }
+  }
+
   // Flow audit 7.1: what members currently see on Home.
   let announcements: AnnouncementView[] = [];
   try {
@@ -211,6 +239,7 @@ async function getDashboardData() {
     announcements,
     todayStr,
     readyForPromotion,
+    teachingToday,
     activeMemberCount: activeMembers.length,
     classesThisWeekCount: (allClasses ?? []).length,
     checkInsToday: checkInsToday ?? 0,
@@ -241,6 +270,27 @@ export default async function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="font-heading text-3xl tracking-wide">Dashboard</h1>
+
+      {data.teachingToday.length > 0 ? (
+        <section
+          className="flex flex-col gap-2 rounded-md border p-4"
+          aria-labelledby="teaching-heading"
+        >
+          <h2 id="teaching-heading" className="text-lg font-medium">
+            You&apos;re teaching today
+          </h2>
+          <ul className="flex flex-col gap-1 text-sm">
+            {data.teachingToday.map((c) => (
+              <li key={c.id}>
+                {formatClassTime(c.startTime)} · {c.name}
+              </li>
+            ))}
+          </ul>
+          <Button asChild variant="outline" className="h-11 self-start">
+            <Link href="/attendance">Take attendance</Link>
+          </Button>
+        </section>
+      ) : null}
 
       {data.announcements.length > 0 ? (
         <section className="flex flex-col gap-2" aria-labelledby="dash-announcements-heading">

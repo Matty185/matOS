@@ -21,6 +21,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
+  CLASS_PROGRAM_LABELS,
   formatClassTime,
   formatSessionDate,
   type Database,
@@ -28,6 +29,7 @@ import {
 } from "@matos/shared";
 import { SessionChangeDialog } from "@/components/shared/session-change-dialog";
 import { useGymToday } from "@/hooks/use-gym-today";
+import { useGymStaff } from "@/hooks/use-gym-staff";
 
 type ClassRow = Database["public"]["Tables"]["classes"]["Row"];
 
@@ -88,6 +90,9 @@ function useUpcomingChanges(today: string | null) {
 export default function ClassesPage() {
   const { data: classes, isLoading, error } = useClasses();
   const today = useGymToday();
+  const { data: staff } = useGymStaff();
+  const staffById = useMemo(() => new Map((staff ?? []).map((s) => [s.id, s])), [staff]);
+  const anyCoachSet = (classes ?? []).some((c) => c.coach_member_id);
   const { data: changes, error: changesError } = useUpcomingChanges(today);
   const queryClient = useQueryClient();
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -101,6 +106,17 @@ export default function ClassesPage() {
     }
     return groups;
   }, [classes]);
+
+  // Flow audit 3.3: " · Coach Name", flagging a coach who has left.
+  function coachLabel(coachId: string | null) {
+    if (!staff) return "";
+    // "No coach set" only once the gym uses coaches at all, so gyms that
+    // don't aren't told about it on every class.
+    if (!coachId) return anyCoachSet ? " · No coach set" : "";
+    const coach = staffById.get(coachId);
+    if (!coach) return "";
+    return ` · ${coach.first_name} ${coach.last_name}${coach.active ? "" : " (no longer active)"}`;
+  }
 
   function refetch() {
     queryClient.invalidateQueries({ queryKey: ["classes"] });
@@ -240,14 +256,18 @@ export default function ClassesPage() {
                       className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3"
                     >
                       <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="font-medium">{c.name}</span>
                           <Badge variant="outline">{CLASS_TYPE_LABELS[c.class_type]}</Badge>
+                          {c.program !== "all_levels" ? (
+                            <Badge variant="secondary">{CLASS_PROGRAM_LABELS[c.program]}</Badge>
+                          ) : null}
                           {!c.active ? <Badge variant="secondary">Inactive</Badge> : null}
                         </div>
                         <span className="text-sm text-muted-foreground">
                           {formatTime(c.start_time)} · {c.duration_minutes} min
                           {c.max_capacity ? ` · max ${c.max_capacity}` : ""}
+                          {coachLabel(c.coach_member_id)}
                         </span>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -270,6 +290,8 @@ export default function ClassesPage() {
                             duration_minutes: c.duration_minutes,
                             max_capacity: c.max_capacity,
                             active: c.active,
+                            coach_member_id: c.coach_member_id,
+                            program: c.program,
                           }}
                           onSaved={refetch}
                         />

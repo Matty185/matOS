@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { CalendarCheck, ChevronDown, Search } from "lucide-react";
 import {
+  CLASS_PROGRAM_LABELS,
   addDaysToDate,
   describeSessionChange,
   formatClassTime,
@@ -15,6 +16,7 @@ import {
   type SessionChange,
 } from "@matos/shared";
 import { useGymToday } from "@/hooks/use-gym-today";
+import { useGymStaff } from "@/hooks/use-gym-staff";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
@@ -49,6 +51,8 @@ export default function AttendancePage() {
   const [pickedDate, setPickedDate] = useState<string | null>(null);
   const selectedDate = pickedDate ?? gymToday;
   const queryClient = useQueryClient();
+  const { data: staff } = useGymStaff();
+  const staffById = useMemo(() => new Map((staff ?? []).map((s) => [s.id, s])), [staff]);
 
   // Flow audit 3.2: the date's sessions with one-off changes applied. All
   // active classes are needed: a session moved onto this date can belong to a
@@ -129,6 +133,12 @@ export default function AttendancePage() {
                 key={`${session.classRow.id}-run`}
                 session={session}
                 date={selectedDate}
+                coachName={(() => {
+                  const coach = session.classRow.coach_member_id
+                    ? staffById.get(session.classRow.coach_member_id)
+                    : undefined;
+                  return coach ? `${coach.first_name} ${coach.last_name}` : null;
+                })()}
               />
             ) : (
               <ChangedSessionCard key={`${session.classRow.id}-off`} session={session} />
@@ -161,7 +171,15 @@ function ChangedSessionCard({ session }: { session: ClassSession<ClassRow> }) {
   );
 }
 
-function ClassAttendanceCard({ session, date }: { session: ClassSession<ClassRow>; date: string }) {
+function ClassAttendanceCard({
+  session,
+  date,
+  coachName,
+}: {
+  session: ClassSession<ClassRow>;
+  date: string;
+  coachName: string | null;
+}) {
   const classRow = session.classRow;
   const [expanded, setExpanded] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -269,14 +287,20 @@ function ClassAttendanceCard({ session, date }: { session: ClassSession<ClassRow
         className="flex min-h-11 w-full items-center justify-between gap-3 p-3 text-left"
       >
         <div className="flex min-w-0 flex-col gap-1">
-          <div className="flex min-w-0 items-center gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <span className="truncate font-medium">{classRow.name}</span>
             <Badge variant="outline" className="shrink-0">
               {CLASS_TYPE_LABELS[classRow.class_type]}
             </Badge>
+            {classRow.program !== "all_levels" ? (
+              <Badge variant="secondary" className="shrink-0">
+                {CLASS_PROGRAM_LABELS[classRow.program]}
+              </Badge>
+            ) : null}
           </div>
           <span className="text-sm text-muted-foreground">
             {formatClassTime(session.startTime)} · {classRow.duration_minutes} min
+            {coachName ? ` · ${coachName}` : ""}
             {session.status === "moved_in" ? ` · ${describeSessionChange(session)}` : ""}
           </span>
         </div>

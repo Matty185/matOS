@@ -171,6 +171,7 @@ export const POST = withAuth(
       beltHistoryResult,
       pushTokensResult,
       notificationsResult,
+      classCoachResult,
     ] = await Promise.all([
       serviceClient.from("attendance").delete().eq("member_id", member.id),
       serviceClient.from("athlete_logs").delete().eq("member_id", member.id),
@@ -191,6 +192,11 @@ export const POST = withAuth(
       // deletion, not this member's, so that PII survives the anonymisation
       // above untouched and indefinitely unless swept here explicitly.
       serviceClient.from("notifications").delete().eq("payload->>member_id", member.id),
+      // Flow audit 3.3: an erased coach stops being named as a class's coach.
+      serviceClient
+        .from("classes")
+        .update({ coach_member_id: null })
+        .eq("coach_member_id", member.id),
     ]);
 
     for (const [label, result] of [
@@ -201,6 +207,7 @@ export const POST = withAuth(
       ["belt_history", beltHistoryResult],
       ["push_tokens", pushTokensResult],
       ["notifications", notificationsResult],
+      ["classes.coach_member_id", classCoachResult],
     ] as const) {
       if (result.error) {
         console.error(`[gdpr] failed to clean up ${label}`, result.error);
