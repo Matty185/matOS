@@ -187,7 +187,7 @@ export default function CheckInPage() {
               className={`flex flex-col gap-3 rounded-md border p-4 sm:flex-row sm:items-center sm:justify-between ${runs ? "" : "border-dashed"}`}
             >
               <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span
                     className={`font-medium ${runs ? "" : "text-muted-foreground line-through"}`}
                   >

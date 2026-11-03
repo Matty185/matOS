@@ -51,6 +51,7 @@ const OWNER_NAV_ITEM: NavItem = { label: "Settings", href: "/settings", icon: Se
 const ATHLETE_NAV: NavItem[] = [
   { label: "Home", href: "/home", icon: Home },
   { label: "Check In", href: "/check-in", icon: CalendarCheck },
+  { label: "Timetable", href: "/timetable", icon: CalendarDays },
   { label: "My Progress", href: "/progress", icon: TrendingUp },
   { label: "Analysis", href: "/analysis", icon: Swords },
   { label: "Account", href: "/account", icon: UserCog },

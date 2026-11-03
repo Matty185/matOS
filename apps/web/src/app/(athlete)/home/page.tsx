@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { CalendarDays, Flame } from "lucide-react";
 import { getCurrentMember } from "@/lib/auth/current-member";
 import { createClient } from "@/lib/supabase/server";
@@ -100,7 +101,15 @@ export default async function AthleteHomePage() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <h2 className="text-lg font-medium">Upcoming classes</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-lg font-medium">Upcoming classes</h2>
+          <Link
+            href="/timetable"
+            className="inline-flex h-11 items-center text-sm font-medium text-primary underline-offset-4 hover:underline"
+          >
+            Full timetable
+          </Link>
+        </div>
         {upcoming.length === 0 ? (
           <EmptyState
             icon={CalendarDays}
