@@ -22,6 +22,7 @@ import {
   classUpdateChangesAnything,
 } from "@/lib/agent/class-proposals";
 import { trailingMonthWindow, getOverdueMemberIds, billableMembers } from "@/lib/payments/overdue";
+import { fetchHoldsForWindow } from "@/lib/payments/holds";
 import { getPaymentsTrackedFrom } from "@/lib/payments/tracked-from";
 
 const RATE_LIMIT_WARNING_AT = 40;
@@ -113,7 +114,11 @@ export const POST = withAuth(
         .lte("period_year", maxYear),
     ]);
     const overdueCount = getOverdueMemberIds(
-      billableMembers(overdueMembers ?? [], await getPaymentsTrackedFrom(supabase)),
+      billableMembers(
+        overdueMembers ?? [],
+        await getPaymentsTrackedFrom(supabase),
+        await fetchHoldsForWindow(supabase, overdueWindow),
+      ),
       overduePayments ?? [],
       overdueWindow,
     ).size;

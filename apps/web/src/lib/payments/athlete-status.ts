@@ -1,11 +1,13 @@
 import { parseISO, startOfMonth } from "date-fns";
 import {
   billableMembers,
+  isFrozenMonth,
   isOverdue,
   trailingMonthWindow,
   type MonthPeriod,
   type PaymentStatus,
 } from "./overdue";
+import { holdCovering, monthStartOf } from "./holds";
 
 // Flow audit 6.4: an athlete's own monthly payment status, for athlete Home.
 // Uses the same rules as the coach payments grid (isBillable, the gym's
@@ -13,7 +15,9 @@ import {
 // takes or returns an amount (CLAUDE.md Rule 3): callers select only
 // period_month, period_year and status.
 
-export type AthleteMonthStatus = "paid" | "waived" | "overdue" | "due";
+export type AthleteMonthStatus = "paid" | "waived" | "frozen" | "overdue" | "due";
+
+type HoldSpan = { start_month: string; end_month: string };
 
 export type AthleteMonth = MonthPeriod & { status: AthleteMonthStatus };
 
@@ -24,6 +28,8 @@ export type AthletePaymentSummary =
       months: AthleteMonth[];
       overdue: AthleteMonth[];
       current: AthleteMonth | null;
+      /** The hold covering today, else the next upcoming one (flow audit 2.4). */
+      hold: (HoldSpan & { active: boolean }) | null;
     };
 
 type MemberFields = {
@@ -51,8 +57,9 @@ export function summariseAthletePayments(
   payments: PaymentFields[],
   paymentsTrackedFrom: string | null,
   today: string,
+  holds: (HoldSpan & { member_id: string })[],
 ): AthletePaymentSummary {
-  const [billable] = billableMembers([member], paymentsTrackedFrom);
+  const [billable] = billableMembers([member], paymentsTrackedFrom, holds);
   if (!billable) {
     return {
       kind: "not_billable",
@@ -75,9 +82,11 @@ export function summariseAthletePayments(
           ? "paid"
           : stored === "waived"
             ? "waived"
-            : isOverdue(stored, p, now)
-              ? "overdue"
-              : "due";
+            : isFrozenMonth(billable, p)
+              ? "frozen"
+              : isOverdue(stored, p, now)
+                ? "overdue"
+                : "due";
       return { ...p, status };
     })
     .reverse(); // newest first
@@ -88,5 +97,16 @@ export function summariseAthletePayments(
     months,
     overdue: months.filter((m) => m.status === "overdue"),
     current: months.find((m) => `${m.year}-${m.month}` === currentKey) ?? null,
+    hold: currentOrNextHold(holds, today),
   };
+}
+
+function currentOrNextHold(holds: HoldSpan[], today: string) {
+  const thisMonth = monthStartOf(today);
+  const active = holdCovering(holds, today);
+  if (active) return { start_month: active.start_month, end_month: active.end_month, active: true };
+  const next = holds
+    .filter((h) => h.start_month > thisMonth)
+    .sort((a, b) => a.start_month.localeCompare(b.start_month))[0];
+  return next ? { start_month: next.start_month, end_month: next.end_month, active: false } : null;
 }

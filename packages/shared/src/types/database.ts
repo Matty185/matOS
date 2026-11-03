@@ -1021,6 +1021,51 @@ export type Database = {
           },
         ];
       };
+      membership_holds: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          end_month: string;
+          gym_id: string;
+          id: string;
+          member_id: string;
+          start_month: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          end_month: string;
+          gym_id: string;
+          id?: string;
+          member_id: string;
+          start_month: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          end_month?: string;
+          gym_id?: string;
+          id?: string;
+          member_id?: string;
+          start_month?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "membership_holds_gym_id_fkey";
+            columns: ["gym_id"];
+            isOneToOne: false;
+            referencedRelation: "gyms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "membership_holds_member_id_fkey";
+            columns: ["member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       memberships: {
         Row: {
           active: boolean;

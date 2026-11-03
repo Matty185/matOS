@@ -16,6 +16,9 @@ import { InviteShareDialog } from "@/components/shared/invite-share-dialog";
 import { PasswordResetLinkDialog } from "@/components/shared/password-reset-link-dialog";
 import { PaymentCellDialog } from "@/components/shared/payment-cell-dialog";
 import { ProfileView } from "@/components/shared/profile-view";
+import { MembershipHolds, useMemberHolds } from "@/components/shared/membership-holds";
+import { holdCovering, holdMonths } from "@/lib/payments/holds";
+import { useGymToday } from "@/hooks/use-gym-today";
 import { PLAN_LABELS } from "@/lib/constants/member-labels";
 import { isBillable, isOverdue, type PaymentStatus } from "@/lib/payments/overdue";
 import { Button } from "@/components/ui/button";
@@ -187,6 +190,7 @@ export function MemberProfileClient({
               ) : (
                 <Badge variant="secondary">Inactive</Badge>
               )}
+              <OnHoldBadge memberId={member.id} />
             </div>
           </div>
         </div>
@@ -283,7 +287,7 @@ export function MemberProfileClient({
                       ? " They can sign in again with their existing password."
                       : " They haven't signed up yet — send them an invite afterwards."}
                     {isBillable(member)
-                      ? " Any months they didn't pay while away will show as overdue on Payments — waive the ones you don't want to chase."
+                      ? " Any months they didn't pay while away will show as overdue on Payments. Put those months on hold (Payments tab) or waive the ones you don't want to chase."
                       : ""}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
@@ -327,6 +331,7 @@ export function MemberProfileClient({
         <TabsContent value="payments" className="pt-4">
           <PaymentsTab
             billable={isBillable(member)}
+            active={member.active}
             memberId={member.id}
             memberName={`${member.first_name} ${member.last_name}`}
             onPaymentChanged={() =>
@@ -528,15 +533,20 @@ function AttendanceTab({ memberId, joinDate }: { memberId: string; joinDate: str
 
 function PaymentsTab({
   billable,
+  active,
   memberId,
   memberName,
   onPaymentChanged,
 }: {
   billable: boolean;
+  active: boolean;
   memberId: string;
   memberName: string;
   onPaymentChanged: () => void;
 }) {
+  // Flow audit 2.4: unpaid rows in a frozen month read "frozen", not overdue.
+  const { data: holds, isLoading: holdsLoading } = useMemberHolds(memberId);
+  const frozen = new Set((holds ?? []).flatMap(holdMonths));
   const [isMarking, setIsMarking] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<{
     month: number;
@@ -577,10 +587,14 @@ function PaymentsTab({
     }
   }
 
-  if (isLoading) return <p className="text-sm text-muted-foreground">Loading...</p>;
+  // Wait for holds too, or a frozen unpaid month would flash "overdue".
+  if (isLoading || holdsLoading) return <p className="text-sm text-muted-foreground">Loading...</p>;
 
   return (
     <div className="flex flex-col gap-4">
+      {billable ? (
+        <MembershipHolds memberId={memberId} memberName={memberName} canEdit={active} />
+      ) : null}
       {billable ? (
         <Button
           variant="outline"
@@ -608,11 +622,16 @@ function PaymentsTab({
             // Rule 8: overdue is computed at query time, never stored — a
             // stored 'unpaid' row only reads as "Overdue" once its period
             // has actually ended, no grace period.
-            const overdue = isOverdue(row.status, {
-              month: row.period_month,
-              year: row.period_year,
-            });
-            const label = overdue ? "overdue" : row.status;
+            const isFrozen =
+              row.status === "unpaid" &&
+              frozen.has(`${row.period_year}-${String(row.period_month).padStart(2, "0")}`);
+            const overdue =
+              !isFrozen &&
+              isOverdue(row.status, {
+                month: row.period_month,
+                year: row.period_year,
+              });
+            const label = isFrozen ? "frozen" : overdue ? "overdue" : row.status;
             const periodLabel = format(
               new Date(row.period_year, row.period_month - 1),
               "MMMM yyyy",
@@ -636,11 +655,13 @@ function PaymentsTab({
                     variant={
                       overdue
                         ? "destructive"
-                        : row.status === "paid"
-                          ? "default"
-                          : row.status === "waived"
-                            ? "secondary"
-                            : "outline"
+                        : isFrozen
+                          ? "secondary"
+                          : row.status === "paid"
+                            ? "default"
+                            : row.status === "waived"
+                              ? "secondary"
+                              : "outline"
                     }
                   >
                     {label}
@@ -831,4 +852,13 @@ function LogsTab({ memberId }: { memberId: string }) {
       ))}
     </ul>
   );
+}
+
+// Flow audit 2.4: "On hold" in the profile header while a hold covers this
+// month (gym calendar).
+function OnHoldBadge({ memberId }: { memberId: string }) {
+  const today = useGymToday();
+  const { data: holds } = useMemberHolds(memberId);
+  if (!today || !holds || !holdCovering(holds, today)) return null;
+  return <Badge variant="secondary">On hold</Badge>;
 }

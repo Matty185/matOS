@@ -34,6 +34,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { Database } from "@matos/shared";
+import { useMembersOnHold } from "@/hooks/use-members-on-hold";
 
 type PaymentStatus = Database["public"]["Enums"]["payment_status"];
 type MembershipPlan = Database["public"]["Enums"]["membership_plan"];
@@ -167,17 +168,22 @@ function useCurrentPeriodPayments() {
 function PaymentBadge({
   status,
   isLoading,
+  frozen,
 }: {
   status: PaymentStatus | "no_record";
   isLoading: boolean;
+  /** Flow audit 2.4: on hold this month, so nothing is owed. */
+  frozen: boolean;
 }) {
   if (isLoading) return <Badge variant="outline">—</Badge>;
   if (status === "paid") return <Badge>Paid</Badge>;
   if (status === "waived") return <Badge variant="secondary">Waived</Badge>;
+  if (frozen) return <Badge variant="secondary">Frozen</Badge>;
   return <Badge variant="destructive">Unpaid</Badge>;
 }
 
 export default function MembersPage() {
+  const { ids: onHold, isLoading: holdsLoading } = useMembersOnHold();
   const { data: members, isLoading, error } = useMembers();
   const {
     data: payments,
@@ -224,6 +230,8 @@ export default function MembersPage() {
       if (paymentFilter !== "all") {
         if (!isBillable(m)) return false;
         const status = payments?.get(m.id)?.status ?? "no_record";
+        // A member on hold owes nothing this month, so isn't "unpaid".
+        if (onHold.has(m.id) && status !== "paid" && status !== "waived") return false;
         if (status !== paymentFilter) return false;
       }
       if (search) {
@@ -235,6 +243,7 @@ export default function MembersPage() {
     });
   }, [
     members,
+    onHold,
     search,
     beltFilter,
     planFilter,
@@ -539,7 +548,8 @@ export default function MembersPage() {
                               ? "no_record"
                               : (payments?.get(member.id)?.status ?? "no_record")
                           }
-                          isLoading={paymentsLoading}
+                          isLoading={paymentsLoading || holdsLoading}
+                          frozen={onHold.has(member.id)}
                         />
                       </button>
                     )}
@@ -549,7 +559,12 @@ export default function MembersPage() {
                   </TableCell>
                   <TableCell>
                     {member.active ? (
-                      <Badge variant="outline">Active</Badge>
+                      onHold.has(member.id) ? (
+                        // Flow audit 2.4.
+                        <Badge variant="secondary">On hold</Badge>
+                      ) : (
+                        <Badge variant="outline">Active</Badge>
+                      )
                     ) : (
                       <Badge variant="secondary">Inactive</Badge>
                     )}

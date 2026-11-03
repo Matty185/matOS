@@ -758,3 +758,56 @@ Gate (security + code, no BLOCKED). Fixed: a proposal is dropped with a plain-la
 - The coach grid, dashboard and assistant still take "today" from the browser or server clock, so within about an hour of a month boundary the two sides can briefly disagree on whether last month is overdue yet.
 - The coach member-profile Payments tab lists raw stored rows without the obligation clamp; the grid is the source of truth.
 - RLS still lets an athlete fetch their own `amount` with a direct API call (by design since Stage 1). A column grant or view would close that.
+
+### 2026-11-03 — Freeze / hold a membership (flow audit 2.4)
+
+**Context.** Members away injured or travelling kept reading as overdue, and the reactivate flow (2.3) could only suggest waiving months one by one. Two choices were confirmed with the user: holds are **whole months** (fees are monthly), and **check-in stays allowed** during a hold, just flagged.
+
+**Decision.** Migration `20261103130000`:
+
+- `membership_holds`: `member_id`, `start_month` and `end_month` (both the 1st of a month, inclusive, at most 12 months), `created_by`. **No reason column**, because the reason is often an injury, which is health data we don't need to hold.
+- `gym_id` is derived from the member by trigger. A per-member advisory-locked trigger refuses overlapping holds (23P01, mapped to 409).
+- RLS: staff select/insert/update/delete in their gym; a member selects their own. UPDATE is granted on `end_month` only (end early or extend). TRUNCATE is revoked.
+
+Routes:
+
+- `POST /api/members/[id]/holds` refuses inactive members, non-billable ones (staff, casual) and personal workspaces. The hold may start up to 12 months back and reach up to 12 months ahead, in the gym's calendar.
+- `PATCH` and `DELETE /api/holds/[id]` change the end month or remove the hold.
+- Audit (`member.hold_added` / `hold_changed` / `hold_removed`) is strict: revert on failure for add and change, audit-first for remove.
+
+**A frozen month is never owed.** `billableMembers` now _requires_ the holds and attaches each member's frozen months; `getOverduePeriodsForMember` skips them. Because the argument is required, every surface had to load holds:
+
+- dashboard
+- payments grid
+- assistant system prompt and `get_overdue_payments`
+- athlete Home
+
+A paid or waived row still wins, and a hold only stops an unpaid month counting.
+
+Where it shows:
+
+- **Member profile Payments tab:** a Membership hold card (Put on hold / Change end / Remove). Unpaid rows in frozen months read "frozen". An "On hold" badge in the header.
+- **Payments grid and members list:** "Frozen" cells. Frozen members are left out of the "Unpaid" filter.
+- **Members list and attendance:** "On hold" badges.
+- **Athlete Membership card:** "Frozen" months, and "Your membership is on hold (…)".
+- **Reactivate dialog:** now suggests putting the missed months on hold.
+
+GDPR: erasure deletes holds explicitly (the member row is anonymised, so the cascade never fires), the export includes them, and delete-solo sweeps them.
+
+**Gate.** database-reviewer (BLOCKING): no BLOCKED. Its must-do was the GDPR sweep, export and solo-delete coverage, done in this change. security + code reviewers: no BLOCKED. Fixed:
+
+- the members list showed a red "Unpaid" for members on hold and counted them under the Unpaid filter;
+- the add dialog kept old months after closing;
+- paging the payments grid briefly applied another window's holds (holds now load once for a fixed ten-year range);
+- the payments grid's error state;
+- profile payment rows wait for holds to load;
+- server-rendered counts refresh after a hold change.
+
+Live-tested: 21 checks covering bounds, overlap, coach and other-gym refusal, athlete 403s, own-only reads, the column grant, extend/shorten, audit and removal. Checked on an emulated iPhone: profile card and header badge, the add dialog (also reopening it), "Frozen" on the grid and members list, and the athlete card. Hand-written types match `supabase gen types`.
+
+Accepted:
+
+- Coaches writing directly through REST skip the route's audit row and checks, the same as other staff-writable tables.
+- PATCH doesn't re-check that the member is still active and billable; it's harmless, because `billableMembers` filters them out anyway.
+- No assistant tool for holds.
+- The athlete card names only the hold covering this month, not one that follows straight after.

@@ -25,10 +25,12 @@ import {
   periodKey,
   getOverdueMemberIds,
   billableMembers,
+  isFrozenMonth,
   type PaymentStatus,
   type MonthPeriod,
 } from "@/lib/payments/overdue";
 import { getPaymentsTrackedFrom } from "@/lib/payments/tracked-from";
+import { fetchHoldsForWindow } from "@/lib/payments/holds";
 
 type MemberRow = {
   id: string;
@@ -59,7 +61,11 @@ export default function PaymentsPage() {
   const minYear = monthWindow[0]!.year;
   const maxYear = monthWindow[monthWindow.length - 1]!.year;
 
-  const { data: members, isLoading: membersLoading } = useQuery({
+  const {
+    data: memberData,
+    isLoading: membersLoading,
+    isError: membersError,
+  } = useQuery({
     queryKey: ["payments-members"],
     queryFn: async () => {
       const supabase = createClient();
@@ -72,9 +78,31 @@ export default function PaymentsPage() {
       // Staff and casual members excluded, and each member's first billable month clamped to
       // when MatOS started tracking this gym's payments (Stage O6) — the
       // grid renders "—" before that, exactly like before a member joined.
-      return billableMembers(data as MemberRow[], await getPaymentsTrackedFrom(supabase));
+      return { rows: data as MemberRow[], trackedFrom: await getPaymentsTrackedFrom(supabase) };
     },
   });
+
+  // Flow audit 2.4: every hold that can touch a window this page can show
+  // (paging goes back in time; holds reach 12 months ahead). One fixed range
+  // rather than per-window, so paging never applies another window's holds.
+  // About ten years back to a year ahead: holds are a handful of rows.
+  const holdsRange = useMemo(() => trailingMonthWindow(132, -12), []);
+  const {
+    data: holds,
+    isLoading: holdsLoading,
+    isError: holdsError,
+  } = useQuery({
+    queryKey: ["payments-holds"],
+    queryFn: () => fetchHoldsForWindow(createClient(), holdsRange),
+  });
+
+  const members = useMemo(
+    () =>
+      memberData && holds
+        ? billableMembers(memberData.rows, memberData.trackedFrom, holds)
+        : undefined,
+    [memberData, holds],
+  );
 
   const { data: payments, isLoading: paymentsLoading } = useQuery({
     queryKey: ["payments-grid", minYear, maxYear],
@@ -123,7 +151,7 @@ export default function PaymentsPage() {
     queryClient.invalidateQueries({ queryKey: ["payments-grid"] });
   }
 
-  const isLoading = membersLoading || paymentsLoading;
+  const isLoading = membersLoading || paymentsLoading || holdsLoading;
   const existingForSelected = selected
     ? (paymentsByKey.get(periodKey(selected.member.id, selected.period)) ?? null)
     : null;
@@ -133,6 +161,15 @@ export default function PaymentsPage() {
       <div className="flex flex-col gap-6">
         <h1 className="font-heading text-3xl tracking-wide">Payments</h1>
         <p className="text-sm text-muted-foreground">Loading payments...</p>
+      </div>
+    );
+  }
+
+  if (membersError || holdsError) {
+    return (
+      <div className="flex flex-col gap-6">
+        <h1 className="font-heading text-3xl tracking-wide">Payments</h1>
+        <p className="text-sm text-destructive">Couldn&apos;t load payments. Try refreshing.</p>
       </div>
     );
   }
@@ -253,21 +290,27 @@ export default function PaymentsPage() {
 
                     const row = paymentsByKey.get(periodKey(member.id, period));
                     const status: PaymentStatus = row?.status ?? "unpaid";
-                    const overdue = isOverdue(status, period);
-                    const label = overdue
-                      ? "Overdue"
-                      : status === "paid"
-                        ? "Paid"
-                        : status === "waived"
-                          ? "Waived"
-                          : "Unpaid";
-                    const variant = overdue
-                      ? "destructive"
-                      : status === "paid"
-                        ? "default"
-                        : status === "waived"
-                          ? "secondary"
-                          : "outline";
+                    // On hold and not paid: never owed (a payment still wins).
+                    const frozenUnpaid = status === "unpaid" && isFrozenMonth(member, period);
+                    const overdue = !frozenUnpaid && isOverdue(status, period);
+                    const label = frozenUnpaid
+                      ? "Frozen"
+                      : overdue
+                        ? "Overdue"
+                        : status === "paid"
+                          ? "Paid"
+                          : status === "waived"
+                            ? "Waived"
+                            : "Unpaid";
+                    const variant = frozenUnpaid
+                      ? "secondary"
+                      : overdue
+                        ? "destructive"
+                        : status === "paid"
+                          ? "default"
+                          : status === "waived"
+                            ? "secondary"
+                            : "outline";
 
                     const periodLabel = format(
                       new Date(period.year, period.month - 1),

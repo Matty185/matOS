@@ -144,6 +144,30 @@ export function describeAuditEntry(row: AuditLogRow, ctx: AuditNameContext): str
       return `${actor} deactivated ${subjectNameFor(row, ctx)}.`;
     case "member.reactivated":
       return `${actor} reactivated ${subjectNameFor(row, ctx)}.`;
+    case "member.hold_added":
+    case "member.hold_changed":
+    case "member.hold_removed": {
+      // Flow audit 2.4: the member is in the state, not the entity id.
+      const before = asRecord(row.before_state);
+      const memberId = typeof after.member_id === "string" ? after.member_id : before.member_id;
+      const who =
+        (typeof memberId === "string" ? ctx.byMemberId.get(memberId) : undefined) ?? "a member";
+      const month = (v: unknown) =>
+        typeof v === "string"
+          ? new Intl.DateTimeFormat("en-IE", {
+              month: "long",
+              year: "numeric",
+              timeZone: "UTC",
+            }).format(new Date(`${v.slice(0, 7)}-01T00:00:00Z`))
+          : "?";
+      if (row.action === "member.hold_added") {
+        return `${actor} put ${who}'s membership on hold, ${month(after.start_month)} to ${month(after.end_month)}.`;
+      }
+      if (row.action === "member.hold_changed") {
+        return `${actor} changed ${who}'s hold to end in ${month(after.end_month)} (was ${month(before.end_month)}).`;
+      }
+      return `${actor} removed ${who}'s membership hold (${month(before.start_month)} to ${month(before.end_month)}).`;
+    }
     case "member.self_updated_contact":
       return `${actor} updated their own contact details.`;
     case "member.data_exported":

@@ -1,5 +1,6 @@
 import { endOfMonth, parseISO, startOfMonth, subMonths } from "date-fns";
 import type { Database } from "@matos/shared";
+import { frozenMonthsByMember, monthKeyOf, type HoldRow } from "./holds";
 
 export type PaymentStatus = Database["public"]["Enums"]["payment_status"];
 
@@ -61,7 +62,9 @@ export type PaymentRowForOverdue = {
   status: PaymentStatus;
 };
 
-export type MemberForOverdue = { id: string; join_date: string };
+// `frozen`: months ("2026-12") the member is on hold (flow audit 2.4),
+// attached by billableMembers. A frozen month is never owed.
+export type MemberForOverdue = { id: string; join_date: string; frozen?: ReadonlySet<string> };
 
 export function periodKey(memberId: string, period: MonthPeriod): string {
   return `${memberId}-${period.month}-${period.year}`;
@@ -98,6 +101,7 @@ export function getOverduePeriodsForMember(
   return window.filter((period) => {
     const periodStart = new Date(period.year, period.month - 1, 1);
     if (periodStart < joinMonth) return false;
+    if (isFrozenMonth(member, period)) return false;
     const status = statusByKey.get(periodKey(member.id, period)) ?? "unpaid";
     return isOverdue(status, period, now);
   });
@@ -147,12 +151,20 @@ export function isBillable(member: BillingFields): boolean {
 export function billableMembers<T extends MemberForOverdue & BillingFields>(
   members: T[],
   paymentsTrackedFrom: string | null | undefined,
+  // Required, not optional: every caller must load holds (flow audit 2.4),
+  // or a frozen member would read as overdue on that surface.
+  holds: HoldRow[],
 ): T[] {
-  return members
-    .filter(isBillable)
-    .map((m) =>
-      paymentsTrackedFrom && m.join_date < paymentsTrackedFrom
-        ? { ...m, join_date: paymentsTrackedFrom }
-        : m,
-    );
+  const frozen = frozenMonthsByMember(holds);
+  return members.filter(isBillable).map((m) => ({
+    ...m,
+    join_date:
+      paymentsTrackedFrom && m.join_date < paymentsTrackedFrom ? paymentsTrackedFrom : m.join_date,
+    frozen: frozen.get(m.id) ?? new Set<string>(),
+  }));
+}
+
+/** True when the member is on hold for that month (flow audit 2.4). */
+export function isFrozenMonth(member: MemberForOverdue, period: MonthPeriod): boolean {
+  return member.frozen?.has(monthKeyOf(period)) ?? false;
 }

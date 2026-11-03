@@ -46,6 +46,7 @@ export default async function AthleteHomePage() {
     { data: classRows },
     { data: paymentRows, error: paymentsError },
     paymentsTrackedFrom,
+    { data: holdRows, error: holdsError },
   ] = await Promise.all([
     supabase
       .from("members")
@@ -61,6 +62,11 @@ export default async function AthleteHomePage() {
       .select("period_month, period_year, status")
       .eq("member_id", member.memberId),
     getPaymentsTrackedFrom(supabase),
+    // Flow audit 2.4: own holds (RLS: membership_holds_select_self).
+    supabase
+      .from("membership_holds")
+      .select("member_id, start_month, end_month")
+      .eq("member_id", member.memberId),
   ]);
 
   // Flow audit 3.2: list from the gym's today with one-off changes applied
@@ -90,10 +96,18 @@ export default async function AthleteHomePage() {
   const streak = computeAttendanceStreak((attendanceRows ?? []).map((a) => a.checked_in_date));
   const upcoming = computeUpcomingClasses(classRows ?? [], { fromDate: today, changes, cap: 6 });
   // Never show a wrong "overdue": if payments can't be read, say so instead.
-  if (paymentsError) console.error("[home] couldn't load payments");
+  // Holds too: without them a frozen month would read as overdue.
+  const membershipError = paymentsError ?? holdsError;
+  if (membershipError) console.error("[home] couldn't load payments or holds");
   const paymentSummary =
-    memberRow && !paymentsError
-      ? summariseAthletePayments(memberRow, paymentRows ?? [], paymentsTrackedFrom, today)
+    memberRow && !membershipError
+      ? summariseAthletePayments(
+          memberRow,
+          paymentRows ?? [],
+          paymentsTrackedFrom,
+          today,
+          holdRows ?? [],
+        )
       : null;
 
   return (
@@ -128,7 +142,7 @@ export default async function AthleteHomePage() {
 
       {paymentSummary && memberRow ? (
         <MembershipStatusCard plan={memberRow.membership_plan} summary={paymentSummary} />
-      ) : paymentsError ? (
+      ) : membershipError ? (
         <p className="rounded-md border p-4 text-sm text-muted-foreground">
           Couldn&apos;t load your membership status. Try refreshing.
         </p>

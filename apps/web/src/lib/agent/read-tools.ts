@@ -7,6 +7,7 @@ import {
   billableMembers,
   periodKey,
 } from "@/lib/payments/overdue";
+import { fetchHoldsForWindow } from "@/lib/payments/holds";
 import { getPaymentsTrackedFrom } from "@/lib/payments/tracked-from";
 import {
   fetchAthleteProfileData,
@@ -229,7 +230,11 @@ export async function executeReadTool(
       if (paymentsError) throw paymentsError;
 
       // Owner excluded, obligations clamped to when tracking began (Stage O6).
-      const members = billableMembers(rawMembers ?? [], await getPaymentsTrackedFrom(supabase));
+      const members = billableMembers(
+        rawMembers ?? [],
+        await getPaymentsTrackedFrom(supabase),
+        await fetchHoldsForWindow(supabase, window),
+      );
       const overdueIds = getOverdueMemberIds(members, payments ?? [], window);
       const statusByKey = new Map(
         (payments ?? []).map((p) => [

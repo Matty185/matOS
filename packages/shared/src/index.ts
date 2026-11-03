@@ -17,6 +17,7 @@ export * from "./validation/breakdown-event";
 export * from "./validation/breakdown-position";
 export * from "./validation/class";
 export * from "./validation/gym";
+export * from "./validation/hold";
 export * from "./validation/external-person";
 export * from "./validation/invite";
 export * from "./validation/kiosk";

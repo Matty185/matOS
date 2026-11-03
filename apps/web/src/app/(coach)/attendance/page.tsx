@@ -17,6 +17,7 @@ import {
 } from "@matos/shared";
 import { useGymToday } from "@/hooks/use-gym-today";
 import { useGymStaff } from "@/hooks/use-gym-staff";
+import { useMembersOnHold } from "@/hooks/use-members-on-hold";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
@@ -185,6 +186,8 @@ function ClassAttendanceCard({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const queryClient = useQueryClient();
+  // Flow audit 2.4: a hint only; check-in still works during a hold.
+  const { ids: onHold } = useMembersOnHold();
 
   const { data, isLoading } = useQuery({
     queryKey: ["attendance-for-class", classRow.id, date],
@@ -329,6 +332,11 @@ function ClassAttendanceCard({
                             <span className="truncate">
                               {m.first_name} {m.last_name}
                               {roleBadge(m.role)}
+                              {onHold.has(m.id) ? (
+                                <Badge variant="secondary" className="ml-2">
+                                  On hold
+                                </Badge>
+                              ) : null}
                               {!m.active ? (
                                 <Badge variant="outline" className="ml-2">
                                   Inactive
@@ -390,6 +398,11 @@ function ClassAttendanceCard({
                         <span className="truncate">
                           {m.first_name} {m.last_name}
                           {roleBadge(m.role)}
+                          {onHold.has(m.id) ? (
+                            <Badge variant="secondary" className="ml-2">
+                              On hold
+                            </Badge>
+                          ) : null}
                         </span>
                         <Button
                           variant="outline"

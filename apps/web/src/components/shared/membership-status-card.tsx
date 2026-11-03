@@ -1,4 +1,5 @@
-import { CheckCircle2, CircleAlert, Clock, MinusCircle, Wallet } from "lucide-react";
+import { CheckCircle2, CircleAlert, Clock, MinusCircle, PauseCircle, Wallet } from "lucide-react";
+import { describeHold } from "@/lib/payments/holds";
 import type { AthleteMonthStatus, AthletePaymentSummary } from "@/lib/payments/athlete-status";
 
 const PLAN_LABELS: Record<string, string> = {
@@ -13,6 +14,7 @@ const STATUS: Record<
 > = {
   paid: { label: "Paid", icon: CheckCircle2, className: "text-green-700 dark:text-green-400" },
   waived: { label: "Waived", icon: MinusCircle, className: "text-muted-foreground" },
+  frozen: { label: "Frozen", icon: PauseCircle, className: "text-muted-foreground" },
   overdue: { label: "Overdue", icon: CircleAlert, className: "text-destructive" },
   // "Unpaid", the coach grid's word for the same state.
   due: { label: "Unpaid", icon: Clock, className: "text-amber-700 dark:text-amber-400" },
@@ -62,7 +64,7 @@ export function MembershipStatusCard({
     );
   }
 
-  const { months, overdue, current } = summary;
+  const { months, overdue, current, hold } = summary;
   // Year only on months from an earlier year than the newest one shown.
   const newestYear = months[0]?.year;
   const headline =
@@ -70,13 +72,15 @@ export function MembershipStatusCard({
       ? overdue.length > 3
         ? `Overdue for ${overdue.length} months, since ${monthName(overdue[overdue.length - 1]!.month, overdue[overdue.length - 1]!.year, true)}. Please talk to your coach.`
         : `Overdue for ${joinNames(overdue.map((m) => monthName(m.month, m.year)))}. Please talk to your coach.`
-      : current?.status === "paid"
-        ? `Paid for ${monthName(current.month, current.year)}. You're all up to date.`
-        : current?.status === "waived"
-          ? `${monthName(current.month, current.year)} is waived. You're all up to date.`
-          : current
-            ? `${monthName(current.month, current.year)} isn't paid yet.`
-            : "You're all up to date.";
+      : hold?.active
+        ? `Your membership is on hold (${describeHold(hold)}). No fee is due for those months.`
+        : current?.status === "paid"
+          ? `Paid for ${monthName(current.month, current.year)}. You're all up to date.`
+          : current?.status === "waived"
+            ? `${monthName(current.month, current.year)} is waived. You're all up to date.`
+            : current
+              ? `${monthName(current.month, current.year)} isn't paid yet.`
+              : "You're all up to date.";
 
   return (
     <section
@@ -94,6 +98,11 @@ export function MembershipStatusCard({
           >
             {headline}
           </p>
+          {hold && !hold.active ? (
+            <p className="text-sm text-muted-foreground">
+              On hold {describeHold(hold)}. No fee is due for those months.
+            </p>
+          ) : null}
         </div>
       </div>
       {months.length > 0 ? (

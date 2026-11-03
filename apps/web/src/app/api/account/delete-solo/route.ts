@@ -89,6 +89,9 @@ export const POST = withAuth(async (_request, context) => {
     "athlete_logs",
     "invites",
     "deletion_requests",
+    // Flow audit 2.4: would cascade with the members row; explicit to match
+    // this sweep rather than rely on the FK.
+    "membership_holds",
   ] as const) {
     const { error } = await supabase.from(table).delete().eq("member_id", context.memberId);
     if (error) {

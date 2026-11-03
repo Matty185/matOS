@@ -26,6 +26,7 @@ import { DismissSetupButton } from "@/components/shared/dismiss-setup-button";
 import { getCurrentMember } from "@/lib/auth/current-member";
 import { getGymTimeZone } from "@/lib/time/gym-timezone";
 import { trailingMonthWindow, getOverdueMemberIds, billableMembers } from "@/lib/payments/overdue";
+import { fetchHoldsForWindow } from "@/lib/payments/holds";
 import { getPaymentsTrackedFrom } from "@/lib/payments/tracked-from";
 import { fetchLiveAnnouncements } from "@/lib/announcements/fetch";
 import { AnnouncementCard, type AnnouncementView } from "@/components/shared/announcement-card";
@@ -85,7 +86,11 @@ async function getDashboardData() {
   if (paymentsError) throw paymentsError;
 
   const overdueIds = getOverdueMemberIds(
-    billableMembers(activeMembers, await getPaymentsTrackedFrom(supabase)),
+    billableMembers(
+      activeMembers,
+      await getPaymentsTrackedFrom(supabase),
+      await fetchHoldsForWindow(supabase, monthWindow),
+    ),
     payments ?? [],
     monthWindow,
   );

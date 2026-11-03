@@ -172,6 +172,7 @@ export const POST = withAuth(
       pushTokensResult,
       notificationsResult,
       classCoachResult,
+      holdsResult,
     ] = await Promise.all([
       serviceClient.from("attendance").delete().eq("member_id", member.id),
       serviceClient.from("athlete_logs").delete().eq("member_id", member.id),
@@ -197,6 +198,9 @@ export const POST = withAuth(
         .from("classes")
         .update({ coach_member_id: null })
         .eq("coach_member_id", member.id),
+      // Flow audit 2.4: membership_holds cascades on member delete, but this
+      // route anonymises the member instead, so the cascade never fires.
+      serviceClient.from("membership_holds").delete().eq("member_id", member.id),
     ]);
 
     for (const [label, result] of [
@@ -208,6 +212,7 @@ export const POST = withAuth(
       ["push_tokens", pushTokensResult],
       ["notifications", notificationsResult],
       ["classes.coach_member_id", classCoachResult],
+      ["membership_holds", holdsResult],
     ] as const) {
       if (result.error) {
         console.error(`[gdpr] failed to clean up ${label}`, result.error);
