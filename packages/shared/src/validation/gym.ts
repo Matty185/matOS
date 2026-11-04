@@ -99,10 +99,29 @@ const planName = z
 
 export const MAX_GYM_PLANS = 30;
 
+// Flow audit 6.6 (L1): a Stripe Payment Link for the plan. Same rule as the
+// database check: only https://buy.stripe.com/<id>, nothing else. Blank
+// clears it.
+export const STRIPE_PAYMENT_LINK = /^https:\/\/buy\.stripe\.com\/[A-Za-z0-9_-]{6,100}$/;
+const paymentLink = z
+  .union([
+    z.literal(""),
+    z.null(),
+    z
+      .string()
+      .trim()
+      .regex(
+        STRIPE_PAYMENT_LINK,
+        "Paste a Stripe Payment Link, like https://buy.stripe.com/… (nothing after it).",
+      ),
+  ])
+  .transform((v) => (v ? v : null));
+
 export const createGymPlanSchema = z.object({
   name: planName,
   kind: z.enum(PLAN_VALUES),
   price: planPrice,
+  payment_link_url: paymentLink.optional(),
 });
 
 export type CreateGymPlanInput = z.infer<typeof createGymPlanSchema>;
@@ -112,10 +131,18 @@ export const updateGymPlanSchema = z
     name: planName.optional(),
     price: planPrice.optional(),
     active: z.boolean().optional(),
+    payment_link_url: paymentLink.optional(),
   })
-  .refine((d) => d.name !== undefined || d.price !== undefined || d.active !== undefined, {
-    message: "Nothing to change.",
-  });
+  .refine(
+    (d) =>
+      d.name !== undefined ||
+      d.price !== undefined ||
+      d.active !== undefined ||
+      d.payment_link_url !== undefined,
+    {
+      message: "Nothing to change.",
+    },
+  );
 
 export type UpdateGymPlanInput = z.infer<typeof updateGymPlanSchema>;
 

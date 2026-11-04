@@ -888,6 +888,7 @@ export type Database = {
           id: string;
           kind: Database["public"]["Enums"]["membership_plan"];
           name: string;
+          payment_link_url: string | null;
           price: number | null;
           sort_order: number;
         };
@@ -898,6 +899,7 @@ export type Database = {
           id?: string;
           kind: Database["public"]["Enums"]["membership_plan"];
           name: string;
+          payment_link_url?: string | null;
           price?: number | null;
           sort_order?: number;
         };
@@ -908,6 +910,7 @@ export type Database = {
           id?: string;
           kind?: Database["public"]["Enums"]["membership_plan"];
           name?: string;
+          payment_link_url?: string | null;
           price?: number | null;
           sort_order?: number;
         };

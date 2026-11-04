@@ -16,6 +16,8 @@ export type GymPlan = {
   price: number | null;
   active: boolean;
   sort_order: number;
+  /** Flow audit 6.6 (L1): the plan's Stripe Payment Link, if any. */
+  payment_link_url: string | null;
 };
 
 type FeeMember = {
@@ -136,7 +138,7 @@ export async function loadFeeContext(
     supabase.from("gyms").select("sibling_discount_percent").eq("id", gymId).maybeSingle(),
     supabase
       .from("gym_plans")
-      .select("id, name, kind, price, active, sort_order")
+      .select("id, name, kind, price, active, sort_order, payment_link_url")
       .eq("gym_id", gymId),
     supabase
       .from("members")

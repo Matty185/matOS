@@ -39,7 +39,7 @@ export default async function SettingsPage() {
   const [{ data: planRows }, { data: planMembers }] = await Promise.all([
     supabase
       .from("gym_plans")
-      .select("id, name, kind, price, active, sort_order")
+      .select("id, name, kind, price, active, sort_order, payment_link_url")
       .eq("gym_id", member.gymId)
       .order("sort_order")
       .order("created_at"),

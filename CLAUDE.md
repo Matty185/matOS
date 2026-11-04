@@ -1071,3 +1071,25 @@ The browser check on emulated iPhones ran the owner adding a parent and getting 
 - **Photos and logo:** coach upload and set; the member sees their photo and others can't; non-member folders, athlete uploads and coach logo uploads refused; delete removes the files.
 
 Browser-checked on an emulated iPhone: Settings (logo, plans), Visitors and the Add Visitor dialog, the members list, and a profile with its photo button. Production build passes.
+
+### 2026-11-04 — Online payments, stage L1: Stripe Payment Links (flow audit 6.6)
+
+**Context.** The user asked whether online billing could be built with no upfront cost (fees taken from payments are fine). They chose option 1 from `matos_payment_links_plan.md`: each gym's own Stripe Payment Links, no Connect. Confirmed: a payment counts for the **oldest unpaid month**; pay-per-class plans may have a link but never mark a month paid; the webhook (L2) comes later, once the gym has used L1.
+
+**Scope rule.** "Payment processing" stays out of scope in the sense CLAUDE.md meant it: MatOS processes nothing, holds no money, card data or Stripe keys. It shows the gym's own Stripe link, and the coach records the result as before. This entry is the deliberate, narrow exception.
+
+**Decision.** Migration `20261104160000`: `gym_plans.payment_link_url`. Only `^https://buy\.stripe\.com/[A-Za-z0-9_-]{6,100}$`, enforced identically in the database check, Zod and the client, and re-checked before building any href. No other host, no query string. Owner-only via the existing column grant.
+
+- **Settings → Membership plans:** a "Stripe payment link" field, with a "(Stripe test mode)" label for `test_` links. Creating a plan with a link, or changing a link, is audited strictly: a changed link is reverted (only the changed fields) and a new plan is retired, unlinked and renamed if the audit fails. Other plan edits stay best effort.
+- **Member side:** the Membership card on athlete Home and each child's card on Family shows "Pay <Month> online" for the oldest unpaid month, or "Pay for a class online" on a pay-per-class plan. It opens in a new tab (`noopener noreferrer`) with `client_reference_id` = `Name-Surname_YYYY-MM_<id8>` (accents stripped, Stripe's allowed characters) and `prefilled_email`. Test links say "(test)".
+- **Coach side:** a "Pays online" hint on the member profile's Payments tab. Not added to the payments grid. The coach marks the month paid as before, with the plan price pre-filled.
+- `matos_stripe_setup.md` is the owner's setup guide.
+
+**Gate.** security + code reviewers: no BLOCKED. Fixed: revert checks and logs its own failure and reverts only the changed fields; the POST cleanup logs its own failure and frees the name; accents stripped from the reference; pay-per-class helper text; test-link label on the button; coach hint only for billable members; doc wording.
+
+**Accepted.**
+
+- The member's (or child's) name and email go to the gym's own Stripe account in the URL. It's their member paying them. Documented in the setup guide, with a note to mention Stripe in the privacy notice.
+- The regex can't prove a `buy.stripe.com` link belongs to the gym's own account. Owners are trusted, and every link change is audited.
+- A coach can move a member to another plan that has an owner-set link, which is covered by the member-update audit.
+- A plan whose creation audit failed stays retired and counts toward the 30-plan cap.

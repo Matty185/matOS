@@ -52,7 +52,9 @@ export default async function AthleteHomePage() {
   ] = await Promise.all([
     supabase
       .from("members")
-      .select("id, belt, stripes, role, membership_plan, join_date, plan:gym_plans(name)")
+      .select(
+        "id, email, first_name, last_name, belt, stripes, role, membership_plan, join_date, plan:gym_plans(name, payment_link_url)",
+      )
       .eq("id", member.memberId)
       .single(),
     supabase.from("attendance").select("checked_in_date").eq("member_id", member.memberId),
@@ -187,6 +189,15 @@ export default async function AthleteHomePage() {
           plan={memberRow.membership_plan}
           planName={memberRow.plan?.name}
           summary={paymentSummary}
+          pay={{
+            url: memberRow.plan?.payment_link_url ?? null,
+            member: {
+              id: memberRow.id,
+              firstName: memberRow.first_name,
+              lastName: memberRow.last_name,
+            },
+            email: memberRow.email,
+          }}
         />
       ) : membershipError ? (
         <p className="rounded-md border p-4 text-sm text-muted-foreground">

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/withAuth";
 import { apiError } from "@/lib/api/response";
 import { createClient } from "@/lib/supabase/server";
-import { writeAuditLog } from "@/lib/audit/log";
+import { writeAuditLogStrict } from "@/lib/audit/log";
 import { createGymPlanSchema, MAX_GYM_PLANS } from "@matos/shared";
 
 // POST /api/gym/plans — owner only (flow audit 6.7). Adds one of the gym's
@@ -34,9 +34,10 @@ export const POST = withAuth(
         name: input.name,
         kind: input.kind,
         price: input.price,
+        payment_link_url: input.payment_link_url ?? null,
         sort_order: Math.min(1000, ((count ?? 0) + 1) * 10),
       })
-      .select("id, name, kind, price, active")
+      .select("id, name, kind, price, active, payment_link_url")
       .single();
 
     if (error || !plan) {
@@ -47,15 +48,42 @@ export const POST = withAuth(
       return apiError(500, "PLAN_CREATE_FAILED", "Something went wrong — the plan wasn't added.");
     }
 
-    await writeAuditLog({
+    // Strict: a plan can carry a payment link (where members' money goes),
+    // so it never exists without a record of who added it.
+    const audited = await writeAuditLogStrict({
       gymId: context.gymId,
       actorId: context.userId,
       action: "gym.plan_created",
       entityType: "gym_plans",
       entityId: plan.id,
-      afterState: { name: plan.name, kind: plan.kind, price: plan.price },
+      afterState: {
+        name: plan.name,
+        kind: plan.kind,
+        price: plan.price,
+        payment_link_url: plan.payment_link_url,
+      },
       initiatedBy: "coach_manual",
     });
+    if (!audited) {
+      // No delete grant for clients: retire it, clear its link, and rename it
+      // so the owner's retry with the same name isn't refused as a duplicate.
+      // It still counts toward MAX_GYM_PLANS (rare; Decision Log).
+      const { error: cleanupError } = await supabase
+        .from("gym_plans")
+        .update({
+          active: false,
+          payment_link_url: null,
+          name: `${plan.name.slice(0, 40)} (not saved ${plan.id.slice(0, 6)})`,
+        })
+        .eq("id", plan.id);
+      if (cleanupError) {
+        console.error("[gym plans] audit failed AND cleanup failed — unaudited plan live", {
+          planId: plan.id,
+          cleanupError,
+        });
+      }
+      return apiError(500, "AUDIT_FAILED", "Something went wrong — the plan wasn't added.");
+    }
 
     return NextResponse.json({ success: true, plan }, { status: 201 });
   },

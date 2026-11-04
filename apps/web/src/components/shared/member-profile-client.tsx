@@ -639,6 +639,9 @@ function PaymentsTab({
 
   const { data: fees } = useFeeContext();
   const fee = fees ? monthlyFee(fees, memberId) : null;
+  // Flow audit 6.6 (L1): their plan has a Stripe Payment Link.
+  const planIdForPay = fees?.members.get(memberId)?.plan_id;
+  const payOnline = !!(planIdForPay && fees?.plans.get(planIdForPay)?.payment_link_url);
 
   // Wait for holds too, or a frozen unpaid month would flash "overdue".
   if (isLoading || holdsLoading) return <p className="text-sm text-muted-foreground">Loading...</p>;
@@ -649,6 +652,13 @@ function PaymentsTab({
         <p className="text-sm text-muted-foreground">
           {fee.note}
           {fee.amount !== fee.base ? ` = ${formatMoney(fee.amount)}` : ""} a month.
+        </p>
+      ) : null}
+      {billable && payOnline ? (
+        <p className="text-sm text-muted-foreground">
+          Pays online: their plan has a Stripe payment link. Payments show in your Stripe dashboard
+          with their name and the month in the reference; mark the month paid here once it&apos;s
+          through.
         </p>
       ) : null}
       {billable ? (

@@ -1,4 +1,14 @@
-import { CheckCircle2, CircleAlert, Clock, MinusCircle, PauseCircle, Wallet } from "lucide-react";
+import {
+  CheckCircle2,
+  CircleAlert,
+  Clock,
+  ExternalLink,
+  MinusCircle,
+  PauseCircle,
+  Wallet,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { payLinkHref, payTarget } from "@/lib/payments/pay-link";
 import { describeHold } from "@/lib/payments/holds";
 import type { AthleteMonthStatus, AthletePaymentSummary } from "@/lib/payments/athlete-status";
 
@@ -39,8 +49,18 @@ export function MembershipStatusCard({
   planName,
   summary,
   childName,
+  pay,
 }: {
   plan: string;
+  /**
+   * Flow audit 6.6 (L1): the plan's Stripe Payment Link, the member it's
+   * for, and an email to pre-fill on Stripe's page.
+   */
+  pay?: {
+    url: string | null;
+    member: { id: string; firstName: string; lastName: string };
+    email?: string | null;
+  };
   /** The gym's own plan name (flow audit 6.7), when there is one. */
   planName?: string | null;
   summary: AthletePaymentSummary;
@@ -50,6 +70,30 @@ export function MembershipStatusCard({
   const whose = childName ? `${childName}'s` : "Your";
   const upToDate = childName ? "All up to date." : "You're all up to date.";
   const planLabel = planName ?? PLAN_LABELS[plan] ?? plan;
+  const target = payTarget(summary);
+  const payHref = pay && target ? payLinkHref(pay.url, pay.member, target, pay.email) : null;
+  const isTestLink = !!pay?.url?.includes("/test_");
+  const payButton =
+    payHref && target ? (
+      <div className="flex flex-col gap-1">
+        <Button asChild className="h-11 w-fit">
+          <a href={payHref} target="_blank" rel="noopener noreferrer">
+            {target === "class"
+              ? "Pay for a class online"
+              : `Pay ${monthName(target.month, target.year)} online`}
+            {isTestLink ? " (test)" : ""}
+            <ExternalLink className="h-4 w-4" aria-hidden />
+            <span className="sr-only"> (opens Stripe in a new tab)</span>
+          </a>
+        </Button>
+        <p className="text-xs text-muted-foreground">
+          {target === "class"
+            ? "You'll pay on Stripe's secure page."
+            : "You'll pay on Stripe's secure page. Your coach marks it paid once it comes through."}
+          {isTestLink ? " This is a test link: no real money is taken." : ""}
+        </p>
+      </div>
+    ) : null;
 
   if (summary.kind === "not_billable") {
     return (
@@ -67,6 +111,7 @@ export function MembershipStatusCard({
               ? "You pay per class, so there's no monthly fee to track here."
               : "Staff don't pay a monthly fee."}
           </p>
+          {payButton}
         </div>
       </section>
     );
@@ -136,6 +181,7 @@ export function MembershipStatusCard({
           })}
         </ul>
       ) : null}
+      {payButton}
       <p className="text-xs text-muted-foreground">
         Payments are recorded by your gym. If something looks wrong, ask your coach.
       </p>

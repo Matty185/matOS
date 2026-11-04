@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatMoney, PLAN_KIND_LABELS, type GymPlan } from "@/lib/payments/fees";
+import { STRIPE_PAYMENT_LINK } from "@matos/shared";
 
 type Kind = GymPlan["kind"];
 
@@ -74,6 +75,12 @@ export function PlansManager({
                   · {memberCounts[p.id] ?? 0} active member
                   {(memberCounts[p.id] ?? 0) === 1 ? "" : "s"}
                 </span>
+                {p.payment_link_url ? (
+                  <span className="text-sm text-muted-foreground">
+                    Online payment link set
+                    {p.payment_link_url.includes("/test_") ? " (Stripe test mode)" : ""}
+                  </span>
+                ) : null}
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" className="h-11" onClick={() => setEditing(p.id)}>
@@ -112,6 +119,7 @@ function PlanForm({ plan, onDone }: { plan?: GymPlan; onDone: (saved: boolean) =
   const [name, setName] = useState(plan?.name ?? "");
   const [kind, setKind] = useState<Kind>(plan?.kind ?? "monthly");
   const [price, setPrice] = useState(plan?.price?.toString() ?? "");
+  const [link, setLink] = useState(plan?.payment_link_url ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -122,6 +130,12 @@ function PlanForm({ plan, onDone }: { plan?: GymPlan; onDone: (saved: boolean) =
       setError("Name the plan.");
       return;
     }
+    if (link.trim() && !STRIPE_PAYMENT_LINK.test(link.trim())) {
+      setError(
+        "Paste a Stripe Payment Link, like https://buy.stripe.com/… (with nothing after it).",
+      );
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch(plan ? `/api/gym/plans/${plan.id}` : "/api/gym/plans", {
@@ -129,8 +143,8 @@ function PlanForm({ plan, onDone }: { plan?: GymPlan; onDone: (saved: boolean) =
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
           plan
-            ? { name: name.trim(), price: price.trim() }
-            : { name: name.trim(), kind, price: price.trim() },
+            ? { name: name.trim(), price: price.trim(), payment_link_url: link.trim() }
+            : { name: name.trim(), kind, price: price.trim(), payment_link_url: link.trim() },
         ),
       });
       const body = await res.json().catch(() => ({}));
@@ -195,6 +209,24 @@ function PlanForm({ plan, onDone }: { plan?: GymPlan; onDone: (saved: boolean) =
           value={price}
           onChange={(e) => setPrice(e.target.value)}
         />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={`plan-link-${plan?.id ?? "new"}`}>Stripe payment link (optional)</Label>
+        <Input
+          id={`plan-link-${plan?.id ?? "new"}`}
+          className="h-11"
+          type="url"
+          inputMode="url"
+          autoComplete="off"
+          placeholder="https://buy.stripe.com/…"
+          value={link}
+          onChange={(e) => setLink(e.target.value)}
+        />
+        <p className="text-sm text-muted-foreground">
+          Members on this plan get a &quot;Pay … online&quot; button that opens this link. Money
+          goes to your own Stripe account; you then mark the month paid as usual. Leave blank to
+          turn it off.
+        </p>
       </div>
       {error ? (
         <p className="text-sm text-destructive" role="alert">
