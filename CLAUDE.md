@@ -1044,7 +1044,7 @@ The browser check on emulated iPhones ran the owner adding a parent and getting 
 
 ### 2026-11-04 — P2 batch 2: plans and prices, sibling discount, drop-ins, capacity, photos and logo (flow audit 6.7, 8.3, 4.6, 3.5, 2.6, 10.5)
 
-**Status.** Built on local branch `p2-batch2` while the user was away. Defaults below were chosen without them. Needs migrations `20261104130000`, `20261104140000` and `20261104150000` applied before merging.
+**Status.** Built on local branch `p2-batch2` while the user was away, so the defaults below were chosen without them. The user applied migrations `20261104130000`, `20261104140000` and `20261104150000`; the branch was then live-tested and merged to main.
 
 **Decisions.**
 
@@ -1061,4 +1061,13 @@ The browser check on emulated iPhones ran the owner adding a parent and getting 
 - **Rule 3 in practice.** Plan prices now land in `payments.amount`, and RLS still lets an athlete or parent read their own rows' amount by direct REST (accepted since Stage 1; the app never selects it). Plan prices are also readable by gym members, as the gym's public prices. A column grant or view on `payments` would close the first.
 - A visitor added at the same moment as a check-in is ordered by the shared lock, but coaches can always go over capacity.
 - Price and photo changes are audited best effort.
-- Not live-tested yet (migrations not applied).
+
+**Verified after the migrations.** Hand-written types match `supabase gen types`. Live test 48/48 on the rehearsal gym with throwaway members, all cleaned up:
+
+- **Plans:** defaults seeded and backfilled; add/duplicate/coach refused; type immutable via REST; athletes read but can't change their plan; create and edit with a plan; legacy writes re-point; retired and other-gym plans refused.
+- **Fees:** 10% sibling discount, so mark-paid records 45 and 40.50; over 90% refused.
+- **Capacity:** a full 1-place class refuses the second member by route and by direct REST; re-check-in says "already checked in"; coach marks over the cap; athletes see the headcount.
+- **Visitors:** fee defaulted, email lowercased, waiver version recorded, counted in the headcount; hidden from athletes; future dates and unsigned typed waivers refused; names not editable; paid; deleted.
+- **Photos and logo:** coach upload and set; the member sees their photo and others can't; non-member folders, athlete uploads and coach logo uploads refused; delete removes the files.
+
+Browser-checked on an emulated iPhone: Settings (logo, plans), Visitors and the Add Visitor dialog, the members list, and a profile with its photo button. Production build passes.
