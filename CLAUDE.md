@@ -1093,3 +1093,19 @@ Browser-checked on an emulated iPhone: Settings (logo, plans), Visitors and the 
 - The regex can't prove a `buy.stripe.com` link belongs to the gym's own account. Owners are trusted, and every link change is audited.
 - A coach can move a member to another plan that has an owner-set link, which is covered by the member-update audit.
 - A plan whose creation audit failed stays retired and counts toward the 30-plan cap.
+
+**Verified after the migration.** The user applied `20261104160000`. Live test against the rehearsal gym, with throwaway data cleaned up:
+
+- **Owner:** creates a plan with a link, audited with the link.
+- **Bad links:** `evil.com`, a query string, `javascript:` and a lookalike host are refused by the route; a direct REST write is refused by the database check (23514).
+- **Coach:** can't change a link, by route (403) or by REST.
+- **Audit:** a link change records the before and after values.
+- **Athlete:** can read their plan's link.
+
+Browser-checked as a throwaway athlete on an emulated iPhone:
+
+- "Pay November online (test)" is 44px tall, opens in a new tab with `noopener noreferrer`, and carries the reference `Sean-O-Briain_2026-11_<id8>` and the pre-filled email.
+- After moving the athlete to the pay-per-class plan, it shows "Pay for a class online" with a `_class_` reference.
+- `payTarget` was checked directly: no button for a paid or frozen month or for staff; the oldest overdue month wins.
+
+**Testing note:** pages need a cookie session, so `fetch` with a bearer token is redirected to /login. Page checks must use the browser. Production build passes.
