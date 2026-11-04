@@ -46,15 +46,15 @@ GoCardless). Vendor claims are marketing, not verified.
 
 ## 3. Classes & timetable
 
-| #   | Flow                                                               | Rating              | Notes                                                                                                                                                                              |
-| --- | ------------------------------------------------------------------ | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 3.1 | Build a weekly timetable (multi-day add)                           | ✅                  |                                                                                                                                                                                    |
-| 3.2 | **Cancel or move one session** (bank holiday, seminar, coach away) | ✅ built 2026-11-02 | Template model only. A cancelled class still shows as "upcoming" and accepts check-ins. A known CLAUDE.md simplification; a lightweight "exceptions" table would solve most of it. |
-| 3.3 | Assign a coach to a class                                          | ✅ built 2026-11-03 | No instructor field. Needed for "who teaches what" and a coach's own view.                                                                                                         |
-| 3.4 | Programs / levels (Kids, Fundamentals, Advanced)                   | ✅ built 2026-11-03 | `class_type` is gi / no-gi / comp / open mat only. Kids and fundamentals classes can only be told apart by name.                                                                   |
-| 3.5 | Capacity                                                           | 🟡 P2               | `max_capacity` is stored and shown to coaches, but not enforced or shown to athletes. Matters only if booking is added.                                                            |
-| 3.6 | Athlete sees the week's timetable                                  | ✅ built 2026-11-03 | Home shows "upcoming" only; no full week view.                                                                                                                                     |
-| 3.7 | Class booking / reservations                                       | ⚪ P2               | Most BJJ gyms are walk-in; low value unless capacity is tight.                                                                                                                     |
+| #   | Flow                                                               | Rating                | Notes                                                                                                                                                                              |
+| --- | ------------------------------------------------------------------ | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 3.1 | Build a weekly timetable (multi-day add)                           | ✅                    |                                                                                                                                                                                    |
+| 3.2 | **Cancel or move one session** (bank holiday, seminar, coach away) | ✅ built 2026-11-02   | Template model only. A cancelled class still shows as "upcoming" and accepts check-ins. A known CLAUDE.md simplification; a lightweight "exceptions" table would solve most of it. |
+| 3.3 | Assign a coach to a class                                          | ✅ built 2026-11-03   | No instructor field. Needed for "who teaches what" and a coach's own view.                                                                                                         |
+| 3.4 | Programs / levels (Kids, Fundamentals, Advanced)                   | ✅ built 2026-11-03   | `class_type` is gi / no-gi / comp / open mat only. Kids and fundamentals classes can only be told apart by name.                                                                   |
+| 3.5 | Capacity                                                           | 🟡 P2                 | `max_capacity` is stored and shown to coaches, but not enforced or shown to athletes. Matters only if booking is added.                                                            |
+| 3.6 | Athlete sees the week's timetable                                  | ✅ built 2026-11-03   | Home shows "upcoming" only; no full week view.                                                                                                                                     |
+| 3.7 | Class booking / reservations                                       | ⏸ deferred 2026-11-04 | Most BJJ gyms are walk-in; low value unless capacity is tight.                                                                                                                     |
 
 ## 4. Attendance
 
@@ -69,26 +69,26 @@ GoCardless). Vendor claims are marketing, not verified.
 
 ## 5. Belts & progression
 
-| #   | Flow                                                            | Rating              | Notes                                                                                                                                                                                  |
-| --- | --------------------------------------------------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 5.1 | Promote belt / stripe (with celebration)                        | ✅                  |                                                                                                                                                                                        |
-| 5.2 | Starting rank on import / sign-up                               | ✅                  |                                                                                                                                                                                        |
-| 5.3 | **Promotion readiness** (classes and time since last promotion) | ✅ built 2026-11-02 | The single most BJJ-specific feature competitors lead with (attendance + time-in-rank criteria). All the data already exists; mostly a computed view plus a "ready for a stripe" list. |
-| 5.4 | Grading day / bulk promotions                                   | ⚪ P2               | Promote several people at once after a grading.                                                                                                                                        |
-| 5.5 | Curriculum / technique tracking                                 | ⚪ P2               |                                                                                                                                                                                        |
+| #   | Flow                                                            | Rating                | Notes                                                                                                                                                                                  |
+| --- | --------------------------------------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 5.1 | Promote belt / stripe (with celebration)                        | ✅                    |                                                                                                                                                                                        |
+| 5.2 | Starting rank on import / sign-up                               | ✅                    |                                                                                                                                                                                        |
+| 5.3 | **Promotion readiness** (classes and time since last promotion) | ✅ built 2026-11-02   | The single most BJJ-specific feature competitors lead with (attendance + time-in-rank criteria). All the data already exists; mostly a computed view plus a "ready for a stripe" list. |
+| 5.4 | Grading day / bulk promotions                                   | ✅ built 2026-11-04   | Promote several people at once after a grading.                                                                                                                                        |
+| 5.5 | Curriculum / technique tracking                                 | ⏸ deferred 2026-11-04 |                                                                                                                                                                                        |
 
 ## 6. Payments
 
-| #   | Flow                                                       | Rating               | Notes                                                                                                                                                                                                                                            |
-| --- | ---------------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 6.1 | **Monthly payment grid & overdue**                         | ✅ fixed 2026-11-02  | `billableMembers()` ignores `membership_plan` and role. Casual (pay-per-class) and comp-team members, and every coach, are flagged "Overdue" every month. Owners are excluded already (O6). False overdues erode trust in the dashboard quickly. |
-| 6.2 | Record / waive a payment                                   | ✅                   | Amount optional; no default price per plan.                                                                                                                                                                                                      |
-| 6.3 | Payments grid on a phone                                   | ✅ built 2026-11-03  | Six-month table scrolls sideways at 390 px (against the UI standard).                                                                                                                                                                            |
-| 6.4 | Athlete sees own payment status                            | ✅ built 2026-11-03  | RLS already allows it (amount filtered); no athlete UI.                                                                                                                                                                                          |
-| 6.5 | Payment reminders                                          | ⚪ P2                | Needs an email domain or WhatsApp templating.                                                                                                                                                                                                    |
-| 6.6 | Online billing / direct debit (Stripe / GoCardless / SEPA) | ⚪ P2 — **decision** | The headline feature of every competitor. Payment processing is explicitly out of scope in CLAUDE.md; changing that is a product decision, not a fix.                                                                                            |
-| 6.7 | Plans & prices configurable per gym                        | ⚪ P2                | Plans are a fixed enum (monthly / casual / comp team).                                                                                                                                                                                           |
-| 6.8 | Revenue summary                                            | ⚪ P2                |                                                                                                                                                                                                                                                  |
+| #   | Flow                                                       | Rating                           | Notes                                                                                                                                                                                                                                            |
+| --- | ---------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 6.1 | **Monthly payment grid & overdue**                         | ✅ fixed 2026-11-02              | `billableMembers()` ignores `membership_plan` and role. Casual (pay-per-class) and comp-team members, and every coach, are flagged "Overdue" every month. Owners are excluded already (O6). False overdues erode trust in the dashboard quickly. |
+| 6.2 | Record / waive a payment                                   | ✅                               | Amount optional; no default price per plan.                                                                                                                                                                                                      |
+| 6.3 | Payments grid on a phone                                   | ✅ built 2026-11-03              | Six-month table scrolls sideways at 390 px (against the UI standard).                                                                                                                                                                            |
+| 6.4 | Athlete sees own payment status                            | ✅ built 2026-11-03              | RLS already allows it (amount filtered); no athlete UI.                                                                                                                                                                                          |
+| 6.5 | Payment reminders                                          | ✅ built 2026-11-04              | Needs an email domain or WhatsApp templating.                                                                                                                                                                                                    |
+| 6.6 | Online billing / direct debit (Stripe / GoCardless / SEPA) | ⛔ stopped — scope/cost decision | The headline feature of every competitor. Payment processing is explicitly out of scope in CLAUDE.md; changing that is a product decision, not a fix.                                                                                            |
+| 6.7 | Plans & prices configurable per gym                        | ⚪ P2                            | Plans are a fixed enum (monthly / casual / comp team).                                                                                                                                                                                           |
+| 6.8 | Revenue summary                                            | ✅ built 2026-11-04              |                                                                                                                                                                                                                                                  |
 
 ## 7. Communication
 
@@ -96,7 +96,7 @@ GoCardless). Vendor claims are marketing, not verified.
 | --- | ------------------------------------------------ | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | 7.1 | Announcements (closures, seminars, gradings)     | ✅ built 2026-11-02                         | The `notifications` table exists but nothing renders it. Even an in-app banner on athlete Home would cover most of it.       |
 | 7.2 | Message one member                               | 🟡                                          | Only via the invite/reset share dialogs (WhatsApp/email from the coach's phone). No general "contact" action on the profile. |
-| 7.3 | Re-engage members not seen recently              | 🟡 P2                                       | The dashboard flags them; no one-tap "send a message" action.                                                                |
+| 7.3 | Re-engage members not seen recently              | ✅ built 2026-11-04                         | The dashboard flags them; no one-tap "send a message" action.                                                                |
 | 7.4 | Transactional email (invites, resets, reminders) | 🟡 code ready 2026-11-04, needs your domain | Blocked on verifying an email sending domain; this unblocks 1.9, 6.5 and 7.1 by email.                                       |
 
 ## 8. Families & kids
@@ -112,19 +112,19 @@ GoCardless). Vendor claims are marketing, not verified.
 | #   | Flow                                                            | Rating              | Notes                                                                                                    |
 | --- | --------------------------------------------------------------- | ------------------- | -------------------------------------------------------------------------------------------------------- |
 | 9.1 | Free-trial booking / lead capture (e.g. from the gym's website) | ✅ built 2026-11-03 | Standard in competitors; the Northside website could feed it directly.                                   |
-| 9.2 | Trial → member conversion tracking                              | ⚪ P2               |                                                                                                          |
+| 9.2 | Trial → member conversion tracking                              | ✅ built 2026-11-04 |                                                                                                          |
 | 9.3 | Liability waiver / medical info at sign-up                      | ✅ built 2026-11-03 | Only GDPR consent today. Waivers (parent-signed for minors) are near-universal in martial arts software. |
 
 ## 10. Insights & admin
 
-| #    | Flow                                                       | Rating | Notes                                          |
-| ---- | ---------------------------------------------------------- | ------ | ---------------------------------------------- |
-| 10.1 | Dashboard stats, flags, recent activity                    | ✅     |                                                |
-| 10.2 | Audit log                                                  | ✅     |                                                |
-| 10.3 | AI assistant (read + confirmed writes)                     | ✅     | Alpha scope.                                   |
-| 10.4 | Reports (attendance trends, busiest classes, growth/churn) | ⚪ P2  |                                                |
-| 10.5 | Gym logo / branding                                        | ⚪ P2  | Deferred in O-stages (needs a storage bucket). |
-| 10.6 | Multiple locations                                         | ⚪ P2  |                                                |
+| #    | Flow                                                       | Rating                | Notes                                          |
+| ---- | ---------------------------------------------------------- | --------------------- | ---------------------------------------------- |
+| 10.1 | Dashboard stats, flags, recent activity                    | ✅                    |                                                |
+| 10.2 | Audit log                                                  | ✅                    |                                                |
+| 10.3 | AI assistant (read + confirmed writes)                     | ✅                    | Alpha scope.                                   |
+| 10.4 | Reports (attendance trends, busiest classes, growth/churn) | ✅ built 2026-11-04   |                                                |
+| 10.5 | Gym logo / branding                                        | ⚪ P2                 | Deferred in O-stages (needs a storage bucket). |
+| 10.6 | Multiple locations                                         | ⏸ deferred 2026-11-04 |                                                |
 
 ---
 
