@@ -52,7 +52,7 @@ export default async function AthleteHomePage() {
   ] = await Promise.all([
     supabase
       .from("members")
-      .select("id, belt, stripes, role, membership_plan, join_date")
+      .select("id, belt, stripes, role, membership_plan, join_date, plan:gym_plans(name)")
       .eq("id", member.memberId)
       .single(),
     supabase.from("attendance").select("checked_in_date").eq("member_id", member.memberId),
@@ -183,7 +183,11 @@ export default async function AthleteHomePage() {
       </div>
 
       {paymentSummary && memberRow ? (
-        <MembershipStatusCard plan={memberRow.membership_plan} summary={paymentSummary} />
+        <MembershipStatusCard
+          plan={memberRow.membership_plan}
+          planName={memberRow.plan?.name}
+          summary={paymentSummary}
+        />
       ) : membershipError ? (
         <p className="rounded-md border p-4 text-sm text-muted-foreground">
           Couldn&apos;t load your membership status. Try refreshing.

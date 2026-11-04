@@ -13,6 +13,7 @@ import { PaymentCellDialog } from "@/components/shared/payment-cell-dialog";
 import { BulkInviteDialog } from "@/components/shared/bulk-invite-dialog";
 import { SignupLinkDialog } from "@/components/shared/signup-link-dialog";
 import { PLAN_LABELS } from "@/lib/constants/member-labels";
+import { MemberAvatar, useSignedPhotos } from "@/components/shared/image-upload";
 import { isBillable } from "@/lib/payments/overdue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,7 +70,7 @@ function useMembers() {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("members")
-        .select("*")
+        .select("*, plan:gym_plans(name)")
         .order("last_name", { ascending: true });
       if (error) throw error;
       return data;
@@ -188,6 +189,10 @@ export default function MembersPage() {
   // Flow audit 9.3.
   const waiverStatus = useWaiverStatus();
   const { data: members, isLoading, error } = useMembers();
+  // Flow audit 2.6: photos help coaches learn names (signed URLs, batched).
+  const photoUrls = useSignedPhotos(
+    (members ?? []).flatMap((m) => (m.photo_url ? [m.photo_url] : [])),
+  );
   const {
     data: payments,
     isLoading: paymentsLoading,
@@ -541,8 +546,14 @@ export default function MembersPage() {
                     cancels the padding). */}
                     <Link
                       href={`/members/${member.id}`}
-                      className="-my-3 block w-full py-3 font-medium hover:underline"
+                      className="-my-3 flex w-full items-center gap-2 py-3 font-medium hover:underline"
                     >
+                      <MemberAvatar
+                        url={member.photo_url ? photoUrls.get(member.photo_url) : null}
+                        firstName={member.first_name}
+                        lastName={member.last_name}
+                        size={28}
+                      />
                       {member.first_name} {member.last_name}
                     </Link>
                   </TableCell>
@@ -555,7 +566,9 @@ export default function MembersPage() {
                     )}
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
-                    {member.role === "guardian" ? "—" : PLAN_LABELS[member.membership_plan]}
+                    {member.role === "guardian"
+                      ? "—"
+                      : (member.plan?.name ?? PLAN_LABELS[member.membership_plan])}
                   </TableCell>
                   <TableCell>
                     {!isBillable(member) ? (

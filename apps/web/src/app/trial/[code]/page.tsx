@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { resolveTrialGym, trialSessions, type TrialSession } from "@/lib/trials/public";
 import { TrialRequestForm } from "@/components/shared/trial-request-form";
+import { signedGymLogo } from "@/lib/storage/logo";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,8 @@ export default async function TrialPage({ params }: { params: { code: string } }
     );
   }
 
+  const logo = await signedGymLogo(gym.id).catch(() => null);
+
   let sessions: TrialSession[] = [];
   try {
     sessions = await trialSessions(gym);
@@ -44,6 +47,10 @@ export default async function TrialPage({ params }: { params: { code: string } }
     <main className="flex min-h-dvh flex-col items-center justify-start p-4 sm:justify-center">
       <Card className="w-full max-w-lg">
         <CardHeader>
+          {logo ? (
+            // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL
+            <img src={logo.url} alt="" className="mb-2 h-16 w-auto max-w-[12rem] object-contain" />
+          ) : null}
           <CardTitle className="font-heading text-3xl tracking-wide">{gym.name}</CardTitle>
           <CardDescription>
             Try a class for free. Tell us a little about yourself and which class you&apos;d like to

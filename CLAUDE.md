@@ -1041,3 +1041,24 @@ The browser check on emulated iPhones ran the owner adding a parent and getting 
 **Gate.** security + code reviewers: no BLOCKED. Fixes: Irish trunk-0 handling, batch cap, NO_CHANGE and inactive refusals, 409 when none promoted, neutral payment text, athlete-only and gym-timezone report counts, and a chart that is one labelled image with a table view (bars too narrow to tap on phones). Live-tested 12/12 (grading + single promote regression); browser-checked at iPhone width.
 
 **Deferred (P2).** 3.7 booking, 5.5 curriculum, 10.6 multiple locations; 6.6 online billing stopped for a scope and cost decision with the user.
+
+### 2026-11-04 — P2 batch 2: plans and prices, sibling discount, drop-ins, capacity, photos and logo (flow audit 6.7, 8.3, 4.6, 3.5, 2.6, 10.5)
+
+**Status.** Built on local branch `p2-batch2` while the user was away. Defaults below were chosen without them. Needs migrations `20261104130000`, `20261104140000` and `20261104150000` applied before merging.
+
+**Decisions.**
+
+- **Plans and prices (6.7).** `members.membership_plan` stays the billing type that `isBillable`, overdue and holds use. `gym_plans` adds the gym's own named plans on top, each of one type, with an optional price; `members.plan_id` points at one. The `members_plan_sync` trigger keeps the two consistent, so every older writer (import, sign-up links, add_guardian, the assistant) still works. Every real gym gets Monthly, Competition team and Pay per class plans (backfilled, and seeded for new gyms). Owner manages plans in Settings; plans are retired, never deleted, and their type is fixed. Prices are guidance only: the payment dialog pre-fills them and bulk mark-paid records them for rows without an amount. Nothing is charged (6.6 stopped).
+- **Sibling discount (8.3).** `gyms.sibling_discount_percent` (0–90). Children who share a parent account (8.2) form a family; the oldest membership pays full price and the others get the discount. Computed in `lib/payments/fees.ts`.
+- **Drop-ins (4.6).** `drop_in_visits`: staff-only visitor records against a class and date (name, optional home gym, belt and contact, mat fee and paid, waiver typed on the coach's device or on paper). No login, no member row. `gyms.drop_in_fee` pre-fills the fee. Coach Visitors page; visitors show on coach Attendance. **Retention:** 12 months, purged when the next visit is recorded; GDPR erasure also deletes visits matching the member's email.
+- **Capacity (3.5).** `classes.max_capacity` is now enforced for member-initiated check-ins (self, parent, kiosk) by a BEFORE INSERT trigger with a per-session advisory lock, so it holds for direct REST inserts too. Coaches marking someone present and coaches adding visitors are never blocked. Visitors count. Athletes see "N of M places taken" via `class_headcounts` (counts only).
+- **Photos and logo (2.6, 10.5).** Two private buckets with storage RLS. `member-photos`: staff of the gym read and write; the member and their parents read; the folder must be a member of the gym. `gym-logos`: gym members read; the owner writes. Uploads need a real gym, not a personal workspace. The browser re-encodes images (drops EXIF/GPS) — a UI safeguard, not enforced. The public trial page and kiosk get a signed logo URL from the server (service role, Rule 4, same category as those pages' other reads). Photos are removed on GDPR erasure and solo deletion. Athletes can no longer set `photo_url` or `plan_id` themselves.
+
+**Gate.** database + security + code reviewers: no BLOCKED. Fixed from the gate: real-gym and member-folder checks on storage writes, self/parent photo reads tied to the gym folder, path regex escapes and logo path validation before signing, "already checked in" reported before "full", composite `(class_id, checked_in_date)` index, plans cascade with their gym (provisioning rollback), anon revoked on plans, visitor lock shared with check-ins, seed respecting capacity, drop-ins in the GDPR sweep, visitor retention, edit form no longer re-defaulting a member's plan, fee cache invalidated on member and parent-link changes, waived months not pre-filled, check-in page refreshing after a refusal, Add Visitor form not reset by late defaults, kiosk logo re-signed every 5 hours.
+
+**Accepted.**
+
+- **Rule 3 in practice.** Plan prices now land in `payments.amount`, and RLS still lets an athlete or parent read their own rows' amount by direct REST (accepted since Stage 1; the app never selects it). Plan prices are also readable by gym members, as the gym's public prices. A column grant or view on `payments` would close the first.
+- A visitor added at the same moment as a check-in is ordered by the shared lock, but coaches can always go over capacity.
+- Price and photo changes are audited best effort.
+- Not live-tested yet (migrations not applied).

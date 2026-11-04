@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/audit/log";
 import { markPaidSchema } from "@matos/shared";
 import { isBillable } from "@/lib/payments/overdue";
+import { loadFeeContext, monthlyFee } from "@/lib/payments/fees";
 
 // POST /api/payments/mark-paid — coach/owner only. Bulk-marks the *current*
 // calendar month paid for the given members, per plan §7's Member List
@@ -31,6 +32,20 @@ export const POST = withAuth(
       .in("id", input.member_ids);
     const billableIds = new Set((rows ?? []).filter(isBillable).map((m) => m.id));
 
+    // Flow audit 6.7: a new payment row records the plan price (with any
+    // sibling discount). An amount the coach already entered is kept — the
+    // upsert below only sends amount for rows that have none yet.
+    const fees = await loadFeeContext(supabase, context.gymId);
+    const { data: existingRows } = await supabase
+      .from("payments")
+      .select("member_id, amount")
+      .in("member_id", input.member_ids)
+      .eq("period_month", periodMonth)
+      .eq("period_year", periodYear);
+    const hasAmount = new Set(
+      (existingRows ?? []).filter((r) => r.amount !== null).map((r) => r.member_id),
+    );
+
     for (const memberId of input.member_ids) {
       if (!billableIds.has(memberId)) {
         failed.push(memberId);
@@ -45,6 +60,12 @@ export const POST = withAuth(
           status: "paid",
           paid_at: now.toISOString(),
           recorded_by: context.userId,
+          ...(hasAmount.has(memberId)
+            ? {}
+            : (() => {
+                const fee = monthlyFee(fees, memberId);
+                return fee ? { amount: fee.amount } : {};
+              })()),
         },
         { onConflict: "member_id,period_month,period_year" },
       );

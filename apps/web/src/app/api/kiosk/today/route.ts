@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { signedGymLogo } from "@/lib/storage/logo";
 import { apiError } from "@/lib/api/response";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { resolveKioskDevice, setKioskCookie } from "@/lib/kiosk/device";
@@ -53,9 +54,14 @@ export async function GET(request: NextRequest) {
     (checkedIn[a.class_id] ??= []).push(a.member_id);
   }
 
+  // Flow audit 10.5: the logo (signed; the screen keeps the first URL it
+  // gets for a given path so polling doesn't reload the image).
+  const logo = await signedGymLogo(device.gymId).catch(() => null);
+
   const response = NextResponse.json(
     {
       gymName: device.gymName,
+      logo,
       today: now.date,
       minutesOfDay: now.minutesOfDay,
       sessions: sessions.map((s) => {

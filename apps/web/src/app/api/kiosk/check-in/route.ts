@@ -89,6 +89,10 @@ export async function POST(request: NextRequest) {
     .select("id")
     .single();
   if (error || !created) {
+    // Flow audit 3.5: attendance_zz_capacity refuses a full session.
+    if (error?.code === "MF001") {
+      return apiError(409, "CLASS_FULL", "This class is full. Ask a coach if there's room.");
+    }
     if (error?.code === "23505") {
       return apiError(
         409,

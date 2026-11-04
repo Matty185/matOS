@@ -658,6 +658,88 @@ export type Database = {
           },
         ];
       };
+      drop_in_visits: {
+        Row: {
+          belt: Database["public"]["Enums"]["belt_color"] | null;
+          class_id: string | null;
+          created_at: string;
+          created_by: string | null;
+          email: string | null;
+          fee: number | null;
+          fee_paid: boolean;
+          first_name: string;
+          gym_id: string;
+          home_gym: string | null;
+          id: string;
+          last_name: string;
+          phone: string | null;
+          visit_date: string;
+          waiver_method: string;
+          waiver_signer_name: string | null;
+          waiver_version_id: string | null;
+        };
+        Insert: {
+          belt?: Database["public"]["Enums"]["belt_color"] | null;
+          class_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          email?: string | null;
+          fee?: number | null;
+          fee_paid?: boolean;
+          first_name: string;
+          gym_id: string;
+          home_gym?: string | null;
+          id?: string;
+          last_name: string;
+          phone?: string | null;
+          visit_date: string;
+          waiver_method?: string;
+          waiver_signer_name?: string | null;
+          waiver_version_id?: string | null;
+        };
+        Update: {
+          belt?: Database["public"]["Enums"]["belt_color"] | null;
+          class_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          email?: string | null;
+          fee?: number | null;
+          fee_paid?: boolean;
+          first_name?: string;
+          gym_id?: string;
+          home_gym?: string | null;
+          id?: string;
+          last_name?: string;
+          phone?: string | null;
+          visit_date?: string;
+          waiver_method?: string;
+          waiver_signer_name?: string | null;
+          waiver_version_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "drop_in_visits_class_id_fkey";
+            columns: ["class_id"];
+            isOneToOne: false;
+            referencedRelation: "classes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "drop_in_visits_gym_id_fkey";
+            columns: ["gym_id"];
+            isOneToOne: false;
+            referencedRelation: "gyms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "drop_in_visits_waiver_version_id_fkey";
+            columns: ["waiver_version_id"];
+            isOneToOne: false;
+            referencedRelation: "waiver_versions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       entitlements: {
         Row: {
           created_at: string;
@@ -798,12 +880,54 @@ export type Database = {
           },
         ];
       };
+      gym_plans: {
+        Row: {
+          active: boolean;
+          created_at: string;
+          gym_id: string;
+          id: string;
+          kind: Database["public"]["Enums"]["membership_plan"];
+          name: string;
+          price: number | null;
+          sort_order: number;
+        };
+        Insert: {
+          active?: boolean;
+          created_at?: string;
+          gym_id: string;
+          id?: string;
+          kind: Database["public"]["Enums"]["membership_plan"];
+          name: string;
+          price?: number | null;
+          sort_order?: number;
+        };
+        Update: {
+          active?: boolean;
+          created_at?: string;
+          gym_id?: string;
+          id?: string;
+          kind?: Database["public"]["Enums"]["membership_plan"];
+          name?: string;
+          price?: number | null;
+          sort_order?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "gym_plans_gym_id_fkey";
+            columns: ["gym_id"];
+            isOneToOne: false;
+            referencedRelation: "gyms";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       gyms: {
         Row: {
           active: boolean;
           address: string | null;
           contact_email: string | null;
           created_at: string;
+          drop_in_fee: number | null;
           id: string;
           kind: Database["public"]["Enums"]["gym_kind"];
           logo_url: string | null;
@@ -812,6 +936,7 @@ export type Database = {
           payments_tracked_from: string | null;
           promotion_classes_per_stripe: number | null;
           promotion_months_per_stripe: number | null;
+          sibling_discount_percent: number;
           timezone: string;
           trial_code: string | null;
         };
@@ -820,6 +945,7 @@ export type Database = {
           address?: string | null;
           contact_email?: string | null;
           created_at?: string;
+          drop_in_fee?: number | null;
           id?: string;
           kind?: Database["public"]["Enums"]["gym_kind"];
           logo_url?: string | null;
@@ -828,6 +954,7 @@ export type Database = {
           payments_tracked_from?: string | null;
           promotion_classes_per_stripe?: number | null;
           promotion_months_per_stripe?: number | null;
+          sibling_discount_percent?: number;
           timezone?: string;
           trial_code?: string | null;
         };
@@ -836,6 +963,7 @@ export type Database = {
           address?: string | null;
           contact_email?: string | null;
           created_at?: string;
+          drop_in_fee?: number | null;
           id?: string;
           kind?: Database["public"]["Enums"]["gym_kind"];
           logo_url?: string | null;
@@ -844,6 +972,7 @@ export type Database = {
           payments_tracked_from?: string | null;
           promotion_classes_per_stripe?: number | null;
           promotion_months_per_stripe?: number | null;
+          sibling_discount_percent?: number;
           timezone?: string;
           trial_code?: string | null;
         };
@@ -1016,6 +1145,7 @@ export type Database = {
           notes: string | null;
           phone: string | null;
           photo_url: string | null;
+          plan_id: string | null;
           role: Database["public"]["Enums"]["member_role"];
           stripes: number;
           updated_at: string;
@@ -1037,6 +1167,7 @@ export type Database = {
           notes?: string | null;
           phone?: string | null;
           photo_url?: string | null;
+          plan_id?: string | null;
           role?: Database["public"]["Enums"]["member_role"];
           stripes?: number;
           updated_at?: string;
@@ -1058,6 +1189,7 @@ export type Database = {
           notes?: string | null;
           phone?: string | null;
           photo_url?: string | null;
+          plan_id?: string | null;
           role?: Database["public"]["Enums"]["member_role"];
           stripes?: number;
           updated_at?: string;
@@ -1069,6 +1201,13 @@ export type Database = {
             columns: ["gym_id"];
             isOneToOne: false;
             referencedRelation: "gyms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "members_plan_id_fkey";
+            columns: ["plan_id"];
+            isOneToOne: false;
+            referencedRelation: "gym_plans";
             referencedColumns: ["id"];
           },
         ];
@@ -1620,6 +1759,13 @@ export type Database = {
         Returns: {
           created: boolean;
           guardian_member_id: string;
+        }[];
+      };
+      class_headcounts: {
+        Args: { p_date: string };
+        Returns: {
+          class_id: string;
+          headcount: number;
         }[];
       };
       class_coach_names: {

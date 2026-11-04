@@ -3,6 +3,7 @@ import { apiError } from "@/lib/api/response";
 import { withAuth } from "@/lib/auth/withAuth";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { writeAuditLog } from "@/lib/audit/log";
+import { purgeStorageFolder } from "@/lib/storage/purge";
 
 // POST /api/account/delete-solo — self-serve, immediate account deletion
 // for solo (personal-workspace-only) users, per matos_mobile_plan.md §2.3
@@ -112,6 +113,29 @@ export const POST = withAuth(async (_request, context) => {
     return apiError(500, "INTERNAL_ERROR", "Something went wrong — nothing was deleted.");
   }
 
+  // Flow audit 2.6 / 10.5: photo and logo files, if the owner uploaded any
+  // directly (the routes refuse personal workspaces).
+  const photosPurged = await purgeStorageFolder(
+    supabase,
+    "member-photos",
+    `${personalGymId}/${context.memberId}`,
+  );
+  const logosPurged = await purgeStorageFolder(supabase, "gym-logos", personalGymId);
+  if (!photosPurged || !logosPurged) {
+    return apiError(500, "INTERNAL_ERROR", "Something went wrong — nothing was deleted.");
+  }
+
+  // Flow audit 4.6: same for drop-in visitors (other people's names and
+  // contact details); they also reference waiver versions deleted below.
+  const { error: dropInsError } = await supabase
+    .from("drop_in_visits")
+    .delete()
+    .eq("gym_id", personalGymId);
+  if (dropInsError) {
+    console.error("[delete-solo] failed to delete drop-in visits", dropInsError);
+    return apiError(500, "INTERNAL_ERROR", "Something went wrong — nothing was deleted.");
+  }
+
   const { error: consentError } = await supabase
     .from("gdpr_consents")
     .delete()
@@ -139,6 +163,17 @@ export const POST = withAuth(async (_request, context) => {
     .eq("gym_id", personalGymId);
   if (waiverVersionsError) {
     console.error("[delete-solo] failed to delete waiver versions", waiverVersionsError);
+    return apiError(500, "INTERNAL_ERROR", "Something went wrong — nothing was deleted.");
+  }
+
+  // Flow audit 6.7: plans aren't seeded for personal workspaces, but an
+  // owner could add one directly. Unreferenced now the member row is gone.
+  const { error: plansError } = await supabase
+    .from("gym_plans")
+    .delete()
+    .eq("gym_id", personalGymId);
+  if (plansError) {
+    console.error("[delete-solo] failed to delete plans", plansError);
     return apiError(500, "INTERNAL_ERROR", "Something went wrong — nothing was deleted.");
   }
 

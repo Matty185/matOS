@@ -3,6 +3,7 @@ import { withAuth } from "@/lib/auth/withAuth";
 import { apiError } from "@/lib/api/response";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { purgeStorageFolder } from "@/lib/storage/purge";
 import { writeAuditLog } from "@/lib/audit/log";
 import { isLastActiveOwner, LAST_OWNER_MESSAGE } from "@/lib/api/member-guards";
 
@@ -65,6 +66,18 @@ export const POST = withAuth(
     // anything is touched instead of leaving an un-anonymisable member row.
     if (await isLastActiveOwner(serviceClient, member.id)) {
       return apiError(409, "LAST_OWNER", LAST_OWNER_MESSAGE);
+    }
+
+    // Flow audit 2.6: their photo goes first (before anything irreversible),
+    // so a storage failure leaves the request safe to retry.
+    if (
+      !(await purgeStorageFolder(serviceClient, "member-photos", `${member.gym_id}/${member.id}`))
+    ) {
+      return apiError(
+        500,
+        "DELETION_FAILED",
+        "Something went wrong — the deletion wasn't completed. It's safe to retry.",
+      );
     }
 
     const anonymizedEmail = `deleted-${member.id}@anonymized.invalid`;
@@ -177,6 +190,7 @@ export const POST = withAuth(
       leadsByLinkResult,
       leadsByEmailResult,
       guardianLinksResult,
+      dropInsResult,
     ] = await Promise.all([
       serviceClient.from("attendance").delete().eq("member_id", member.id),
       serviceClient.from("athlete_logs").delete().eq("member_id", member.id),
@@ -230,6 +244,15 @@ export const POST = withAuth(
         .from("member_guardians")
         .delete()
         .or(`guardian_member_id.eq.${member.id},child_member_id.eq.${member.id}`),
+      // Flow audit 4.6: drop-in visits they made before joining (visitor
+      // emails are stored lowercased). Skipped on a retry, once anonymised.
+      member.email && !/@anonymized\.invalid$/.test(member.email)
+        ? serviceClient
+            .from("drop_in_visits")
+            .delete()
+            .eq("gym_id", member.gym_id)
+            .eq("email", member.email.toLowerCase())
+        : Promise.resolve({ error: null }),
     ]);
 
     for (const [label, result] of [
@@ -246,6 +269,7 @@ export const POST = withAuth(
       ["trial_leads (converted)", leadsByLinkResult],
       ["trial_leads (email)", leadsByEmailResult],
       ["member_guardians", guardianLinksResult],
+      ["drop_in_visits", dropInsResult],
     ] as const) {
       if (result.error) {
         console.error(`[gdpr] failed to clean up ${label}`, result.error);

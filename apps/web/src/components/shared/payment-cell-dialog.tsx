@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { PaymentStatus } from "@/lib/payments/overdue";
+import type { Fee } from "@/lib/payments/fees";
 
 type FormValues = {
   status: PaymentStatus;
@@ -41,6 +42,8 @@ type PaymentCellDialogProps = {
   periodMonth: number;
   periodYear: number;
   existing: { status: PaymentStatus; amount: number | null; notes: string | null } | null;
+  /** The member's plan fee (flow audit 6.7), pre-filled when no amount is recorded yet. */
+  fee?: Fee | null;
   onSaved: () => void;
 };
 
@@ -52,6 +55,7 @@ export function PaymentCellDialog({
   periodMonth,
   periodYear,
   existing,
+  fee = null,
   onSaved,
 }: PaymentCellDialogProps) {
   const {
@@ -80,10 +84,12 @@ export function PaymentCellDialog({
     if (!open || isDirty) return;
     reset({
       status: existing?.status ?? "unpaid",
-      amount: existing?.amount ?? null,
+      amount:
+        existing?.amount ??
+        (!existing || existing.status !== "waived" ? (fee?.amount ?? null) : null),
       notes: existing?.notes ?? "",
     });
-  }, [open, memberId, periodMonth, periodYear, existing, isDirty, reset]);
+  }, [open, memberId, periodMonth, periodYear, existing, fee?.amount, isDirty, reset]);
 
   // Clears isDirty on close so the guard above doesn't block the resync
   // effect the next time a *different* cell is opened (isDirty otherwise
@@ -167,6 +173,8 @@ export function PaymentCellDialog({
             />
             {errors.amount ? (
               <p className="text-sm text-destructive">{errors.amount.message}</p>
+            ) : fee ? (
+              <p className="text-sm text-muted-foreground">Plan price — {fee.note}.</p>
             ) : null}
           </div>
 

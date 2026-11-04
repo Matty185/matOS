@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/audit/log";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { editMemberSchema } from "@matos/shared";
+import { resolvePlan } from "@/lib/payments/resolve-plan";
 
 // PATCH /api/members/[id] — coach/owner only. Contact/plan/notes fields
 // only — belt/stripes change via .../promote, active via .../deactivate,
@@ -22,13 +23,29 @@ export const PATCH = withAuth(
     const { data: before } = await supabase
       .from("members")
       .select(
-        "first_name, last_name, email, user_id, phone, emergency_contact_name, emergency_contact_phone, membership_plan, notes",
+        "first_name, last_name, email, user_id, phone, emergency_contact_name, emergency_contact_phone, membership_plan, plan_id, notes",
       )
       .eq("id", id)
       .single();
 
     if (!before) {
       return apiError(404, "MEMBER_NOT_FOUND", "No member found with that id in your gym.");
+    }
+
+    // Flow audit 6.7: a chosen plan sets the billing type. Keeping a retired
+    // plan the member is already on is fine; switching to one isn't.
+    let membershipPlan = input.membership_plan;
+    let planId: string | undefined;
+    if (input.plan_id) {
+      const plan = await resolvePlan(
+        supabase,
+        context.gymId,
+        input.plan_id,
+        input.plan_id === before.plan_id,
+      );
+      if (!plan.ok) return apiError(400, "INVALID_PLAN", "Choose one of your gym's current plans.");
+      membershipPlan = plan.kind;
+      planId = input.plan_id;
     }
 
     const emailChanged = input.email !== undefined && input.email !== before.email;
@@ -68,7 +85,8 @@ export const PATCH = withAuth(
         phone: input.phone || null,
         emergency_contact_name: input.emergency_contact_name || null,
         emergency_contact_phone: input.emergency_contact_phone || null,
-        membership_plan: input.membership_plan,
+        membership_plan: membershipPlan,
+        ...(planId ? { plan_id: planId } : {}),
         notes: input.notes || null,
       })
       .eq("id", id);
@@ -86,6 +104,9 @@ export const PATCH = withAuth(
     }
 
     if (updateError) {
+      if (updateError.code === "22023") {
+        return apiError(400, "INVALID_PLAN", "Choose one of your gym's current plans.");
+      }
       if (updateError.code === "23505") {
         return apiError(409, "EMAIL_TAKEN", "Someone in your gym already has this email.");
       }
@@ -110,6 +131,7 @@ export const PATCH = withAuth(
         emergency_contact_name: before.emergency_contact_name,
         emergency_contact_phone: before.emergency_contact_phone,
         membership_plan: before.membership_plan,
+        plan_id: before.plan_id,
         notes: before.notes,
       },
       afterState: {
@@ -119,7 +141,8 @@ export const PATCH = withAuth(
         phone: input.phone || null,
         emergency_contact_name: input.emergency_contact_name || null,
         emergency_contact_phone: input.emergency_contact_phone || null,
-        membership_plan: input.membership_plan,
+        membership_plan: membershipPlan,
+        ...(planId ? { plan_id: planId } : {}),
         notes: input.notes || null,
       },
       initiatedBy: input.agent_query ? "agent" : "coach_manual",

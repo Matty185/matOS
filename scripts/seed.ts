@@ -721,6 +721,8 @@ async function main() {
   console.log("Generating attendance (this is the slow part)...");
   const windowStart = addDaysUTC(today, -13 * 7);
   const attendanceRows: Database["public"]["Tables"]["attendance"]["Insert"][] = [];
+  // Per class+date head count, so seeded self check-ins stay within capacity.
+  const sessionCount = new Map<string, number>();
   for (let offset = 0; ; offset++) {
     const dateStr = addDaysUTC(windowStart, offset);
     if (dateStr > today) break;
@@ -733,17 +735,24 @@ async function main() {
         if (dateStr < joinDate) continue;
         if (!a.regularClasses.includes(cls.key)) continue;
         if (Math.random() > a.attendanceProbability) continue;
+        const sessionKey = `${cls.key}:${dateStr}`;
         attendanceRows.push({
           member_id: memberIdByKey.get(a.key)!,
           class_id: classIdByKey.get(cls.key)!,
           gym_id: gymId,
           checked_in_at: dublinISO(dateStr, `${cls.start_time}:00`),
-          checked_in_by: Math.random() < 0.15 ? "coach" : "self",
+          // Self check-ins are refused once a class is full (flow audit
+          // 3.5); any past the cap are recorded as marked by a coach.
+          checked_in_by:
+            Math.random() < 0.15 || (sessionCount.get(sessionKey) ?? 0) >= cls.max_capacity
+              ? "coach"
+              : "self",
           // Placeholder the generated Insert type requires — Stage 1's
           // attendance_set_checked_in_date trigger unconditionally
           // overwrites it, same as the real mark/check-in routes.
           checked_in_date: dateStr,
         });
+        sessionCount.set(sessionKey, (sessionCount.get(sessionKey) ?? 0) + 1);
       }
     }
   }

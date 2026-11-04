@@ -20,7 +20,9 @@ import { MembershipHolds, useMemberHolds } from "@/components/shared/membership-
 import { MemberWaiver } from "@/components/shared/member-waiver";
 import { MemberGuardians } from "@/components/shared/member-guardians";
 import { MessageMember } from "@/components/shared/message-member";
+import { ImageUploadButton, MemberAvatar, useSignedImage } from "@/components/shared/image-upload";
 import { holdCovering, holdMonths } from "@/lib/payments/holds";
+import { loadFeeContext, monthlyFee, formatMoney } from "@/lib/payments/fees";
 import { useGymToday } from "@/hooks/use-gym-today";
 import { PLAN_LABELS } from "@/lib/constants/member-labels";
 import { isBillable, isOverdue, type PaymentStatus } from "@/lib/payments/overdue";
@@ -174,13 +176,11 @@ export function MemberProfileClient({
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div
-            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-muted text-lg font-semibold"
-            aria-hidden="true"
-          >
-            {member.first_name[0]}
-            {member.last_name[0]}
-          </div>
+          <ProfilePhoto
+            path={member.photo_url}
+            firstName={member.first_name}
+            lastName={member.last_name}
+          />
           <div className="flex flex-col gap-1">
             <h1 className="font-heading text-3xl tracking-wide">
               {member.first_name} {member.last_name}
@@ -192,7 +192,9 @@ export function MemberProfileClient({
               ) : (
                 <>
                   <BeltDisplay belt={member.belt} stripes={member.stripes} size="sm" showLabel />
-                  <Badge variant="outline">{PLAN_LABELS[member.membership_plan]}</Badge>
+                  <Badge variant="outline">
+                    <PlanName memberId={member.id} fallback={PLAN_LABELS[member.membership_plan]} />
+                  </Badge>
                 </>
               )}
               {member.active ? (
@@ -206,6 +208,16 @@ export function MemberProfileClient({
         </div>
 
         <div className="flex flex-wrap gap-2">
+          {member.active ? (
+            <ImageUploadButton
+              bucket="member-photos"
+              folder={`${member.gym_id}/${member.id}`}
+              saveUrl={`/api/members/${member.id}/photo`}
+              label={member.photo_url ? "Change photo" : "Add photo"}
+              onSaved={() => router.refresh()}
+            />
+          ) : null}
+          {member.photo_url ? <RemovePhotoButton memberId={member.id} /> : null}
           <Button asChild variant="outline" className="h-11">
             <Link href={`/members/${member.id}/edit`}>Edit</Link>
           </Button>
@@ -625,11 +637,20 @@ function PaymentsTab({
     }
   }
 
+  const { data: fees } = useFeeContext();
+  const fee = fees ? monthlyFee(fees, memberId) : null;
+
   // Wait for holds too, or a frozen unpaid month would flash "overdue".
   if (isLoading || holdsLoading) return <p className="text-sm text-muted-foreground">Loading...</p>;
 
   return (
     <div className="flex flex-col gap-4">
+      {billable && fee ? (
+        <p className="text-sm text-muted-foreground">
+          {fee.note}
+          {fee.amount !== fee.base ? ` = ${formatMoney(fee.amount)}` : ""} a month.
+        </p>
+      ) : null}
       {billable ? (
         <MembershipHolds memberId={memberId} memberName={memberName} canEdit={active} />
       ) : null}
@@ -731,6 +752,7 @@ function PaymentsTab({
         periodMonth={selectedPeriod?.month ?? 1}
         periodYear={selectedPeriod?.year ?? new Date().getFullYear()}
         existing={selectedPeriod?.existing ?? null}
+        fee={fee}
         onSaved={() => {
           setSelectedPeriod(null);
           onPaymentChanged();
@@ -738,6 +760,62 @@ function PaymentsTab({
       />
     </div>
   );
+}
+
+// Flow audit 2.6: the member's photo (private bucket, signed URL).
+function ProfilePhoto({
+  path,
+  firstName,
+  lastName,
+}: {
+  path: string | null;
+  firstName: string;
+  lastName: string;
+}) {
+  const url = useSignedImage("member-photos", path);
+  return <MemberAvatar url={url} firstName={firstName} lastName={lastName} size={64} />;
+}
+
+function RemovePhotoButton({ memberId }: { memberId: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  async function remove() {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/members/${memberId}/photo`, { method: "DELETE" });
+      if (!res.ok) {
+        toast.error("Couldn't remove the photo.");
+        return;
+      }
+      toast.success("Photo removed.");
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Button variant="ghost" className="h-11" onClick={remove} disabled={busy}>
+      Remove photo
+    </Button>
+  );
+}
+
+// Flow audit 6.7: the gym's plans and sibling discount, shared by the
+// header badge and the Payments tab (one cached query).
+function useFeeContext() {
+  return useQuery({
+    queryKey: ["fee-context"],
+    queryFn: () => loadFeeContext(createClient()),
+    // Invalidated by plan, member and parent-link changes.
+    staleTime: 5 * 60_000,
+  });
+}
+
+function PlanName({ memberId, fallback }: { memberId: string; fallback: string }) {
+  const { data } = useFeeContext();
+  const planId = data?.members.get(memberId)?.plan_id;
+  const plan = planId ? data?.plans.get(planId) : undefined;
+  return <>{plan?.name ?? fallback}</>;
 }
 
 function BeltHistoryTab({ memberId }: { memberId: string }) {

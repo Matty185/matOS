@@ -195,7 +195,7 @@ function ClassAttendanceCard({
     queryKey: ["attendance-for-class", classRow.id, date],
     queryFn: async () => {
       const supabase = createClient();
-      const [membersRes, attendanceRes] = await Promise.all([
+      const [membersRes, attendanceRes, visitorsRes] = await Promise.all([
         // All members, not just active ones: a check-in by someone since
         // deactivated must still be visible (and removable). Only active
         // members are offered for marking.
@@ -210,10 +210,22 @@ function ClassAttendanceCard({
           .select("id, member_id, checked_in_at, checked_in_by, offline_queued")
           .eq("class_id", classRow.id)
           .eq("checked_in_date", date),
+        // Flow audit 4.6: drop-in visitors at this session.
+        supabase
+          .from("drop_in_visits")
+          .select("id, first_name, last_name, home_gym")
+          .eq("class_id", classRow.id)
+          .eq("visit_date", date)
+          .order("created_at"),
       ]);
       if (membersRes.error) throw membersRes.error;
       if (attendanceRes.error) throw attendanceRes.error;
-      return { members: membersRes.data as Member[], attendance: attendanceRes.data };
+      if (visitorsRes.error) throw visitorsRes.error;
+      return {
+        members: membersRes.data as Member[],
+        attendance: attendanceRes.data,
+        visitors: visitorsRes.data,
+      };
     },
     enabled: expanded,
   });
@@ -323,7 +335,27 @@ function ClassAttendanceCard({
           ) : (
             <>
               <div className="flex flex-col gap-2">
-                <p className="text-sm font-medium">Checked in ({checkedIn.length})</p>
+                <p className="text-sm font-medium">
+                  Checked in ({checkedIn.length}
+                  {(data?.visitors.length ?? 0) > 0
+                    ? ` + ${data?.visitors.length} visitor${data?.visitors.length === 1 ? "" : "s"}`
+                    : ""}
+                  {classRow.max_capacity !== null
+                    ? ` · ${checkedIn.length + (data?.visitors.length ?? 0)} of ${classRow.max_capacity} places`
+                    : ""}
+                  )
+                </p>
+                {(data?.visitors ?? []).length > 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Visitors:{" "}
+                    {(data?.visitors ?? [])
+                      .map(
+                        (v) =>
+                          `${v.first_name} ${v.last_name}${v.home_gym ? ` (${v.home_gym})` : ""}`,
+                      )
+                      .join(", ")}
+                  </p>
+                ) : null}
                 {checkedIn.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No one yet.</p>
                 ) : (

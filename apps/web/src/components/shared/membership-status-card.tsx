@@ -36,17 +36,20 @@ function joinNames(names: string[]): string {
 // shown (CLAUDE.md Rule 3) — just paid / waived / overdue / due per month.
 export function MembershipStatusCard({
   plan,
+  planName,
   summary,
   childName,
 }: {
   plan: string;
+  /** The gym's own plan name (flow audit 6.7), when there is one. */
+  planName?: string | null;
   summary: AthletePaymentSummary;
   /** A parent viewing a child's card (flow audit 8.2): "Saoirse's" not "Your". */
   childName?: string;
 }) {
   const whose = childName ? `${childName}'s` : "Your";
   const upToDate = childName ? "All up to date." : "You're all up to date.";
-  const planLabel = PLAN_LABELS[plan] ?? plan;
+  const planLabel = planName ?? PLAN_LABELS[plan] ?? plan;
 
   if (summary.kind === "not_billable") {
     return (

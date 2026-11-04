@@ -7,7 +7,7 @@ export default async function EditMemberPage({ params }: { params: { id: string 
   const { data: member } = await supabase
     .from("members")
     .select(
-      "first_name, last_name, email, user_id, phone, emergency_contact_name, emergency_contact_phone, membership_plan, notes",
+      "first_name, last_name, email, user_id, phone, emergency_contact_name, emergency_contact_phone, membership_plan, plan_id, notes",
     )
     .eq("id", params.id)
     .single();
@@ -29,6 +29,7 @@ export default async function EditMemberPage({ params }: { params: { id: string 
           emergency_contact_name: member.emergency_contact_name ?? "",
           emergency_contact_phone: member.emergency_contact_phone ?? "",
           membership_plan: member.membership_plan,
+          plan_id: member.plan_id,
           notes: member.notes ?? "",
         }}
       />

@@ -31,6 +31,7 @@ import {
 } from "@/lib/payments/overdue";
 import { getPaymentsTrackedFrom } from "@/lib/payments/tracked-from";
 import { fetchHoldsForWindow } from "@/lib/payments/holds";
+import { loadFeeContext, monthlyFee } from "@/lib/payments/fees";
 
 type MemberRow = {
   id: string;
@@ -94,6 +95,13 @@ export default function PaymentsPage() {
   } = useQuery({
     queryKey: ["payments-holds"],
     queryFn: () => fetchHoldsForWindow(createClient(), holdsRange),
+  });
+
+  // Flow audit 6.7: plan prices pre-fill the payment dialog.
+  const { data: fees } = useQuery({
+    queryKey: ["fee-context"],
+    queryFn: () => loadFeeContext(createClient()),
+    staleTime: 5 * 60_000,
   });
 
   const members = useMemo(
@@ -396,6 +404,7 @@ export default function PaymentsPage() {
         periodMonth={selected?.period.month ?? 1}
         periodYear={selected?.period.year ?? new Date().getFullYear()}
         existing={existingForSelected}
+        fee={selected && fees ? monthlyFee(fees, selected.member.id) : null}
         onSaved={refetch}
       />
     </div>

@@ -22,6 +22,7 @@ type KioskSession = {
 type KioskMember = { id: string; name: string; belt: BeltColor; stripes: number };
 type KioskToday = {
   gymName: string;
+  logo: { path: string; url: string } | null;
   today: string;
   minutesOfDay: number;
   sessions: KioskSession[];
@@ -68,6 +69,18 @@ function useKioskToday() {
 export default function KioskPage() {
   const { data, error, isPending } = useKioskToday();
   const queryClient = useQueryClient();
+  // Keep one signed logo URL per path so each poll's fresh signature
+  // doesn't reload the image, but swap it after 5 hours: the URL is signed
+  // for 6 and the tablet stays open all day.
+  const [logo, setLogo] = useState<{ path: string; url: string; at: number } | null>(null);
+  useEffect(() => {
+    const next = data?.logo ?? null;
+    setLogo((prev) => {
+      if (!next) return null;
+      if (prev?.path === next.path && Date.now() - prev.at < 5 * 3600_000) return prev;
+      return { ...next, at: Date.now() };
+    });
+  }, [data?.logo]);
   const [classId, setClassId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<KioskMember | null>(null);
@@ -247,7 +260,13 @@ export default function KioskPage() {
 
   const header = (
     <header className="flex flex-wrap items-baseline justify-between gap-2">
-      <h1 className="font-heading text-4xl tracking-wide">{data.gymName}</h1>
+      <div className="flex items-center gap-3">
+        {logo ? (
+          // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL
+          <img src={logo.url} alt="" className="h-12 w-auto max-w-[10rem] object-contain" />
+        ) : null}
+        <h1 className="font-heading text-4xl tracking-wide">{data.gymName}</h1>
+      </div>
       <p className="text-lg text-muted-foreground">Tap your name to check in</p>
     </header>
   );

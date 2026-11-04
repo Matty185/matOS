@@ -70,6 +70,8 @@ export default function CheckInPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["check-in", "today", today],
     enabled: !!today,
+    // Keep "N of M places taken" current while the page stays open.
+    refetchInterval: 60_000,
     queryFn: async () => {
       const date = today!;
       const supabase = createClient();
@@ -88,7 +90,7 @@ export default function CheckInPage() {
       // All active classes, not just today's weekday: a session moved onto
       // today (flow audit 3.2) can belong to a class that usually runs on
       // another day.
-      const [classesRes, attendanceRes, changesRes, coachRes] = await Promise.all([
+      const [classesRes, attendanceRes, changesRes, coachRes, countRes] = await Promise.all([
         supabase.from("classes").select("*").eq("active", true),
         supabase
           .from("attendance")
@@ -102,6 +104,8 @@ export default function CheckInPage() {
           .lte("session_date", addDaysToDate(date, 6)),
         // Flow audit 3.3: coach names (athletes can't read staff rows).
         supabase.rpc("class_coach_names"),
+        // Flow audit 3.5: how full each class is today (counts only).
+        supabase.rpc("class_headcounts", { p_date: date }),
       ]);
       if (classesRes.error) throw classesRes.error;
       if (attendanceRes.error) throw attendanceRes.error;
@@ -112,6 +116,9 @@ export default function CheckInPage() {
         checkedInClassIds: new Set(attendanceRes.data.map((a) => a.class_id)),
         coachByClass: new Map(
           (coachRes.data ?? []).map((row) => [row.class_id, row.coach_name] as const),
+        ),
+        headcount: new Map(
+          (countRes.data ?? []).map((row) => [row.class_id, row.headcount] as const),
         ),
       };
     },
@@ -131,6 +138,8 @@ export default function CheckInPage() {
         queryClient.invalidateQueries({ queryKey: ["check-in"] });
       } else {
         toast.error(body.error ?? "Couldn't check in.");
+        // e.g. CLASS_FULL: show the current headcount, not the stale one.
+        queryClient.invalidateQueries({ queryKey: ["check-in"] });
       }
     } finally {
       setCheckingInId(null);
@@ -180,6 +189,8 @@ export default function CheckInPage() {
           const runs = sessionRuns(session.status);
           const windowState = getWindowState(session, now);
           const changeLabel = describeSessionChange(session);
+          const count = data.headcount.get(c.id) ?? 0;
+          const full = c.max_capacity !== null && count >= c.max_capacity;
 
           return (
             <li
@@ -202,6 +213,11 @@ export default function CheckInPage() {
                   {formatClassTime(session.startTime)} · {c.duration_minutes} min
                   {data.coachByClass.get(c.id) ? ` · ${data.coachByClass.get(c.id)}` : ""}
                 </span>
+                {runs && c.max_capacity !== null ? (
+                  <span className="text-sm text-muted-foreground">
+                    {count} of {c.max_capacity} places taken
+                  </span>
+                ) : null}
                 {changeLabel ? (
                   <span className="text-sm text-muted-foreground">
                     {changeLabel}
@@ -228,6 +244,10 @@ export default function CheckInPage() {
               ) : windowState === "too_late" ? (
                 <p className="text-sm text-muted-foreground sm:max-w-40 sm:text-right">
                   Check-in window has closed
+                </p>
+              ) : full ? (
+                <p className="text-sm text-muted-foreground sm:max-w-40 sm:text-right">
+                  Class is full. Ask a coach if there&apos;s room.
                 </p>
               ) : (
                 <Button

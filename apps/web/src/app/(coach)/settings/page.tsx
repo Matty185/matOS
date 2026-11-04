@@ -11,6 +11,8 @@ import { KioskManager } from "@/components/shared/kiosk-manager";
 import { PromotionRulesForm } from "@/components/shared/promotion-rules-form";
 import { WaiverManager } from "@/components/shared/waiver-manager";
 import { TrialLinkManager } from "@/components/shared/trial-link-manager";
+import { PlansManager } from "@/components/shared/plans-manager";
+import { GymLogoSetting } from "@/components/shared/gym-logo-setting";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -28,10 +30,30 @@ export default async function SettingsPage() {
   const { data: gym } = await supabase
     .from("gyms")
     .select(
-      "name, address, contact_email, timezone, onboarding_completed_at, promotion_classes_per_stripe, promotion_months_per_stripe",
+      "name, address, contact_email, timezone, onboarding_completed_at, promotion_classes_per_stripe, promotion_months_per_stripe, sibling_discount_percent, drop_in_fee, logo_url",
     )
     .eq("id", member.gymId)
     .single();
+
+  // Flow audit 6.7: plans, and how many active members are on each.
+  const [{ data: planRows }, { data: planMembers }] = await Promise.all([
+    supabase
+      .from("gym_plans")
+      .select("id, name, kind, price, active, sort_order")
+      .eq("gym_id", member.gymId)
+      .order("sort_order")
+      .order("created_at"),
+    supabase
+      .from("members")
+      .select("plan_id")
+      .eq("gym_id", member.gymId)
+      .eq("active", true)
+      .not("plan_id", "is", null),
+  ]);
+  const memberCounts: Record<string, number> = {};
+  for (const m of planMembers ?? []) {
+    if (m.plan_id) memberCounts[m.plan_id] = (memberCounts[m.plan_id] ?? 0) + 1;
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -58,6 +80,30 @@ export default async function SettingsPage() {
               contact_email: gym?.contact_email ?? "",
               timezone: gym?.timezone ?? DEFAULT_GYM_TIMEZONE,
             }}
+          />
+          <div className="mt-6 border-t pt-6">
+            <GymLogoSetting gymId={member.gymId} path={gym?.logo_url ?? null} />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Membership plans</CardTitle>
+          <CardDescription>
+            Your plans and prices. Prices fill in when you record a payment; MatOS doesn&apos;t
+            charge anyone.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PlansManager
+            plans={(planRows ?? []).map((p) => ({
+              ...p,
+              price: p.price === null ? null : Number(p.price),
+            }))}
+            siblingDiscount={gym?.sibling_discount_percent ?? 0}
+            dropInFee={gym?.drop_in_fee == null ? null : Number(gym.drop_in_fee)}
+            memberCounts={memberCounts}
           />
         </CardContent>
       </Card>

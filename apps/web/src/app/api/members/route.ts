@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createInvite } from "@/lib/auth/create-invite";
 import { isInviteEmailEnabled } from "@/lib/email/invite";
 import { writeAuditLog } from "@/lib/audit/log";
+import { resolvePlan } from "@/lib/payments/resolve-plan";
 import { createMemberSchema } from "@matos/shared";
 
 // POST /api/members — coach/owner only. Creates an athlete member row (this
@@ -29,6 +30,14 @@ export const POST = withAuth(
 
     const supabase = createClient();
 
+    // Flow audit 6.7: the gym's own plan, when chosen, sets the billing type.
+    let membershipPlan = input.membership_plan;
+    if (input.plan_id) {
+      const plan = await resolvePlan(supabase, context.gymId, input.plan_id);
+      if (!plan.ok) return apiError(400, "INVALID_PLAN", "Choose one of your gym's current plans.");
+      membershipPlan = plan.kind;
+    }
+
     // Stage O2: via import_members (one row) rather than a bare insert, so
     // the starting rank lands atomically as an is_initial belt_history row
     // alongside the member — same path as bulk import (/api/members/import).
@@ -44,7 +53,7 @@ export const POST = withAuth(
           phone: input.phone || null,
           emergency_contact_name: input.emergency_contact_name || null,
           emergency_contact_phone: input.emergency_contact_phone || null,
-          membership_plan: input.membership_plan,
+          membership_plan: membershipPlan,
           notes: input.notes || null,
           belt: input.belt,
           stripes: input.stripes,
@@ -66,6 +75,17 @@ export const POST = withAuth(
         "MEMBER_CREATE_FAILED",
         "Something went wrong — the member wasn't added.",
       );
+    }
+
+    // The insert trigger put them on the gym's first plan of that type; move
+    // them to the one chosen. Same type, so billing is right even if this
+    // fails (logged).
+    if (input.plan_id) {
+      const { error: planError } = await supabase
+        .from("members")
+        .update({ plan_id: input.plan_id })
+        .eq("id", member.id);
+      if (planError) console.error("[members] setting plan after create failed", planError);
     }
 
     await writeAuditLog({

@@ -1,6 +1,10 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { createClient } from "@/lib/supabase/client";
+import { formatMoney } from "@/lib/payments/fees";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -32,6 +36,7 @@ type MemberFormValues = {
   emergency_contact_name?: string;
   emergency_contact_phone?: string;
   membership_plan: "monthly" | "casual" | "comp_team";
+  plan_id?: string | null;
   notes?: string;
   // Create mode only (Stage O2): starting rank + join date. After creation
   // belt only changes via Promote.
@@ -58,12 +63,15 @@ type MemberFormProps =
 
 export function MemberForm(props: MemberFormProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const isEdit = props.mode === "edit";
 
   const {
     register,
     handleSubmit,
     control,
+    setValue,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<MemberFormValues>({
     // Cast needed: editMemberSchema's inferred type has no `email` key at
@@ -82,6 +90,35 @@ export function MemberForm(props: MemberFormProps) {
         },
   });
 
+  // Flow audit 6.7: the gym's own plans. RLS limits gym_plans to the
+  // caller's current gym. Without any (e.g. before the migration), the
+  // fixed billing types below are shown instead.
+  const currentPlanId = isEdit ? (props.defaultValues.plan_id ?? null) : null;
+  const { data: plans } = useQuery({
+    queryKey: ["gym-plans"],
+    queryFn: async () => {
+      const { data } = await createClient()
+        .from("gym_plans")
+        .select("id, name, kind, price, active, sort_order")
+        .order("sort_order")
+        .order("created_at");
+      return data ?? [];
+    },
+  });
+
+  // New members start on the first current plan of their billing type.
+  // Never in edit mode: that could silently change an existing member's
+  // billing type on an unrelated save.
+  useEffect(() => {
+    if (isEdit || !plans || plans.length === 0 || getValues("plan_id")) return;
+    const kind = getValues("membership_plan") ?? "monthly";
+    const first = plans.find((p) => p.active && p.kind === kind);
+    if (first) {
+      setValue("plan_id", first.id);
+      setValue("membership_plan", first.kind);
+    }
+  }, [isEdit, plans, getValues, setValue]);
+
   async function onSubmit(data: MemberFormValues) {
     const url = isEdit ? `/api/members/${props.memberId}` : "/api/members";
     const method = isEdit ? "PATCH" : "POST";
@@ -97,6 +134,8 @@ export function MemberForm(props: MemberFormProps) {
       toast.error(body.error ?? "Something went wrong.");
       return;
     }
+    // Plans and sibling order feed the payment price suggestions.
+    void queryClient.invalidateQueries({ queryKey: ["fee-context"] });
 
     if (props.mode === "create" && props.leadId) {
       const conv = await fetch(`/api/trial-leads/${props.leadId}`, {
@@ -264,26 +303,66 @@ export function MemberForm(props: MemberFormProps) {
         </div>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="membership_plan">Membership plan</Label>
-        <Controller
-          name="membership_plan"
-          control={control}
-          defaultValue={isEdit ? props.defaultValues.membership_plan : "monthly"}
-          render={({ field }) => (
-            <Select value={field.value} onValueChange={field.onChange}>
-              <SelectTrigger className="h-11" id="membership_plan">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="monthly">Monthly</SelectItem>
-                <SelectItem value="casual">Casual</SelectItem>
-                <SelectItem value="comp_team">Comp Team</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
-        />
-      </div>
+      {plans && plans.length > 0 ? (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="plan_id">Membership plan</Label>
+          <Controller
+            name="plan_id"
+            control={control}
+            render={({ field }) => (
+              <Select
+                value={field.value ?? undefined}
+                onValueChange={(v) => {
+                  field.onChange(v);
+                  const plan = plans.find((p) => p.id === v);
+                  if (plan) setValue("membership_plan", plan.kind);
+                }}
+              >
+                <SelectTrigger className="h-11" id="plan_id">
+                  <SelectValue placeholder="Choose a plan" />
+                </SelectTrigger>
+                <SelectContent>
+                  {plans
+                    .filter((p) => p.active || p.id === currentPlanId)
+                    .map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                        {p.price !== null
+                          ? ` · ${formatMoney(Number(p.price))}${p.kind === "casual" ? " a class" : " a month"}`
+                          : ""}
+                        {p.active ? "" : " (retired)"}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          {errors.plan_id ? (
+            <p className="text-sm text-destructive">{errors.plan_id.message}</p>
+          ) : null}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="membership_plan">Membership plan</Label>
+          <Controller
+            name="membership_plan"
+            control={control}
+            defaultValue={isEdit ? props.defaultValues.membership_plan : "monthly"}
+            render={({ field }) => (
+              <Select value={field.value} onValueChange={field.onChange}>
+                <SelectTrigger className="h-11" id="membership_plan">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                  <SelectItem value="casual">Casual</SelectItem>
+                  <SelectItem value="comp_team">Comp Team</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+          />
+        </div>
+      )}
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="notes">Notes</Label>

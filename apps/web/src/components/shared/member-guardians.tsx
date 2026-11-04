@@ -96,6 +96,8 @@ export function MemberGuardians({
   function refresh() {
     queryClient.invalidateQueries({ queryKey: ["member-guardians"] });
     queryClient.invalidateQueries({ queryKey: ["members"] });
+    // Parent links decide the sibling discount (flow audit 8.3).
+    queryClient.invalidateQueries({ queryKey: ["fee-context"] });
   }
 
   async function unlink(linkId: string) {

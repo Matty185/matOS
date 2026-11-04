@@ -32,6 +32,9 @@ const memberFieldsSchema = z.object({
   emergency_contact_name: z.string().trim().max(100).optional().or(z.literal("")),
   emergency_contact_phone: z.string().trim().max(30).optional().or(z.literal("")),
   membership_plan: z.enum(PLAN_VALUES),
+  // Flow audit 6.7: the gym's own named plan. When given it wins — the
+  // route sets membership_plan (the billing type) from the plan.
+  plan_id: z.string().uuid().nullable().optional(),
   notes: z.string().trim().max(2000).optional().or(z.literal("")),
 });
 

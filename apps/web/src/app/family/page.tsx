@@ -39,7 +39,7 @@ type Child = Pick<
   | "join_date"
   | "role"
   | "membership_plan"
->;
+> & { plan: { name: string } | null };
 
 // Flow audit 8.2: a parent's linked children. Everything here is read under
 // RLS as the parent (guardian policies on members, attendance, belt history,
@@ -66,7 +66,7 @@ export default function FamilyPage() {
       const { data: kids, error: kidError } = await supabase
         .from("members")
         .select(
-          "id, first_name, last_name, belt, stripes, active, join_date, role, membership_plan",
+          "id, first_name, last_name, belt, stripes, active, join_date, role, membership_plan, plan:gym_plans(name)",
         )
         .in("id", ids)
         .order("first_name");
@@ -333,6 +333,7 @@ function ChildCard({ child }: { child: Child }) {
 
           <MembershipStatusCard
             plan={child.membership_plan}
+            planName={child.plan?.name}
             summary={data.summary}
             childName={child.first_name}
           />

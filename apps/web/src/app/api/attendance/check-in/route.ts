@@ -105,6 +105,10 @@ export const POST = withAuth(
       .single();
 
     if (insertError || !created) {
+      // Flow audit 3.5: attendance_zz_capacity refuses a full session.
+      if (insertError?.code === "MF001") {
+        return apiError(409, "CLASS_FULL", "This class is full. Ask a coach if there's room.");
+      }
       if (insertError?.code === "23505") {
         return apiError(
           409,
