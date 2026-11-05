@@ -104,7 +104,7 @@ export function TrialRequestForm({ code, sessions }: { code: string; sessions: T
   if (done) {
     return (
       <div className="flex items-start gap-3" role="status">
-        <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-green-700" aria-hidden />
+        <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-success" aria-hidden />
         <div className="flex flex-col gap-1">
           <p className="font-medium">
             Thanks{forChild ? `, ${parentName.trim()}` : `, ${firstName.trim()}`}! Your request has

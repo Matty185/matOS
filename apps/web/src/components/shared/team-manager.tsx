@@ -172,7 +172,7 @@ export function TeamManager({ currentMemberId }: { currentMemberId: string }) {
                   {status === "joined" ? null : status === "invited" ? (
                     <Badge variant="secondary">Invited</Badge>
                   ) : status === "expired" ? (
-                    <Badge variant="destructive">Invite expired</Badge>
+                    <Badge variant="warning">Invite expired</Badge>
                   ) : (
                     <Badge variant="outline" className="border-dashed text-muted-foreground">
                       Not invited

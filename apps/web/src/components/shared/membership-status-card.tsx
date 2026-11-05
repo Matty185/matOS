@@ -22,12 +22,12 @@ const STATUS: Record<
   AthleteMonthStatus,
   { label: string; icon: typeof CheckCircle2; className: string }
 > = {
-  paid: { label: "Paid", icon: CheckCircle2, className: "text-green-700 dark:text-green-400" },
+  paid: { label: "Paid", icon: CheckCircle2, className: "text-success" },
   waived: { label: "Waived", icon: MinusCircle, className: "text-muted-foreground" },
   frozen: { label: "Frozen", icon: PauseCircle, className: "text-muted-foreground" },
   overdue: { label: "Overdue", icon: CircleAlert, className: "text-destructive" },
   // "Unpaid", the coach grid's word for the same state.
-  due: { label: "Unpaid", icon: Clock, className: "text-amber-700 dark:text-amber-400" },
+  due: { label: "Unpaid", icon: Clock, className: "text-warning" },
 };
 
 const monthName = (month: number, year: number, withYear = false) =>

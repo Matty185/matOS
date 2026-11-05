@@ -243,7 +243,7 @@ export function RosterImporter({
         aria-live="polite"
       >
         <span className="flex items-center gap-1.5">
-          <CheckCircle2 className="h-4 w-4 text-green-600" aria-hidden="true" />
+          <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
           {validCount} ready
         </span>
         {invalidCount > 0 ? (

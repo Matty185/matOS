@@ -261,7 +261,7 @@ export function AgentChat() {
             aria-atomic="false"
           >
             {items.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{CAPABILITIES_HINT}</p>
+              <p className="text-sm text-muted-foreground">No questions yet.</p>
             ) : (
               <ul className="flex flex-col gap-3">
                 {items.map((item, index) => (

@@ -65,3 +65,12 @@ Thumbs.db
 
 .vercel
 .env*
+
+# Local working files, not part of the product
+.playwright-cli/
+androidstudio-screenshot/
+docs/product-discovery.zip
+docs/strategy/
+docs/implementation/CLAUDE-INTEGRATION.md
+docs/brand/brand-strategy-v1.0-superseded.md
+assets/brand/_archive-concept/

@@ -24,6 +24,7 @@ import { RosterImporter } from "@/components/shared/roster-importer";
 import { BulkInviteDialog } from "@/components/shared/bulk-invite-dialog";
 import { SignupLinkDialog } from "@/components/shared/signup-link-dialog";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/shared/logo";
 
 const STEPS = [
   { key: "gym", title: "Your gym", icon: Building2, blurb: "The basics members will see." },
@@ -199,7 +200,7 @@ export function SetupWizard({
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-6 p-4 md:p-8">
       <header className="flex items-center justify-between gap-4">
-        <p className="font-heading text-2xl tracking-wide text-primary">MatOS</p>
+        <Logo />
         <Button asChild variant="ghost" className="h-11">
           <Link
             href="/dashboard"
@@ -321,7 +322,7 @@ export function SetupWizard({
           ) : (
             <div className="flex flex-col items-start gap-3 rounded-md border p-4">
               <p className="flex items-center gap-2 font-medium">
-                <Check className="h-5 w-5 text-green-600" aria-hidden="true" />
+                <Check className="h-5 w-5 text-success" aria-hidden="true" />
                 {importedCount} member{importedCount === 1 ? "" : "s"} added.
               </p>
               <div className="flex flex-wrap gap-2">

@@ -43,7 +43,7 @@ const CARD_WIDTH = 342;
 const CARD_HEIGHT = 608;
 
 // A social "poster" image, not a screenshot of an app screen — full-bleed
-// navy (matching apps/web's own opengraph-image.tsx brand color, #1B4F72)
+// navy (matching apps/web's own opengraph-image.tsx brand color, #0B1B33)
 // rather than a white card floating on a background, since that's the
 // visual language IG/TikTok Stories sharing actually expects. Content
 // mirrors web's public ProfileCard/BreakdownCard (share/[token]/page.tsx)

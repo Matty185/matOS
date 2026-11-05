@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Logo } from "@/components/shared/logo";
 
 const LINK_INVALID =
   "This link has expired or has already been used. Ask your coach for a new one.";
@@ -142,7 +143,9 @@ export default function ResetPasswordPage() {
     <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="font-heading text-3xl tracking-wide text-primary">MatOS</CardTitle>
+          <CardTitle>
+            <Logo className="h-9" />
+          </CardTitle>
           <CardDescription>Choose a new password</CardDescription>
         </CardHeader>
         <CardContent>

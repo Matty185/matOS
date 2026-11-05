@@ -251,7 +251,7 @@ export default function KioskPage() {
   if (success) {
     return shell(
       <div className="m-auto flex flex-col items-center gap-4 text-center" role="status">
-        <CheckCircle2 className="h-24 w-24 text-green-600" aria-hidden="true" />
+        <CheckCircle2 className="h-24 w-24 text-success" aria-hidden="true" />
         <p className="font-heading text-5xl tracking-wide">You&apos;re in, {success.firstName}!</p>
         <p className="text-xl text-muted-foreground">Checked in to {success.className}.</p>
       </div>,
@@ -433,7 +433,7 @@ export default function KioskPage() {
                   </span>
                   {done ? (
                     <span className="flex shrink-0 items-center gap-1 text-base">
-                      <CheckCircle2 className="h-5 w-5 text-green-600" aria-hidden="true" />
+                      <CheckCircle2 className="h-5 w-5 text-success" aria-hidden="true" />
                       In
                     </span>
                   ) : null}

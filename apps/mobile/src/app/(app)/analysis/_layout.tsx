@@ -7,7 +7,7 @@ import { Stack } from "expo-router";
 // person is a modal reachable from the people list, not its own screen).
 export default function AnalysisLayout() {
   return (
-    <Stack screenOptions={{ headerShown: true, headerTintColor: "#1B4F72" }}>
+    <Stack screenOptions={{ headerShown: true, headerTintColor: "#0B1B33" }}>
       <Stack.Screen name="index" options={{ title: "Analysis", headerShown: false }} />
       <Stack.Screen name="new" options={{ title: "Log a match" }} />
       <Stack.Screen name="[id]/index" options={{ title: "Breakdown" }} />

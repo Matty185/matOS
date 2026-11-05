@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Logo } from "@/components/shared/logo";
 
 // Only a same-origin, single-segment-leading-slash relative path is a valid
 // redirect target — anything else (a protocol-relative "//evil.example", an
@@ -98,7 +99,9 @@ export default function LoginPage() {
     <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="font-heading text-3xl tracking-wide text-primary">MatOS</CardTitle>
+          <CardTitle>
+            <Logo className="h-9" />
+          </CardTitle>
           <CardDescription>Sign in to your gym account</CardDescription>
         </CardHeader>
         <CardContent>

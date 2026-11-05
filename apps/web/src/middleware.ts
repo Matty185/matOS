@@ -103,6 +103,6 @@ export const config = {
     // redirected to /login — harmless for rendering (browsers don't block
     // page load on a failed icon fetch) but still wrong. Matches
     // public/'s actual contents now instead of a guessed list.
-    "/((?!_next/static|_next/image|favicon\\.(?:ico|png)|manifest\\.json|icons/|sw\\.js|workbox-).*)",
+    "/((?!_next/static|_next/image|favicon\\.(?:ico|png|svg)|manifest\\.json|icons/|brand/|sw\\.js|workbox-).*)",
   ],
 };

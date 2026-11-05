@@ -126,7 +126,7 @@ function signupStatus(
 function SignupBadge({ status }: { status: SignupStatus }) {
   if (status === "joined") return <Badge variant="outline">Joined</Badge>;
   if (status === "invited") return <Badge variant="secondary">Invited</Badge>;
-  if (status === "expired") return <Badge variant="destructive">Invite expired</Badge>;
+  if (status === "expired") return <Badge variant="warning">Invite expired</Badge>;
   if (status === "no_login") {
     return (
       <Badge variant="outline" className="text-muted-foreground">
@@ -604,7 +604,7 @@ export default function MembersPage() {
                   </TableCell>
                   <TableCell>
                     {waiverStatus.missing(member) ? (
-                      <Badge variant="destructive" className="mb-1 mr-1">
+                      <Badge variant="warning" className="mb-1 mr-1">
                         No waiver
                       </Badge>
                     ) : null}

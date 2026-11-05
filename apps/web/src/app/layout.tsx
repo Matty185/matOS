@@ -18,16 +18,19 @@ const bebasNeue = Bebas_Neue({
 
 export const metadata: Metadata = {
   title: "MatOS",
-  description: "BJJ gym management",
+  description: "The connected platform for Brazilian Jiu-Jitsu academies and athletes.",
   manifest: "/manifest.json",
   icons: {
-    icon: "/favicon.png",
-    apple: "/icons/icon-192.png",
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon.png", type: "image/png", sizes: "48x48" },
+    ],
+    apple: "/icons/apple-touch-icon.png",
   },
 };
 
 export const viewport = {
-  themeColor: "#1B4F72",
+  themeColor: "#0B1B33",
 };
 
 export default function RootLayout({

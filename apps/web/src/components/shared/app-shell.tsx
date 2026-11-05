@@ -30,6 +30,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { SignOutButton } from "@/components/shared/sign-out-button";
 import { GymSwitcher } from "@/components/shared/gym-switcher";
 import type { GymMembership } from "@/lib/auth/current-member";
+import { Logo } from "@/components/shared/logo";
 
 type NavItem = { label: string; href: string; icon: LucideIcon };
 
@@ -122,7 +123,7 @@ export function AppShell({
     return pathname === href || pathname.startsWith(`${href}/`);
   }
 
-  function NavLinks() {
+  function NavLinks({ onDark = false }: { onDark?: boolean }) {
     return (
       <nav className="flex flex-col gap-1">
         {navItems.map((item) => (
@@ -132,9 +133,15 @@ export function AppShell({
             onClick={() => setOpen(false)}
             className={cn(
               "flex min-h-11 items-center gap-3 rounded-md px-3 py-3 text-sm font-medium transition-colors",
+              onDark &&
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue",
               isActive(item.href)
-                ? "bg-primary text-primary-foreground"
-                : "text-foreground hover:bg-accent",
+                ? onDark
+                  ? "bg-white/10 text-white shadow-[inset_3px_0_0_hsl(var(--brand-blue))]"
+                  : "bg-primary text-primary-foreground"
+                : onDark
+                  ? "text-white/80 hover:bg-white/10 hover:text-white"
+                  : "text-foreground hover:bg-accent",
             )}
           >
             <item.icon className="h-5 w-5 shrink-0" aria-hidden="true" />
@@ -145,43 +152,57 @@ export function AppShell({
     );
   }
 
-  function MemberFooter() {
+  function MemberFooter({ onDark = false }: { onDark?: boolean }) {
     return (
-      <div className="mt-auto flex flex-col gap-2 border-t pt-4">
+      <div className={cn("mt-auto flex flex-col gap-2 border-t pt-4", onDark && "border-white/15")}>
         {memberships && memberships.length > 1 ? (
-          <div className="px-3">
+          <div className={cn("px-3", onDark && "text-foreground")}>
             <GymSwitcher memberships={memberships} />
           </div>
         ) : null}
         <div className="px-3">
           <p className="text-sm font-medium">{memberName}</p>
-          <p className="text-xs text-muted-foreground">{roleLabel}</p>
+          <p className={cn("text-xs", onDark ? "text-white/70" : "text-muted-foreground")}>
+            {roleLabel}
+          </p>
         </div>
-        <SignOutButton className="h-11 justify-start" />
+        <SignOutButton
+          className={cn(
+            "h-11 justify-start",
+            onDark && "text-white/80 hover:bg-white/10 hover:text-white",
+          )}
+        />
       </div>
     );
   }
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
-      <aside className="hidden md:flex md:w-64 md:flex-col md:border-r md:p-4">
-        <p className="mb-6 px-2 font-heading text-2xl tracking-wide text-primary">MatOS</p>
-        <NavLinks />
-        <MemberFooter />
+      <aside className="hidden bg-primary text-primary-foreground md:sticky md:top-0 md:flex md:h-screen md:w-64 md:flex-col md:overflow-y-auto md:p-4">
+        <div className="mb-6 px-3 pt-1">
+          <Logo tone="reversed" />
+        </div>
+        <NavLinks onDark />
+        <MemberFooter onDark />
       </aside>
 
-      <header className="flex items-center justify-between border-b p-4 md:hidden">
-        <p className="font-heading text-2xl tracking-wide text-primary">MatOS</p>
+      <header className="flex items-center justify-between bg-primary px-4 py-2 md:hidden">
+        <Logo tone="reversed" />
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-11 w-11" aria-label="Open menu">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-11 w-11 text-primary-foreground hover:bg-white/10 hover:text-primary-foreground"
+              aria-label="Open menu"
+            >
               <Menu className="h-6 w-6" />
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="flex w-72 flex-col">
             <SheetHeader>
-              <SheetTitle className="font-heading text-2xl tracking-wide text-primary">
-                MatOS
+              <SheetTitle>
+                <Logo />
               </SheetTitle>
             </SheetHeader>
             <NavLinks />

@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Logo } from "@/components/shared/logo";
 import {
   Select,
   SelectContent,
@@ -140,7 +141,9 @@ export default function JoinGymPage({ params }: { params: { token: string } }) {
     <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="font-heading text-3xl tracking-wide text-primary">MatOS</CardTitle>
+          <CardTitle>
+            <Logo className="h-9" />
+          </CardTitle>
           <CardDescription>
             Join {gymLabel}. Fill in your details and choose a password — this takes about a minute.
           </CardDescription>

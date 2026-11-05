@@ -123,7 +123,7 @@ export function MemberWaiver({
         ) : exempt ? (
           <Badge variant="outline">Not needed</Badge>
         ) : (
-          <Badge variant="destructive">Not signed</Badge>
+          <Badge variant="warning">Not signed</Badge>
         )}
       </div>
       {sig ? (

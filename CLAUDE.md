@@ -27,7 +27,7 @@ Every path elsewhere in this file that looks like `src/...` means `apps/web/src/
 ## Stack (do not deviate without flagging)
 
 - Node 24 LTS (updated 2026-07-15 from Node 20, which reached EOL 2026-04-30; see decision note below), npm, Next.js 14 App Router, TypeScript **strict** (`strict: true`, `noUncheckedIndexedAccess: true`)
-- Tailwind + shadcn/ui. Primary colour deep navy `#1B4F72`. Inter body, Bebas Neue headings
+- Tailwind + shadcn/ui. Primary colour navy `#0B1B33` (see `docs/brand/brand-guidelines.md`). Inter body, Bebas Neue headings
 - Supabase: Postgres + RLS + Auth + Storage (photos/documents ONLY — never video)
 - TanStack Query for server state; useState for UI state; no global state library
 - React Hook Form + Zod — Zod schemas are the single validation source of truth, shared client/server
@@ -1109,3 +1109,13 @@ Browser-checked as a throwaway athlete on an emulated iPhone:
 - `payTarget` was checked directly: no button for a paid or frozen month or for staff; the oldest overdue month wins.
 
 **Testing note:** pages need a cookie session, so `fetch` with a bearer token is redirected to /login. Page checks must use the browser. Production build passes.
+
+### 2026-11-05 — Brand foundation and "academy" wording (web)
+
+**Context.** A branding and strategy package arrived from a separate ChatGPT session; `docs/implementation/integration-audit.md` is the assessment. The founder decided: redraw the provisional logo, keep committing and deploying per checked step, launch the founding academy on the web app, keep "video never touches the server" for now, tidy the assets, and change the UI wording to "academy".
+
+**Decision.** Primary colour changes from `#1B4F72` to navy `#0B1B33` (flagged here per the stack rule), with the page on off-white `#F8FAFC`, a navy sidebar and a central `<Logo />`. The supplied logo was redrawn as filled, outlined vectors: the original had colliding strokes, live text and scrambled file names. The supplied blue, green, amber and red fail WCAG AA as text or behind white text, so they stay brand colours while the UI uses AA-safe values (`docs/brand/brand-guidelines.md`). Red is now reserved for overdue, cancelled and destructive; a missing waiver and an expired invite are amber. No new dependencies. Middleware excludes `/brand/` and `favicon.svg` so logos load signed out.
+
+**Wording.** User-facing text says "academy". Identifiers, routes, enum values, audit action names and the schema stay `gym`, so this is copy only. The parked mobile app's own strings still say "gym". Mobile received icons, splash and colours only; emoji tabs remain (they need an icon dependency) and nothing was run on a device.
+
+**Local-only by choice.** `docs/strategy/`, the original concept assets and the discovery zip are git-ignored as not needed for production. The older v1.0 strategy, which contradicts BJJ-first, was marked superseded.

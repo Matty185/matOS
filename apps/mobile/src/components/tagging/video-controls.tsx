@@ -54,7 +54,7 @@ export function VideoControls({
           minimumValue={0}
           maximumValue={Math.max(duration, 0.1)}
           value={currentTime}
-          minimumTrackTintColor="#1B4F72"
+          minimumTrackTintColor="#0B1B33"
           maximumTrackTintColor="#ffffff55"
           thumbTintColor="#ffffff"
           onSlidingComplete={onSeek}

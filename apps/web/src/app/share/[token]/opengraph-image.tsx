@@ -57,7 +57,7 @@ async function loadFonts() {
 export default async function Image({ params }: { params: { token: string } }) {
   const [share, fonts] = await Promise.all([resolveShareLink(params.token), loadFonts()]);
 
-  const navy = "#1B4F72";
+  const navy = "#0B1B33";
 
   if (!share) {
     return new ImageResponse(

@@ -374,7 +374,7 @@ function DataPrivacyCard({
         </Button>
 
         {isSolo && hasRealGymMembership ? (
-          <div className="rounded-md border border-amber-500/50 bg-amber-500/5 p-3 text-sm">
+          <div className="rounded-md border border-warning/40 bg-warning/5 p-3 text-sm">
             <p className="font-medium">You also belong to a gym</p>
             <p className="text-muted-foreground">
               Account deletion for gym members goes through your coach&apos;s request flow — switch

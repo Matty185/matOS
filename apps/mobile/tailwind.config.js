@@ -6,13 +6,13 @@ module.exports = {
   theme: {
     extend: {
       // Same values as apps/web/tailwind.config.ts's shadcn CSS-variable
-      // tokens (--primary: 204.1 61.7% 27.6%, which is #1B4F72) — mobile
+      // tokens (--primary: 216 64.5% 12.2%, which is #0B1B33) — mobile
       // uses the hex directly rather than mirroring web's CSS-variable
       // indirection, since that mechanism exists there specifically to
       // support runtime CSS theming, which isn't how NativeWind resolves
       // colors on native.
       colors: {
-        primary: "#1B4F72",
+        primary: "#0B1B33",
       },
       fontFamily: {
         // Loaded via expo-font in the root layout — see

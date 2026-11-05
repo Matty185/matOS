@@ -364,10 +364,7 @@ export default async function DashboardPage() {
                     className="flex min-h-11 items-center gap-3 rounded-md px-2 text-sm hover:bg-accent"
                   >
                     {item.done ? (
-                      <CheckCircle2
-                        className="h-5 w-5 shrink-0 text-green-600"
-                        aria-hidden="true"
-                      />
+                      <CheckCircle2 className="h-5 w-5 shrink-0 text-success" aria-hidden="true" />
                     ) : (
                       <Circle
                         className="h-5 w-5 shrink-0 text-muted-foreground"

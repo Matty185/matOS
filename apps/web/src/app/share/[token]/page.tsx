@@ -16,6 +16,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BeltDisplay } from "@/components/shared/belt-display";
+import { Logo } from "@/components/shared/logo";
 
 // Live-testing (part of this stage's own security-fix re-verification)
 // caught this route being statically cached by Next's default full-route
@@ -55,7 +56,9 @@ function Unavailable() {
     <main className="flex min-h-screen flex-col items-center justify-center p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="font-heading text-3xl tracking-wide text-primary">MatOS</CardTitle>
+          <CardTitle>
+            <Logo className="h-9" />
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
@@ -99,7 +102,7 @@ function ProfileCard({ share }: { share: ResolvedProfileShare }) {
     <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <p className="font-heading text-lg tracking-wide text-primary">MatOS</p>
+          <Logo className="h-6" />
           <div className="flex items-center gap-3">
             <CardTitle className="text-2xl">{share.displayName}</CardTitle>
             {share.belt ? <BeltDisplay belt={share.belt} stripes={share.stripes ?? 0} /> : null}
@@ -142,7 +145,7 @@ function BreakdownCard({ share }: { share: ResolvedBreakdownShare }) {
     <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <p className="font-heading text-lg tracking-wide text-primary">MatOS</p>
+          <Logo className="h-6" />
           <CardTitle className="text-2xl">{share.name}</CardTitle>
           <p className="text-sm text-muted-foreground">
             {share.focusDisplayName} ·{" "}

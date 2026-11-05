@@ -113,7 +113,7 @@ export default function WaiverPage() {
       {header}
       {data.signedAt ? (
         <div className="flex items-start gap-3 rounded-md border p-4">
-          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-700" aria-hidden />
+          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" aria-hidden />
           <div className="flex flex-col gap-1">
             <p className="font-medium">You signed this waiver on {fmt(data.signedAt)}.</p>
             <p className="text-sm text-muted-foreground">
