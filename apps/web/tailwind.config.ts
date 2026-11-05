@@ -7,6 +7,9 @@ const config: Config = {
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+    // Belt colour classes live in packages/shared (BELT_STYLES); without this
+    // Tailwind strips them and every belt renders uncoloured.
+    "../../packages/shared/src/**/*.{ts,tsx}",
   ],
   theme: {
     extend: {
