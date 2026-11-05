@@ -4,7 +4,8 @@ import { withAuth } from "@/lib/auth/withAuth";
 import { apiError } from "@/lib/api/response";
 import { createClient } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/audit/log";
-import { agentRequestSchema } from "@matos/shared";
+import { addDaysToDate, agentRequestSchema, dayOfWeekOfDate, gymWallClock } from "@matos/shared";
+import { getGymTimeZone } from "@/lib/time/gym-timezone";
 import {
   ALL_TOOLS,
   WRITE_TOOL_NAMES,
@@ -123,10 +124,29 @@ export const POST = withAuth(
       overdueWindow,
     ).size;
 
+    // The gym's own calendar date and weekday: "today" in UTC can be the
+    // wrong day near midnight, and without a weekday the model guesses it
+    // (and gets "this week" wrong).
+    const timeZone = await getGymTimeZone(supabase, context.gymId);
+    const gymToday = gymWallClock(new Date(), timeZone).date;
+    const dayName = (d: string) =>
+      new Intl.DateTimeFormat("en-IE", { weekday: "long", timeZone: "UTC" }).format(
+        new Date(`${d}T00:00:00Z`),
+      );
+    const weekday = dayName(gymToday);
+    // Spell out this week's dates (Monday to Sunday) so the model never has
+    // to do calendar arithmetic itself.
+    const monday = addDaysToDate(gymToday, -((dayOfWeekOfDate(gymToday) + 6) % 7));
+    const weekDates = Array.from({ length: 7 }, (_, i) => {
+      const d = addDaysToDate(monday, i);
+      return `${dayName(d)} ${d}`;
+    }).join(", ");
+
     const systemPrompt = buildSystemPrompt({
       gymName: gym?.name ?? "your gym",
       coachName: coachMember ? `${coachMember.first_name} ${coachMember.last_name}` : "Coach",
-      currentDate: today,
+      currentDate: `${weekday} ${gymToday} (${timeZone})`,
+      weekDates,
       activeMemberCount: activeMemberCount ?? 0,
       overdueCount,
     });

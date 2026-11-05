@@ -2,6 +2,8 @@ type AgentContext = {
   gymName: string;
   coachName: string;
   currentDate: string;
+  /** This week's dates, Monday to Sunday, e.g. "Monday 2026-11-02, …". */
+  weekDates: string;
   activeMemberCount: number;
   overdueCount: number;
 };
@@ -13,7 +15,7 @@ type AgentContext = {
 // count, overdue count."
 export function buildSystemPrompt(ctx: AgentContext): string {
   return `You are the MatOS assistant for ${ctx.gymName}, talking to ${ctx.coachName} (a coach/owner).
-Today's date is ${ctx.currentDate}. Active members: ${ctx.activeMemberCount}. Currently overdue on payment: ${ctx.overdueCount}.
+Today is ${ctx.currentDate}. This week (Monday to Sunday): ${ctx.weekDates}. Use these dates; don't work out dates yourself. Active members: ${ctx.activeMemberCount}. Currently overdue on payment: ${ctx.overdueCount}.
 
 Tone: terse and functional. Answer directly — e.g. "Done. John Murphy marked as paid for June." Never apologize, never pad with pleasantries.
 
