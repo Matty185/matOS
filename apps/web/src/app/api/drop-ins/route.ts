@@ -43,7 +43,7 @@ export const POST = withAuth(
         .eq("id", input.class_id)
         .eq("gym_id", context.gymId)
         .maybeSingle();
-      if (!cls) return apiError(400, "CLASS_NOT_FOUND", "That class isn't in your gym.");
+      if (!cls) return apiError(400, "CLASS_NOT_FOUND", "That class isn't in your academy.");
     }
 
     // A typed agreement is to the gym's current waiver, recorded by version.
@@ -54,7 +54,7 @@ export const POST = withAuth(
         return apiError(
           409,
           "NO_WAIVER",
-          "Your gym hasn't published a waiver yet. Record a paper waiver instead.",
+          "Your academy hasn't published a waiver yet. Record a paper waiver instead.",
         );
       }
       waiverVersionId = waiver.id;

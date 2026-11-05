@@ -223,8 +223,8 @@ export default function KioskPage() {
       <div className="m-auto flex max-w-md flex-col gap-3 text-center">
         <h1 className="font-heading text-4xl tracking-wide">MatOS kiosk</h1>
         <p className="text-muted-foreground">
-          This tablet isn&apos;t set up as a kiosk (or it was removed). The gym owner can add it in
-          Settings → Front-desk kiosk.
+          This tablet isn&apos;t set up as a kiosk (or it was removed). The academy owner can add it
+          in Settings → Front-desk kiosk.
         </p>
       </div>,
     );

@@ -33,7 +33,7 @@ export const PATCH = withAuth(
       .single();
 
     if (!member) {
-      return apiError(404, "MEMBER_NOT_FOUND", "No member found with that id in your gym.");
+      return apiError(404, "MEMBER_NOT_FOUND", "No member found with that id in your academy.");
     }
     if (!member.active) {
       return apiError(409, "MEMBER_INACTIVE", "Reactivate this person before changing their role.");

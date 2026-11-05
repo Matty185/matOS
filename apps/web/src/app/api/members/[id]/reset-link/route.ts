@@ -44,7 +44,7 @@ export const POST = withAuth(
       .single();
 
     if (!member) {
-      return apiError(404, "MEMBER_NOT_FOUND", "No member found with that id in your gym.");
+      return apiError(404, "MEMBER_NOT_FOUND", "No member found with that id in your academy.");
     }
     if (member.id === context.memberId) {
       return apiError(400, "OWN_ACCOUNT", "Change your own password from your Account page.");
@@ -60,7 +60,7 @@ export const POST = withAuth(
       );
     }
     if (isStaffRole(member.role) && context.role !== "gym_owner") {
-      return apiError(403, "FORBIDDEN", "Only the gym owner can reset a coach's password.");
+      return apiError(403, "FORBIDDEN", "Only the academy owner can reset a coach's password.");
     }
 
     const serviceRole = createServiceRoleClient();
@@ -78,7 +78,7 @@ export const POST = withAuth(
       return apiError(
         409,
         "ACCOUNT_SHARED",
-        `${member.first_name}'s MatOS account is also used outside your gym, so they need to reset it themselves.`,
+        `${member.first_name}'s MatOS account is also used outside your academy, so they need to reset it themselves.`,
       );
     }
 

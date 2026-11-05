@@ -135,7 +135,7 @@ export function InviteShareDialog({
   const smsHref =
     smsNumber.length >= 6 ? `sms:${smsNumber}?&body=${encodeURIComponent(message)}` : null;
   const mailHref = `mailto:${encodeURIComponent(member.email ?? "")}?subject=${encodeURIComponent(
-    `Join ${link?.gymName ?? "the gym"} on MatOS`,
+    `Join ${link?.gymName ?? "the academy"} on MatOS`,
   )}&body=${encodeURIComponent(message)}`;
   const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
 

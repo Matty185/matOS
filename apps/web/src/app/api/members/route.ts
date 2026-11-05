@@ -34,7 +34,8 @@ export const POST = withAuth(
     let membershipPlan = input.membership_plan;
     if (input.plan_id) {
       const plan = await resolvePlan(supabase, context.gymId, input.plan_id);
-      if (!plan.ok) return apiError(400, "INVALID_PLAN", "Choose one of your gym's current plans.");
+      if (!plan.ok)
+        return apiError(400, "INVALID_PLAN", "Choose one of your academy's current plans.");
       membershipPlan = plan.kind;
     }
 
@@ -67,7 +68,11 @@ export const POST = withAuth(
       // members_gym_email_unique (Stage 1) is the likely cause of a
       // conflict here — another member in this gym already has this email.
       if (insertError?.code === "23505") {
-        return apiError(409, "EMAIL_TAKEN", "A member with this email already exists in your gym.");
+        return apiError(
+          409,
+          "EMAIL_TAKEN",
+          "A member with this email already exists in your academy.",
+        );
       }
       console.error("[members] create failed", insertError);
       return apiError(
@@ -116,7 +121,7 @@ export const POST = withAuth(
         memberGymId: context.gymId,
         memberFirstName: input.first_name,
         memberEmail: input.email,
-        gymName: gym?.name ?? "your gym",
+        gymName: gym?.name ?? "your academy",
         actorUserId: context.userId,
         delivery: "email",
       });

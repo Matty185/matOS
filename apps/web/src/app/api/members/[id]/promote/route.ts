@@ -26,7 +26,7 @@ export const POST = withAuth(
     );
     if (!result.ok) {
       if (result.code === "MEMBER_NOT_FOUND") {
-        return apiError(404, "MEMBER_NOT_FOUND", "No member found with that id in your gym.");
+        return apiError(404, "MEMBER_NOT_FOUND", "No member found with that id in your academy.");
       }
       if (result.code === "MEMBER_INACTIVE") {
         return apiError(409, "MEMBER_INACTIVE", "Reactivate this member before promoting them.");

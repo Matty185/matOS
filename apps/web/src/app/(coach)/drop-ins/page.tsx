@@ -160,8 +160,8 @@ export default function DropInsPage() {
         <div className="flex flex-col gap-1">
           <h1 className="font-heading text-3xl tracking-wide">Visitors</h1>
           <p className="text-sm text-muted-foreground">
-            Drop-ins from other gyms and one-off visits. They count towards a class&apos;s capacity;
-            they don&apos;t get a login.
+            Drop-ins from other academies and one-off visits. They count towards a class&apos;s
+            capacity; they don&apos;t get a login.
           </p>
         </div>
         <Button className="h-11" onClick={() => setAdding(true)} disabled={!today}>
@@ -385,7 +385,7 @@ function AddVisitorDialog({
         <DialogHeader>
           <DialogTitle>Add a visitor</DialogTitle>
           <DialogDescription>
-            Someone training here once: a guest from another gym, or a visit.
+            Someone training here once: a guest from another academy, or a visit.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={save} className="flex flex-col gap-4" noValidate>
@@ -439,7 +439,7 @@ function AddVisitorDialog({
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="v-gym">Home gym (optional)</Label>
+              <Label htmlFor="v-gym">Home academy (optional)</Label>
               <Input
                 id="v-gym"
                 className="h-11"

@@ -13,9 +13,9 @@ export function GymTeaser() {
       <CardContent className="flex items-start gap-3 py-4">
         <Lightbulb className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
         <div className="flex flex-col gap-1">
-          <p className="text-sm font-medium">Your gym isn&apos;t on MatOS yet</p>
+          <p className="text-sm font-medium">Your academy isn&apos;t on MatOS yet</p>
           <p className="text-sm text-muted-foreground">
-            Tell your coach about MatOS — once your gym signs up, they can invite you and your
+            Tell your coach about MatOS — once your academy signs up, they can invite you and your
             workspace stays exactly as it is.
           </p>
         </div>

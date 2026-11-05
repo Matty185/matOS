@@ -23,7 +23,7 @@ export const POST = withAuth(
       return apiError(
         409,
         "TOO_MANY_PLANS",
-        `A gym can have up to ${MAX_GYM_PLANS} plans. Retire one you no longer use instead.`,
+        `An academy can have up to ${MAX_GYM_PLANS} plans. Retire one you no longer use instead.`,
       );
     }
 

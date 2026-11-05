@@ -36,7 +36,7 @@ export const POST = withAuth(
       .select("name")
       .eq("id", context.gymId)
       .single();
-    const gymName = gym?.name ?? "your gym";
+    const gymName = gym?.name ?? "your academy";
 
     const eligible = (members ?? []).filter(
       (m) =>

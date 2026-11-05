@@ -27,7 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/shared/logo";
 
 const STEPS = [
-  { key: "gym", title: "Your gym", icon: Building2, blurb: "The basics members will see." },
+  { key: "gym", title: "Your academy", icon: Building2, blurb: "The basics members will see." },
   {
     key: "timetable",
     title: "Timetable",
@@ -264,7 +264,7 @@ export function SetupWizard({
           </h1>
           <p className="text-sm text-muted-foreground">
             {step.key === "gym"
-              ? "Let's get your gym set up — about ten minutes. You can skip anything and come back to it."
+              ? "Let's get your academy set up — about ten minutes. You can skip anything and come back to it."
               : step.blurb}
           </p>
         </div>

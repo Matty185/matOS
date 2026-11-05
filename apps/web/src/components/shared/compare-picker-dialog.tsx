@@ -118,7 +118,7 @@ export function ComparePickerDialog({ subjectA }: { subjectA: ProfileSubject }) 
                   setSelectedId("");
                 }}
               >
-                A gym member
+                An academy member
               </Button>
               <Button
                 type="button"

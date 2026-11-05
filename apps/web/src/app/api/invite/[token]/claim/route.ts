@@ -147,7 +147,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
       return apiError(
         403,
         "INVITE_NOT_VALID_FOR_ROLE",
-        "This link can't be used for a coach account. Ask the gym owner for a new one.",
+        "This link can't be used for a coach account. Ask the academy owner for a new one.",
       );
     }
   }

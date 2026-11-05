@@ -375,10 +375,10 @@ function DataPrivacyCard({
 
         {isSolo && hasRealGymMembership ? (
           <div className="rounded-md border border-warning/40 bg-warning/5 p-3 text-sm">
-            <p className="font-medium">You also belong to a gym</p>
+            <p className="font-medium">You also belong to an academy</p>
             <p className="text-muted-foreground">
-              Account deletion for gym members goes through your coach&apos;s request flow — switch
-              to that gym to request it.
+              Account deletion for academy members goes through your coach&apos;s request flow —
+              switch to that academy to request it.
             </p>
           </div>
         ) : isSolo ? (

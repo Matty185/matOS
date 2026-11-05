@@ -173,7 +173,7 @@ export default function CheckInPage() {
         <EmptyState
           icon={CalendarCheck}
           title="No classes today"
-          description="Check back on a day your gym has classes scheduled."
+          description="Check back on a day your academy has classes scheduled."
         />
       </div>
     );

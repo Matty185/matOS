@@ -6,7 +6,7 @@ import { BELT_VALUES, PLAN_VALUES } from "./member";
 // wizard's first step). kind/active are never editable here — the
 // gyms_owner_column_guard trigger enforces that at the DB layer too.
 export const updateGymSchema = z.object({
-  name: z.string().trim().min(1, "Gym name is required.").max(120),
+  name: z.string().trim().min(1, "Academy name is required.").max(120),
   address: z.string().trim().max(300).optional().or(z.literal("")),
   contact_email: z
     .string()

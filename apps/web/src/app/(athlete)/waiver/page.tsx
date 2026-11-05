@@ -99,7 +99,7 @@ export default function WaiverPage() {
         <EmptyState
           icon={FileSignature}
           title="No waiver to sign"
-          description="Your gym hasn't published a waiver."
+          description="Your academy hasn't published a waiver."
           actionLabel="Back to Home"
           actionHref="/home"
         />
@@ -126,7 +126,8 @@ export default function WaiverPage() {
         </div>
       ) : (
         <p className="text-sm text-muted-foreground">
-          Please read your gym&apos;s waiver, then type your full name and tick the box to sign it.
+          Please read your academy&apos;s waiver, then type your full name and tick the box to sign
+          it.
         </p>
       )}
 

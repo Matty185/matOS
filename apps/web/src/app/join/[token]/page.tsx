@@ -68,7 +68,7 @@ export default function JoinGymPage({ params }: { params: { token: string } }) {
 
   const existingAccount = watch("existing_account");
   const consent = watch("consent");
-  const gymLabel = info?.gymName ?? "the gym";
+  const gymLabel = info?.gymName ?? "the academy";
 
   function setExistingAccount(value: boolean) {
     setValue("existing_account", value);
@@ -337,7 +337,7 @@ export default function JoinGymPage({ params }: { params: { token: string } }) {
               />
               <Label htmlFor="consent" className="text-sm font-normal leading-snug">
                 I consent to MatOS storing my membership, attendance, and payment data as described
-                in {info?.gymName ? `${info.gymName}'s` : "the gym's"} data policy.
+                in {info?.gymName ? `${info.gymName}'s` : "the academy's"} data policy.
               </Label>
             </div>
             {errors.consent ? (

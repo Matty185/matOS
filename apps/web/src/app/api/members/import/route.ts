@@ -48,7 +48,7 @@ export const POST = withAuth(
       const rows = input.members.flatMap((m, i) => (m.email && taken.has(m.email) ? [i + 1] : []));
       return NextResponse.json(
         {
-          error: `${rows.length} ${rows.length === 1 ? "person is" : "people are"} already in your gym (row ${rows.join(", ")}). Remove them and try again.`,
+          error: `${rows.length} ${rows.length === 1 ? "person is" : "people are"} already in your academy (row ${rows.join(", ")}). Remove them and try again.`,
           code: "EMAIL_TAKEN",
           status: 409,
           rows,
@@ -80,7 +80,7 @@ export const POST = withAuth(
         return apiError(
           409,
           "EMAIL_TAKEN",
-          "Someone in this list was just added to your gym. Refresh and try again.",
+          "Someone in this list was just added to your academy. Refresh and try again.",
         );
       }
       console.error("[members/import] import_members failed", error);

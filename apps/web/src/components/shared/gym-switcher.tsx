@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@matos/shared";
 import { createClient } from "@/lib/supabase/client";
 import {
   Select,
@@ -15,13 +16,14 @@ import type { GymMembership } from "@/lib/auth/current-member";
 
 type GymSwitcherProps = {
   memberships: GymMembership[];
+  triggerClassName?: string;
 };
 
 // Stage S2 (matos_mobile_plan.md §2.3): "UI gets a context switcher only
 // when >1 membership exists" — renders nothing otherwise, so a
 // single-membership user (the entire alpha population today) sees no
 // change at all.
-export function GymSwitcher({ memberships }: GymSwitcherProps) {
+export function GymSwitcher({ memberships, triggerClassName }: GymSwitcherProps) {
   const [switching, setSwitching] = useState(false);
 
   if (memberships.length <= 1) return null;
@@ -36,7 +38,7 @@ export function GymSwitcher({ memberships }: GymSwitcherProps) {
     const { error } = await supabase.rpc("set_active_gym", { p_gym_id: gymId });
 
     if (error) {
-      toast.error("Couldn't switch gyms. Try again.");
+      toast.error("Couldn't switch academies. Try again.");
       setSwitching(false);
       return;
     }
@@ -51,7 +53,10 @@ export function GymSwitcher({ memberships }: GymSwitcherProps) {
 
   return (
     <Select value={current?.gymId} onValueChange={handleSwitch} disabled={switching}>
-      <SelectTrigger className="h-11 w-full text-sm font-medium" aria-label="Switch active gym">
+      <SelectTrigger
+        className={cn("h-11 w-full text-sm font-medium", triggerClassName)}
+        aria-label="Switch active academy"
+      >
         <SelectValue>{switching ? "Switching..." : current?.gymName}</SelectValue>
       </SelectTrigger>
       <SelectContent>

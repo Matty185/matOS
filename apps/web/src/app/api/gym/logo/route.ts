@@ -16,7 +16,7 @@ export const PUT = withAuth(
       return apiError(403, "FORBIDDEN", "Personal workspaces don't have a logo.");
     }
     if (!input.path.startsWith(`${context.gymId}/`)) {
-      return apiError(400, "INVALID_PATH", "That logo doesn't belong to your gym.");
+      return apiError(400, "INVALID_PATH", "That logo doesn't belong to your academy.");
     }
     const supabase = createClient();
     const fileName = input.path.slice(context.gymId.length + 1);

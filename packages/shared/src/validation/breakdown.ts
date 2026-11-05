@@ -33,7 +33,7 @@ export const createBreakdownBaseSchema = z.object({
 export const createBreakdownSchema = createBreakdownBaseSchema.refine(
   (data) => Boolean(data.member_id) !== Boolean(data.external_person_id),
   {
-    message: "Pick exactly one focus — a gym member or an external person.",
+    message: "Pick exactly one focus — an academy member or an external person.",
     path: ["member_id"],
   },
 );

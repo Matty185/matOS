@@ -13,7 +13,7 @@ export const PATCH = withAuth(
 
     const { data: before } = await supabase.from("classes").select("*").eq("id", id).single();
     if (!before) {
-      return apiError(404, "CLASS_NOT_FOUND", "No class found with that id in your gym.");
+      return apiError(404, "CLASS_NOT_FOUND", "No class found with that id in your academy.");
     }
 
     const { error: updateError } = await supabase
@@ -33,7 +33,7 @@ export const PATCH = withAuth(
       .eq("id", id);
 
     if (updateError?.code === "22023") {
-      return apiError(400, "INVALID_COACH", "Pick an active coach or owner from your gym.");
+      return apiError(400, "INVALID_COACH", "Pick an active coach or owner from your academy.");
     }
     if (updateError) {
       return apiError(
@@ -78,7 +78,7 @@ export const DELETE = withAuth(
 
     const { data: existing } = await supabase.from("classes").select("name").eq("id", id).single();
     if (!existing) {
-      return apiError(404, "CLASS_NOT_FOUND", "No class found with that id in your gym.");
+      return apiError(404, "CLASS_NOT_FOUND", "No class found with that id in your academy.");
     }
 
     const { error: deleteError } = await supabase.from("classes").delete().eq("id", id);

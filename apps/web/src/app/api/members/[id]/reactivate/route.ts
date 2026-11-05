@@ -27,7 +27,7 @@ export const POST = withAuth(
       .eq("id", id)
       .single();
     if (memberError || !member) {
-      return apiError(404, "MEMBER_NOT_FOUND", "No member found with that id in your gym.");
+      return apiError(404, "MEMBER_NOT_FOUND", "No member found with that id in your academy.");
     }
     if (member.active) {
       return apiError(409, "ALREADY_ACTIVE", "This member is already active.");

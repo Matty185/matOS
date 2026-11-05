@@ -58,7 +58,7 @@ export default async function SettingsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="font-heading text-3xl tracking-wide">Gym Settings</h1>
+        <h1 className="font-heading text-3xl tracking-wide">Academy Settings</h1>
         <Button asChild variant="outline" className="h-11">
           <Link href="/setup">
             <ListChecks className="mr-2 h-4 w-4" />
@@ -69,8 +69,10 @@ export default async function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Gym</CardTitle>
-          <CardDescription>How your gym appears to members, and its local time.</CardDescription>
+          <CardTitle>Academy</CardTitle>
+          <CardDescription>
+            How your academy appears to members, and its local time.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <GymDetailsForm
@@ -124,7 +126,7 @@ export default async function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Team</CardTitle>
-          <CardDescription>Owners and coaches who run the gym.</CardDescription>
+          <CardDescription>Owners and coaches who run the academy.</CardDescription>
         </CardHeader>
         <CardContent>
           <TeamManager currentMemberId={member.memberId} />

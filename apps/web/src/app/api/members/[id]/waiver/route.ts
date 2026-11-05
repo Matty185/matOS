@@ -16,7 +16,7 @@ import { recordWaiverSchema } from "@matos/shared";
 export const POST = withAuth(
   async (_request: NextRequest, context, input, params) => {
     if (context.gymKind === "personal") {
-      return apiError(403, "FORBIDDEN", "Waivers are for gyms, not personal workspaces.");
+      return apiError(403, "FORBIDDEN", "Waivers are for academies, not personal workspaces.");
     }
     const id = params.id;
     if (!id) return apiError(400, "MISSING_ID", "No member id provided.");
@@ -28,7 +28,7 @@ export const POST = withAuth(
       .eq("id", id)
       .maybeSingle();
     if (!member) {
-      return apiError(404, "MEMBER_NOT_FOUND", "No member found with that id in your gym.");
+      return apiError(404, "MEMBER_NOT_FOUND", "No member found with that id in your academy.");
     }
     if (!member.active) {
       return apiError(409, "MEMBER_INACTIVE", "Reactivate this member first.");

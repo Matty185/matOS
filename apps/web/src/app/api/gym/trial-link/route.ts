@@ -22,10 +22,10 @@ function newCode(): string {
 export const POST = withAuth(
   async (_request, context, input) => {
     if (context.gymKind === "personal") {
-      return apiError(403, "FORBIDDEN", "Trial links are for gyms, not personal workspaces.");
+      return apiError(403, "FORBIDDEN", "Trial links are for academies, not personal workspaces.");
     }
     if (context.role !== "gym_owner") {
-      return apiError(403, "FORBIDDEN", "Only the gym owner can change the trial link.");
+      return apiError(403, "FORBIDDEN", "Only the academy owner can change the trial link.");
     }
     const supabase = createClient();
     const { data: before } = await supabase

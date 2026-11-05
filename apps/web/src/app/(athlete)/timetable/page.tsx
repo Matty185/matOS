@@ -112,7 +112,7 @@ export default function TimetablePage() {
         <EmptyState
           icon={CalendarDays}
           title="No classes scheduled"
-          description="Your gym hasn't added its timetable yet. Check back soon."
+          description="Your academy hasn't added its timetable yet. Check back soon."
         />
       </div>
     );

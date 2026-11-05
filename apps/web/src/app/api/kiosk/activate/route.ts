@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     return apiError(
       410,
       "LINK_UNAVAILABLE",
-      "This setup link has already been used or has expired. Ask the gym owner for a new one.",
+      "This setup link has already been used or has expired. Ask the academy owner for a new one.",
     );
   }
 

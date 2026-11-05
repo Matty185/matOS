@@ -29,7 +29,7 @@ export const PATCH = withAuth(
       .single();
 
     if (!before) {
-      return apiError(404, "MEMBER_NOT_FOUND", "No member found with that id in your gym.");
+      return apiError(404, "MEMBER_NOT_FOUND", "No member found with that id in your academy.");
     }
 
     // Flow audit 6.7: a chosen plan sets the billing type. Keeping a retired
@@ -43,7 +43,8 @@ export const PATCH = withAuth(
         input.plan_id,
         input.plan_id === before.plan_id,
       );
-      if (!plan.ok) return apiError(400, "INVALID_PLAN", "Choose one of your gym's current plans.");
+      if (!plan.ok)
+        return apiError(400, "INVALID_PLAN", "Choose one of your academy's current plans.");
       membershipPlan = plan.kind;
       planId = input.plan_id;
     }
@@ -105,10 +106,10 @@ export const PATCH = withAuth(
 
     if (updateError) {
       if (updateError.code === "22023") {
-        return apiError(400, "INVALID_PLAN", "Choose one of your gym's current plans.");
+        return apiError(400, "INVALID_PLAN", "Choose one of your academy's current plans.");
       }
       if (updateError.code === "23505") {
-        return apiError(409, "EMAIL_TAKEN", "Someone in your gym already has this email.");
+        return apiError(409, "EMAIL_TAKEN", "Someone in your academy already has this email.");
       }
       return apiError(
         500,

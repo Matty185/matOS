@@ -12,10 +12,10 @@ import { publishWaiverSchema } from "@matos/shared";
 export const POST = withAuth(
   async (_request: NextRequest, context, input) => {
     if (context.gymKind === "personal") {
-      return apiError(403, "FORBIDDEN", "Waivers are for gyms, not personal workspaces.");
+      return apiError(403, "FORBIDDEN", "Waivers are for academies, not personal workspaces.");
     }
     if (context.role !== "gym_owner") {
-      return apiError(403, "FORBIDDEN", "Only the gym owner can change the waiver.");
+      return apiError(403, "FORBIDDEN", "Only the academy owner can change the waiver.");
     }
     const supabase = createClient();
 

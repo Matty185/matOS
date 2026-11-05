@@ -116,7 +116,7 @@ export function SignupLinkDialog({
     }
   }
 
-  const gymName = link?.gymName ?? "the gym";
+  const gymName = link?.gymName ?? "the academy";
   const message = link
     ? `Hi! Here's your link to join ${gymName} on MatOS — fill in your details and pick a password (works once, for 7 days): ${link.url}`
     : "";

@@ -127,7 +127,7 @@ function NewAccountForm({ token, gymName }: { token: string; gymName: string | n
         />
         <Label htmlFor="consent" className="text-sm font-normal leading-snug">
           I consent to MatOS storing my membership, attendance, and payment data as described in
-          {gymName ? ` ${gymName}'s` : " the gym's"} data policy.
+          {gymName ? ` ${gymName}'s` : " the academy's"} data policy.
         </Label>
       </div>
       {errors.consent ? <p className="text-sm text-destructive">{errors.consent.message}</p> : null}
@@ -172,8 +172,8 @@ function AttachAccountForm({ token, gymName }: { token: string; gymName: string 
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
       <p className="text-sm text-muted-foreground">
         This email already has a MatOS account. Enter your password to link
-        {gymName ? ` ${gymName}` : " this gym"} to it — your existing workspace stays exactly as it
-        is.
+        {gymName ? ` ${gymName}` : " this academy"} to it — your existing workspace stays exactly as
+        it is.
       </p>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="password">Password</Label>
@@ -201,7 +201,7 @@ function AttachAccountForm({ token, gymName }: { token: string; gymName: string 
         />
         <Label htmlFor="consent" className="text-sm font-normal leading-snug">
           I consent to MatOS storing my membership, attendance, and payment data as described in
-          {gymName ? ` ${gymName}'s` : " the gym's"} data policy.
+          {gymName ? ` ${gymName}'s` : " the academy's"} data policy.
         </Label>
       </div>
       {errors.consent ? <p className="text-sm text-destructive">{errors.consent.message}</p> : null}
@@ -260,8 +260,8 @@ export default function ClaimInvitePage({ params }: { params: { token: string } 
           <CardDescription>
             {invite?.memberFirstName ? `Welcome, ${invite.memberFirstName}. ` : ""}
             {invite?.accountExists
-              ? `Confirm you'd like to join${invite?.gymName ? ` ${invite.gymName}` : " this gym"}.`
-              : `Set your password to join${invite?.gymName ? ` ${invite.gymName}` : " your gym"}.`}
+              ? `Confirm you'd like to join${invite?.gymName ? ` ${invite.gymName}` : " this academy"}.`
+              : `Set your password to join${invite?.gymName ? ` ${invite.gymName}` : " your academy"}.`}
           </CardDescription>
         </CardHeader>
         <CardContent>

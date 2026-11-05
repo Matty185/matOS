@@ -164,7 +164,7 @@ async function getDashboardData() {
       const joined = canSignUp.filter((m) => m.user_id).length;
       setup = [
         {
-          label: "Add your gym's details",
+          label: "Add your academy's details",
           done: Boolean(gymRow.address || gymRow.contact_email),
           href: "/settings",
         },
@@ -282,7 +282,7 @@ async function getDashboardData() {
     overdueCount: overdueIds.size,
     overdueMembers,
     notSeenMembers,
-    gymName: gymName?.name ?? "the gym",
+    gymName: gymName?.name ?? "the academy",
     recentActivity,
   };
 }
@@ -349,7 +349,7 @@ export default async function DashboardPage() {
         <Card className="border-primary/40">
           <CardHeader className="pb-3">
             <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-lg">
-              Finish setting up your gym
+              Finish setting up your academy
               <span className="text-sm font-normal text-muted-foreground">
                 {data.setup.filter((s) => s.done).length} of {data.setup.length} done
               </span>

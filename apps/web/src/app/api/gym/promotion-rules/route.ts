@@ -11,7 +11,7 @@ import { promotionRulesSchema } from "@matos/shared";
 export const PATCH = withAuth(
   async (_request, context, input) => {
     if (context.gymKind === "personal") {
-      return apiError(403, "FORBIDDEN", "Personal workspaces don't have gym settings.");
+      return apiError(403, "FORBIDDEN", "Personal workspaces don't have academy settings.");
     }
 
     const supabase = createClient();

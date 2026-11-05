@@ -34,7 +34,7 @@ export const PUT = withAuth(
     const supabase = createClient();
     const member = await loadMember(supabase, id, context.gymId);
     if (!member)
-      return apiError(404, "MEMBER_NOT_FOUND", "No member found with that id in your gym.");
+      return apiError(404, "MEMBER_NOT_FOUND", "No member found with that id in your academy.");
 
     // The file must really be there (uploaded under this session's RLS).
     const folder = `${context.gymId}/${id}`;
@@ -78,7 +78,7 @@ export const DELETE = withAuth(
     const supabase = createClient();
     const member = await loadMember(supabase, id, context.gymId);
     if (!member)
-      return apiError(404, "MEMBER_NOT_FOUND", "No member found with that id in your gym.");
+      return apiError(404, "MEMBER_NOT_FOUND", "No member found with that id in your academy.");
     if (!member.photo_url) return NextResponse.json({ success: true });
 
     const { error } = await supabase.from("members").update({ photo_url: null }).eq("id", id);

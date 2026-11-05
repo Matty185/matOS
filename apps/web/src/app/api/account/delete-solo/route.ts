@@ -50,7 +50,7 @@ export const POST = withAuth(async (_request, context) => {
     return apiError(
       409,
       "HAS_GYM_MEMBERSHIP",
-      "You also belong to a gym. Account deletion for gym members goes through your coach's request flow.",
+      "You also belong to an academy. Account deletion for academy members goes through your coach's request flow.",
     );
   }
 

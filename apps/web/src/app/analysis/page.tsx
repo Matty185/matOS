@@ -83,7 +83,7 @@ export default function AnalysisPage() {
             {isSolo
               ? "Your logged match breakdowns."
               : isStaff
-                ? "Match breakdowns across your gym."
+                ? "Match breakdowns across your academy."
                 : "Your logged match breakdowns."}
           </p>
         </div>

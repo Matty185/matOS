@@ -31,7 +31,7 @@ export const READ_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_members",
     description:
-      "List members in the gym, optionally filtered. Use this for browsing/counting; use get_member to look up a specific person by name.",
+      "List members in the academy, optionally filtered. Use this for browsing/counting; use get_member to look up a specific person by name.",
     input_schema: {
       type: "object",
       properties: {
@@ -92,7 +92,7 @@ export const READ_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_classes",
     description:
-      "List the gym's recurring weekly classes (with programme, e.g. kids or fundamentals, and coach name when set), plus any one-off cancelled or moved sessions in the next 14 days (a cancelled session does not run that date).",
+      "List the academy's recurring weekly classes (with programme, e.g. kids or fundamentals, and coach name when set), plus any one-off cancelled or moved sessions in the next 14 days (a cancelled session does not run that date).",
     input_schema: {
       type: "object",
       properties: {
@@ -129,7 +129,7 @@ export const READ_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: "get_audit_log",
-    description: "Get recent audit log entries for the gym, most recent first.",
+    description: "Get recent audit log entries for the academy, most recent first.",
     input_schema: {
       type: "object",
       properties: {
@@ -140,7 +140,7 @@ export const READ_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_external_person",
     description:
-      "Look up an external person (an opponent/analyst record, not a gym member) by name, to find their id before calling get_athlete_profile/get_metric/compare_profiles/get_breakdowns with external_person_id. Returns every matching person — if more than one comes back, list them for the coach and ask which one, rather than guessing.",
+      "Look up an external person (an opponent/analyst record, not an academy member) by name, to find their id before calling get_athlete_profile/get_metric/compare_profiles/get_breakdowns with external_person_id. Returns every matching person — if more than one comes back, list them for the coach and ask which one, rather than guessing.",
     input_schema: {
       type: "object",
       properties: {
@@ -152,14 +152,14 @@ export const READ_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_athlete_profile",
     description:
-      "Get a computed match-analysis profile for a gym member or external person: style card, wrestling/passing/guard/submission/escape success rates, all as factual numbers with their sample size (n). Never returns coaching advice — if asked what someone should work on, report the metrics with the smallest n or weakest values, factually, and stop there.",
+      "Get a computed match-analysis profile for an academy member or external person: style card, wrestling/passing/guard/submission/escape success rates, all as factual numbers with their sample size (n). Never returns coaching advice — if asked what someone should work on, report the metrics with the smallest n or weakest values, factually, and stop there.",
     input_schema: {
       type: "object",
       properties: {
         member_id: {
           type: "string",
           description:
-            "UUID of a gym member. Exactly one of member_id/external_person_id is required.",
+            "UUID of an academy member. Exactly one of member_id/external_person_id is required.",
         },
         external_person_id: {
           type: "string",
@@ -175,14 +175,14 @@ export const READ_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_metric",
     description:
-      "Get one specific named metric for a gym member or external person (e.g. takedown success rate). Use this instead of get_athlete_profile when the coach asks about a single number.",
+      "Get one specific named metric for an academy member or external person (e.g. takedown success rate). Use this instead of get_athlete_profile when the coach asks about a single number.",
     input_schema: {
       type: "object",
       properties: {
         member_id: {
           type: "string",
           description:
-            "UUID of a gym member. Exactly one of member_id/external_person_id is required.",
+            "UUID of an academy member. Exactly one of member_id/external_person_id is required.",
         },
         external_person_id: { type: "string", description: "UUID of an external person." },
         metric_name: { type: "string", enum: METRIC_NAMES },
@@ -197,16 +197,16 @@ export const READ_TOOLS: Anthropic.Tool[] = [
   {
     name: "compare_profiles",
     description:
-      "Compare two computed profiles (gym members and/or external people) side by side, same metrics for both. Factual numbers only — never recommend who is 'better,' just report both sets of numbers.",
+      "Compare two computed profiles (academy members and/or external people) side by side, same metrics for both. Factual numbers only — never recommend who is 'better,' just report both sets of numbers.",
     input_schema: {
       type: "object",
       properties: {
-        member_id_a: { type: "string", description: "Subject A: UUID of a gym member." },
+        member_id_a: { type: "string", description: "Subject A: UUID of an academy member." },
         external_person_id_a: {
           type: "string",
           description: "Subject A: UUID of an external person.",
         },
-        member_id_b: { type: "string", description: "Subject B: UUID of a gym member." },
+        member_id_b: { type: "string", description: "Subject B: UUID of an academy member." },
         external_person_id_b: {
           type: "string",
           description: "Subject B: UUID of an external person.",

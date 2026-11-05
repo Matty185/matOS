@@ -95,7 +95,7 @@ export function TrialRequestForm({ code, sessions }: { code: string; sessions: T
       }
       setDone(true);
     } catch {
-      setError("Couldn't reach the gym's system. Check your connection and try again.");
+      setError("Couldn't reach the academy's system. Check your connection and try again.");
     } finally {
       setSaving(false);
     }
@@ -111,7 +111,8 @@ export function TrialRequestForm({ code, sessions }: { code: string; sessions: T
             been sent.
           </p>
           <p className="text-sm text-muted-foreground">
-            The gym will contact you to confirm your trial. Bring comfortable sportswear and water.
+            The academy will contact you to confirm your trial. Bring comfortable sportswear and
+            water.
           </p>
         </div>
       </div>
@@ -245,7 +246,7 @@ export function TrialRequestForm({ code, sessions }: { code: string; sessions: T
         </Select>
         {sessions.length === 0 ? (
           <p className="text-xs text-muted-foreground">
-            No classes are listed for the next two weeks — the gym will suggest one.
+            No classes are listed for the next two weeks — the academy will suggest one.
           </p>
         ) : null}
       </div>
@@ -288,7 +289,7 @@ export function TrialRequestForm({ code, sessions }: { code: string; sessions: T
           onCheckedChange={(v) => setConsent(v === true)}
         />
         <Label htmlFor="trial-consent" className="font-normal leading-snug">
-          The gym may store these details and contact me about a trial. I can ask for them to be
+          The academy may store these details and contact me about a trial. I can ask for them to be
           deleted at any time.
         </Label>
       </div>

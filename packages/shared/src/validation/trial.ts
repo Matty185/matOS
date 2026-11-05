@@ -63,7 +63,7 @@ export const trialRequestSchema = z
         .regex(/^\d{4}-\d{2}-\d{2}$/)
         .optional(),
     ),
-    consent: z.literal(true, { message: "Tick the box so the gym can contact you." }),
+    consent: z.literal(true, { message: "Tick the box so the academy can contact you." }),
     // Honeypot: hidden from people (and named so autofill skips it),
     // filled in by naive bots.
     hp_field: z.string().max(200).optional(),
@@ -73,7 +73,7 @@ export const trialRequestSchema = z
       ctx.addIssue({
         code: "custom",
         path: ["email"],
-        message: "Give an email or a phone number so the gym can reach you.",
+        message: "Give an email or a phone number so the academy can reach you.",
       });
     }
     if (v.for_child && !v.parent_name) {

@@ -41,7 +41,7 @@ export function GymLogoSetting({ gymId, path }: { gymId: string; path: string | 
           // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL
           <img
             src={url}
-            alt="Your gym logo"
+            alt="Your academy logo"
             className="h-14 w-auto max-w-[10rem] rounded object-contain"
           />
         ) : null}

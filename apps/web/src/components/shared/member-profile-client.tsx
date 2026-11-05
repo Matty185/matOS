@@ -693,7 +693,7 @@ function PaymentsTab({
         <EmptyState
           icon={CreditCard}
           title="No payment history yet"
-          description="This member's payments will list here as they're recorded — see the full gym-wide grid under Payments."
+          description="This member's payments will list here as they're recorded — see the full academy-wide grid under Payments."
         />
       ) : (
         <ul className="flex flex-col gap-2">

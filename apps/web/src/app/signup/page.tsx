@@ -72,7 +72,7 @@ export default function SignupPage() {
             <Logo className="h-9" />
           </CardTitle>
           <CardDescription>
-            Create your personal workspace — no gym or coach required to get started.
+            Create your personal workspace — no academy or coach required to get started.
           </CardDescription>
         </CardHeader>
         <CardContent>

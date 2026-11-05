@@ -22,7 +22,11 @@ const MAX_LIVE = 10;
 export const POST = withAuth(
   async (_request: NextRequest, context, input) => {
     if (context.gymKind === "personal") {
-      return apiError(403, "FORBIDDEN", "Announcements are for gyms, not personal workspaces.");
+      return apiError(
+        403,
+        "FORBIDDEN",
+        "Announcements are for academies, not personal workspaces.",
+      );
     }
     const supabase = createClient();
 

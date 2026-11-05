@@ -38,7 +38,6 @@ export function Logo({ tone = "color", layout = "horizontal", className }: LogoP
       width={source.width}
       height={source.height}
       unoptimized
-      priority
       className={cn("h-7 w-auto", className)}
     />
   );

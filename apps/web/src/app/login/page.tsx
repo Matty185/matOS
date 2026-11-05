@@ -102,14 +102,14 @@ export default function LoginPage() {
           <CardTitle>
             <Logo className="h-9" />
           </CardTitle>
-          <CardDescription>Sign in to your gym account</CardDescription>
+          <CardDescription>Sign in to your academy account</CardDescription>
         </CardHeader>
         <CardContent>
           <Suspense fallback={<p className="text-sm text-muted-foreground">Loading...</p>}>
             <LoginForm />
           </Suspense>
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            No gym yet?{" "}
+            No academy yet?{" "}
             <Link
               href="/signup"
               className="font-medium text-primary underline-offset-4 hover:underline"

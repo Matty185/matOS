@@ -77,7 +77,7 @@ export function RosterImporter({
       if (email && prev === undefined) firstIndex.set(email, i);
       const errors = validate(row, prev ?? null);
       if (!errors.email && serverDuplicateRows.has(i + 1)) {
-        errors.email = "Already a member of your gym.";
+        errors.email = "Already a member of your academy.";
       }
       return errors;
     });

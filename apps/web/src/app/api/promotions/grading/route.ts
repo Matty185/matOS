@@ -18,7 +18,7 @@ const BATCH = 5;
 export const POST = withAuth(
   async (_request, context, input) => {
     if (context.gymKind === "personal") {
-      return apiError(403, "FORBIDDEN", "Grading day is for gyms, not personal workspaces.");
+      return apiError(403, "FORBIDDEN", "Grading day is for academies, not personal workspaces.");
     }
     const supabase = createClient();
     // Small parallel batches: quick enough for the function time limit,

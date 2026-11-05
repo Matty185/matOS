@@ -15,7 +15,7 @@ import { signWaiverSchema } from "@matos/shared";
 export const POST = withAuth(
   async (_request: NextRequest, context, input) => {
     if (context.gymKind === "personal") {
-      return apiError(403, "FORBIDDEN", "Waivers are for gyms, not personal workspaces.");
+      return apiError(403, "FORBIDDEN", "Waivers are for academies, not personal workspaces.");
     }
     const supabase = createClient();
 

@@ -17,7 +17,7 @@ const MAX_DEVICES = 5;
 export const POST = withAuth(
   async (_request, context, input) => {
     if (context.gymKind === "personal") {
-      return apiError(403, "FORBIDDEN", "A kiosk is for gyms, not personal workspaces.");
+      return apiError(403, "FORBIDDEN", "A kiosk is for academies, not personal workspaces.");
     }
     const supabase = createServiceRoleClient();
 

@@ -55,12 +55,12 @@ export function MessageMember({
       const supabase = createClient();
       const { data: current } = await supabase.rpc("current_member");
       const gymId = current?.[0]?.gym_id;
-      if (!gymId) return "the gym";
+      if (!gymId) return "the academy";
       const { data } = await supabase.from("gyms").select("name").eq("id", gymId).maybeSingle();
-      return data?.name ?? "the gym";
+      return data?.name ?? "the academy";
     },
   });
-  const initial = messageTemplate(kind, firstName, gymName ?? fetchedName ?? "the gym");
+  const initial = messageTemplate(kind, firstName, gymName ?? fetchedName ?? "the academy");
   const [text, setText] = useState(initial.text);
   const wa = whatsappUrl(phone, text);
   const sms = smsUrl(phone, text);

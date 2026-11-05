@@ -143,7 +143,7 @@ export const POST = withAuth(
     }).join(", ");
 
     const systemPrompt = buildSystemPrompt({
-      gymName: gym?.name ?? "your gym",
+      gymName: gym?.name ?? "your academy",
       coachName: coachMember ? `${coachMember.first_name} ${coachMember.last_name}` : "Coach",
       currentDate: `${weekday} ${gymToday} (${timeZone})`,
       weekDates,
@@ -304,7 +304,7 @@ export const POST = withAuth(
         const name = coachNames.get(id);
         return name
           ? `${name} isn't an active coach or owner, so they can't be assigned to a class.`
-          : "Couldn't find that coach in your gym.";
+          : "Couldn't find that coach in your academy.";
       };
 
       const pending: PendingWriteCall[] = [];

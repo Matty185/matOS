@@ -152,7 +152,7 @@ export default async function AthleteHomePage() {
             <FileSignature className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden />
             <div className="flex flex-col gap-1">
               <h2 id="waiver-prompt-heading" className="font-medium">
-                Please sign the gym&apos;s waiver
+                Please sign the academy&apos;s waiver
               </h2>
               <p className="text-sm text-muted-foreground">It takes a minute.</p>
             </div>
@@ -219,7 +219,7 @@ export default async function AthleteHomePage() {
           <EmptyState
             icon={CalendarDays}
             title="No classes scheduled"
-            description="Your gym's schedule will show up here once it's set up."
+            description="Your academy's schedule will show up here once it's set up."
           />
         ) : (
           <ul className="flex flex-col gap-2">

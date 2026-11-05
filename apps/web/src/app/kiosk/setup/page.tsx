@@ -23,7 +23,7 @@ export default function KioskSetupPage() {
     const token = window.location.hash.slice(1);
     window.history.replaceState(null, "", "/kiosk/setup");
     if (!token) {
-      setError("This setup link is incomplete. Open the full link from the gym owner.");
+      setError("This setup link is incomplete. Open the full link from the academy owner.");
       return;
     }
     (async () => {

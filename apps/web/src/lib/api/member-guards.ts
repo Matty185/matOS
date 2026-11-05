@@ -6,7 +6,7 @@ import { apiError } from "@/lib/api/response";
 type PostgrestLikeError = { code?: string; message?: string; hint?: string | null } | null;
 
 export const LAST_OWNER_MESSAGE =
-  "A gym needs at least one active owner. Make someone else an owner first.";
+  "An academy needs at least one active owner. Make someone else an owner first.";
 
 /**
  * Stage O1: maps the two DB-level member guards from migration
@@ -23,7 +23,7 @@ export function mapMemberGuardError(error: PostgrestLikeError): Response | null 
     return apiError(409, "LAST_OWNER", LAST_OWNER_MESSAGE);
   }
   if (error.code === "42501") {
-    return apiError(403, "FORBIDDEN", "Only the gym owner can change staff accounts.");
+    return apiError(403, "FORBIDDEN", "Only the academy owner can change staff accounts.");
   }
   return null;
 }

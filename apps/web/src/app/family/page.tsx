@@ -107,7 +107,7 @@ export default function FamilyPage() {
         <EmptyState
           icon={Baby}
           title="No children linked yet"
-          description="Ask your gym to link your child to your account from their profile."
+          description="Ask your academy to link your child to your account from their profile."
         />
       </div>
     );
@@ -392,7 +392,7 @@ function GuardianWaiverForm({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="flex items-center gap-2 text-sm font-medium">
           <FileSignature className="h-4 w-4 text-primary" aria-hidden />
-          Please sign the gym&apos;s waiver for {childName}
+          Please sign the academy&apos;s waiver for {childName}
         </span>
         {!open ? (
           <Button className="h-11" onClick={() => setOpen(true)}>

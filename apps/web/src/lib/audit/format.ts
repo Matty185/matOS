@@ -262,9 +262,9 @@ export function describeAuditEntry(row: AuditLogRow, ctx: AuditNameContext): str
     case "promotion.grading_day":
       return `${actor} promoted ${typeof after.promoted === "number" ? after.promoted : "several"} members on grading day.`;
     case "waiver.published":
-      return `${actor} published a new version of the gym's waiver.`;
+      return `${actor} published a new version of the academy's waiver.`;
     case "waiver.signed":
-      return `${actor} signed the gym's waiver.`;
+      return `${actor} signed the academy's waiver.`;
     case "waiver.recorded": {
       const who =
         typeof after.member_id === "string"
@@ -309,11 +309,11 @@ export function describeAuditEntry(row: AuditLogRow, ctx: AuditNameContext): str
       return `${actor} imported ${count} member${count === 1 ? "" : "s"}.`;
     }
     case "gym.updated":
-      return `${actor} updated the gym's details.`;
+      return `${actor} updated the academy's details.`;
     case "gym.promotion_rules_updated":
       return `${actor} changed the promotion guidance.`;
     case "gym.onboarding_completed":
-      return `${actor} finished setting up the gym.`;
+      return `${actor} finished setting up the academy.`;
     case "team.coach_added":
       return `${actor} added ${subjectNameFor(row, ctx)} as a coach.`;
     case "team.role_changed": {
@@ -335,7 +335,7 @@ export function describeAuditEntry(row: AuditLogRow, ctx: AuditNameContext): str
     case "member.self_registered":
       return `${subjectNameFor(row, ctx)} joined using a sign-up link.`;
     case "gym.provisioned":
-      return "Gym created on MatOS.";
+      return "Academy created on MatOS.";
     default:
       return `${actor} performed "${row.action}"${row.entity_type ? ` on ${row.entity_type}` : ""}.`;
   }

@@ -27,7 +27,7 @@ export default function ForgotPasswordPage() {
             <li>Open it and choose a new password. It works once, within an hour.</li>
           </ol>
           <p className="text-sm text-muted-foreground">
-            Gym owners: contact MatOS support for a new link.
+            Academy owners: contact MatOS support for a new link.
           </p>
           <Button asChild variant="outline" className="h-11">
             <Link href="/login">Back to sign in</Link>

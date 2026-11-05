@@ -183,7 +183,7 @@ export function MembershipStatusCard({
       ) : null}
       {payButton}
       <p className="text-xs text-muted-foreground">
-        Payments are recorded by your gym. If something looks wrong, ask your coach.
+        Payments are recorded by your academy. If something looks wrong, ask your coach.
       </p>
     </section>
   );

@@ -25,7 +25,7 @@ export default async function TrialPage({ params }: { params: { code: string } }
           <CardHeader>
             <CardTitle>This link isn&apos;t active</CardTitle>
             <CardDescription>
-              The trial link may have been changed or turned off. Contact the gym directly to
+              The trial link may have been changed or turned off. Contact the academy directly to
               arrange a trial.
             </CardDescription>
           </CardHeader>
@@ -54,7 +54,7 @@ export default async function TrialPage({ params }: { params: { code: string } }
           <CardTitle className="font-heading text-3xl tracking-wide">{gym.name}</CardTitle>
           <CardDescription>
             Try a class for free. Tell us a little about yourself and which class you&apos;d like to
-            try, and the gym will get back to you.
+            try, and the academy will get back to you.
           </CardDescription>
         </CardHeader>
         <CardContent>

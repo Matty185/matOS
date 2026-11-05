@@ -16,7 +16,11 @@ import { addGuardianSchema } from "@matos/shared";
 export const POST = withAuth(
   async (_request: NextRequest, context, input, params) => {
     if (context.gymKind === "personal") {
-      return apiError(403, "FORBIDDEN", "Parent accounts are for gyms, not personal workspaces.");
+      return apiError(
+        403,
+        "FORBIDDEN",
+        "Parent accounts are for academies, not personal workspaces.",
+      );
     }
     const childId = params.id;
     if (!childId) return apiError(400, "MISSING_ID", "No member id provided.");
@@ -28,7 +32,7 @@ export const POST = withAuth(
       .eq("id", childId)
       .maybeSingle();
     if (!child) {
-      return apiError(404, "MEMBER_NOT_FOUND", "No member found with that id in your gym.");
+      return apiError(404, "MEMBER_NOT_FOUND", "No member found with that id in your academy.");
     }
     if (child.role !== "athlete") {
       return apiError(409, "NOT_ATHLETE", "Only athletes can have a parent account linked.");

@@ -30,7 +30,7 @@ export const POST = withAuth(
       .single();
 
     if (insertError?.code === "22023") {
-      return apiError(400, "INVALID_COACH", "Pick an active coach or owner from your gym.");
+      return apiError(400, "INVALID_COACH", "Pick an active coach or owner from your academy.");
     }
     if (insertError || !created) {
       return apiError(500, "CLASS_CREATE_FAILED", "Something went wrong — the class wasn't saved.");

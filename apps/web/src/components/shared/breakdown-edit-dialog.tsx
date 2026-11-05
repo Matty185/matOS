@@ -193,7 +193,7 @@ export function BreakdownEditDialog({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="private">Private (only you)</SelectItem>
-                    <SelectItem value="gym">Shared with gym (coach can see it)</SelectItem>
+                    <SelectItem value="gym">Shared with academy (coach can see it)</SelectItem>
                   </SelectContent>
                 </Select>
               )}

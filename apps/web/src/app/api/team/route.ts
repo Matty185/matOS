@@ -43,7 +43,7 @@ export const POST = withAuth(
         return apiError(
           409,
           "EMAIL_TAKEN",
-          "Someone with this email is already in your gym — change their role from the team list instead.",
+          "Someone with this email is already in your academy — change their role from the team list instead.",
         );
       }
       console.error("[team] add coach failed", error);

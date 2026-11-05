@@ -298,8 +298,8 @@ function AddGuardianDialog({
           <DialogTitle>Add a parent for {childName}</DialogTitle>
           <DialogDescription>
             They get their own login to check {childName.split(" ")[0]} in, sign their waiver and
-            see their progress. If someone in your gym already uses this email (a parent who trains,
-            or a sibling&apos;s parent), they&apos;re linked instead.
+            see their progress. If someone in your academy already uses this email (a parent who
+            trains, or a sibling&apos;s parent), they&apos;re linked instead.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">

@@ -56,7 +56,7 @@ export const PATCH = withAuth(
       .eq("id", id)
       .select("id");
     if (error?.code === "22023") {
-      return apiError(400, "INVALID_MEMBER", "That member isn't in your gym.");
+      return apiError(400, "INVALID_MEMBER", "That member isn't in your academy.");
     }
     if (error || !updated || updated.length === 0) {
       console.error("[trial-leads] update failed", error?.code);

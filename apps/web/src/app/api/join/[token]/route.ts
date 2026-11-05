@@ -58,7 +58,7 @@ function emailInGym() {
   return apiError(
     409,
     "EMAIL_IN_GYM",
-    "Someone with this email is already on the gym's list. Ask your coach for your personal invite link instead.",
+    "Someone with this email is already on the academy's list. Ask your coach for your personal invite link instead.",
   );
 }
 
@@ -211,7 +211,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
         return apiError(
           409,
           "ALREADY_MEMBER",
-          "You're already a member of this gym — just sign in.",
+          "You're already a member of this academy — just sign in.",
         );
       case "LINK_UNAVAILABLE":
         return apiError(410, "LINK_USED", `This sign-up link has already been used. ${ASK}`);

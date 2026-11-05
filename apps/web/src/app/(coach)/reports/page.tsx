@@ -153,8 +153,8 @@ export default async function ReportsPage() {
       <div className="flex flex-col gap-1">
         <h1 className="font-heading text-3xl tracking-wide">Reports</h1>
         <p className="text-sm text-muted-foreground">
-          How the gym is doing, from what&apos;s recorded in MatOS. Months are calendar months; the
-          last one is still in progress.
+          How the academy is doing, from what&apos;s recorded in MatOS. Months are calendar months;
+          the last one is still in progress.
         </p>
         {failed ? (
           <p className="text-sm text-destructive">

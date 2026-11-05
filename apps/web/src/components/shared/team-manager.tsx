@@ -229,8 +229,8 @@ export function TeamManager({ currentMemberId }: { currentMemberId: string }) {
         </Button>
       ) : null}
       <p className="text-xs text-muted-foreground">
-        Owners manage gym settings and the team; coaches run everything else. Already have a member
-        who coaches? Open their profile and choose &ldquo;Make coach&rdquo;.
+        Owners manage academy settings and the team; coaches run everything else. Already have a
+        member who coaches? Open their profile and choose &ldquo;Make coach&rdquo;.
       </p>
 
       <AlertDialog
@@ -250,7 +250,7 @@ export function TeamManager({ currentMemberId }: { currentMemberId: string }) {
             </AlertDialogTitle>
             <AlertDialogDescription>
               {pendingRole?.role === "gym_owner"
-                ? "Owners can change gym settings and manage the whole team, including you."
+                ? "Owners can change academy settings and manage the whole team, including you."
                 : pendingRole?.role === "coach"
                   ? "Coaches can see every member's details, payments and attendance."
                   : "They'll become an athlete and lose access to the coach area."}

@@ -64,10 +64,10 @@ export function GymDetailsForm({
       });
       const body = await res.json();
       if (!res.ok) {
-        toast.error(body.error ?? "Couldn't save the gym details.");
+        toast.error(body.error ?? "Couldn't save the academy details.");
         return;
       }
-      if (!onSaved) toast.success("Gym details saved.");
+      if (!onSaved) toast.success("Academy details saved.");
       // New baseline: the saved values are now the form's "clean" state.
       reset(data);
       onSaved?.(data);
@@ -79,7 +79,7 @@ export function GymDetailsForm({
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex max-w-lg flex-col gap-4" noValidate>
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="gym-name">Gym name</Label>
+        <Label htmlFor="gym-name">Academy name</Label>
         <Input id="gym-name" className="h-11" {...register("name")} />
         {errors.name ? <p className="text-sm text-destructive">{errors.name.message}</p> : null}
       </div>

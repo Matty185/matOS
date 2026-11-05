@@ -27,7 +27,7 @@ export const POST = withAuth(
       .single();
 
     if (memberError || !member) {
-      return apiError(404, "MEMBER_NOT_FOUND", "No member found with that id in your gym.");
+      return apiError(404, "MEMBER_NOT_FOUND", "No member found with that id in your academy.");
     }
 
     if (!member.active) {
@@ -46,7 +46,7 @@ export const POST = withAuth(
     // already blocks a coach *creating* a staff row; this stops a coach
     // minting a claim link for an existing coach/owner row and claiming it.
     if (isStaffRole(member.role) && context.role !== "gym_owner") {
-      return apiError(403, "FORBIDDEN", "Only the gym owner can invite coaches.");
+      return apiError(403, "FORBIDDEN", "Only the academy owner can invite coaches.");
     }
 
     if (input.delivery === "email" && !isInviteEmailEnabled()) {

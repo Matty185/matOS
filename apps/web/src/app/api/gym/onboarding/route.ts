@@ -10,7 +10,7 @@ import { writeAuditLog } from "@/lib/audit/log";
 export const POST = withAuth(
   async (_request, context) => {
     if (context.gymKind === "personal") {
-      return apiError(403, "FORBIDDEN", "Personal workspaces don't have gym setup.");
+      return apiError(403, "FORBIDDEN", "Personal workspaces don't have academy setup.");
     }
 
     const supabase = createClient();

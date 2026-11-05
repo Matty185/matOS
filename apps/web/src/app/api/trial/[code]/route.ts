@@ -50,7 +50,7 @@ export async function POST(request: NextRequest, { params }: { params: { code: s
     return apiError(
       404,
       "LINK_NOT_FOUND",
-      "This trial link isn't active. Contact the gym directly.",
+      "This trial link isn't active. Contact the academy directly.",
     );
   }
 
@@ -109,14 +109,14 @@ export async function POST(request: NextRequest, { params }: { params: { code: s
     return apiError(
       429,
       "ALREADY_REQUESTED",
-      "We've already got your request — the gym will be in touch soon.",
+      "We've already got your request — the academy will be in touch soon.",
     );
   }
   if (lastHour >= PER_GYM_PER_HOUR || openNew >= MAX_NEW_PER_GYM) {
     return apiError(
       429,
       "SLOW_DOWN",
-      "The gym has had a lot of requests just now. Try again later.",
+      "The academy has had a lot of requests just now. Try again later.",
     );
   }
 

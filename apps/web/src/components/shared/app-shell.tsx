@@ -156,8 +156,15 @@ export function AppShell({
     return (
       <div className={cn("mt-auto flex flex-col gap-2 border-t pt-4", onDark && "border-white/15")}>
         {memberships && memberships.length > 1 ? (
-          <div className={cn("px-3", onDark && "text-foreground")}>
-            <GymSwitcher memberships={memberships} />
+          <div className="px-3">
+            <GymSwitcher
+              memberships={memberships}
+              triggerClassName={
+                onDark
+                  ? "border-white/30 text-white focus:ring-brand-blue focus:ring-offset-0 [&>svg]:text-white [&>svg]:opacity-100"
+                  : undefined
+              }
+            />
           </div>
         ) : null}
         <div className="px-3">
@@ -169,7 +176,8 @@ export function AppShell({
         <SignOutButton
           className={cn(
             "h-11 justify-start",
-            onDark && "text-white/80 hover:bg-white/10 hover:text-white",
+            onDark &&
+              "text-white/80 hover:bg-white/10 hover:text-white focus-visible:ring-brand-blue focus-visible:ring-offset-0",
           )}
         />
       </div>
@@ -178,7 +186,7 @@ export function AppShell({
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
-      <aside className="hidden bg-primary text-primary-foreground md:sticky md:top-0 md:flex md:h-screen md:w-64 md:flex-col md:overflow-y-auto md:p-4">
+      <aside className="hidden bg-primary text-primary-foreground md:sticky md:top-0 md:flex md:h-dvh md:w-64 md:flex-col md:overflow-y-auto md:p-4">
         <div className="mb-6 px-3 pt-1">
           <Logo tone="reversed" />
         </div>
