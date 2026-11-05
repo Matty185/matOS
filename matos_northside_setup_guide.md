@@ -1,125 +1,140 @@
 # Setting up Northside BJJ on MatOS
 
-For you, at the academy before or after training. You'll have your laptop and phone, and the coach will have a laptop.
+You do most of this at home as a temporary owner, then hand over to the head coach at the academy. You'll have your laptop and phone there, and the coach will have a laptop.
 
-**Time:** 30–45 minutes together, plus 10 minutes at home first.
+**Time:** about an hour at home, about 7 days for members to sign up, then 20–30 minutes with the coach.
 
 **Site:** https://matos-pi.vercel.app
 
 ## Who ends up with what
 
-| Person        | Role    | How they get in                                         |
-| ------------- | ------- | ------------------------------------------------------- |
-| Head coach    | Owner   | A link you make at home (Part 1)                        |
-| Other coaches | Coach   | A link the head coach makes in the setup steps          |
-| You           | Athlete | An invite, signing in with your existing MatOS password |
-| Members       | Athlete | A QR code or a link                                     |
+| Person        | During setup | At the end | How they get in                                           |
+| ------------- | ------------ | ---------- | --------------------------------------------------------- |
+| You           | Owner        | Athlete    | A link from the setup script, plus your existing password |
+| Head coach    | Owner        | Owner      | A link you create in MatOS                                |
+| Other coaches | Coach        | Coach      | A link you create in MatOS                                |
+| Members       | Athlete      | Athlete    | A sign-up link, or an invite once you've added them       |
 
-## Part 1: at home, before you go
+## Part 1: create the academy (10 minutes)
 
-1. **Get from the coach:** their email address, and how they spell their name.
-2. **Ask them to bring, if they can:**
-   - the timetable (days, times, class lengths);
-   - the member list (names, emails, belts; a spreadsheet or even a WhatsApp list works);
+1. **Get from the coach:** their email address and how they spell their name, plus:
+   - the monthly prices;
    - the waiver text, if they have one;
-   - their monthly prices.
-3. **Create the academy.** In a terminal, from the project folder:
-
-   ```
-   npm run provision-gym -- --name "Northside BJJ" --owner-email COACH_EMAIL --owner-first FIRSTNAME --owner-last SURNAME --owner-belt black --timezone Europe/Dublin --app-url https://matos-pi.vercel.app
-   ```
-
-   Change the belt if needed.
-
-4. **Save the link it prints.** Send it to yourself, because you'll need it at the academy. It works once and lasts 7 days. Treat it like a password: anyone holding it can claim the owner account.
-5. **Check your own password.** Sign in at the site with your personal email. You'll need this password in Part 3. If you've forgotten it, run this and open the link:
+   - their OK for you to hold owner access during setup. You'll be able to see member and payment details.
+2. **Check your own password.** Sign in at the site with your personal email. You'll need this password in step 4. If you've forgotten it, run this and open the link:
 
    ```
    npm run provision-gym -- --owner-reset --owner-email YOUR_EMAIL --app-url https://matos-pi.vercel.app
    ```
 
-**If something goes wrong:**
+3. **Create the academy.** In a terminal, from the project folder:
 
-- **The script reports an error, or says that gym or email already exists:** don't run it again with changes. Copy the message and ask Claude first.
-- **The owner link was lost or has expired:** run this for a new one:
+   ```
+   npm run provision-gym -- --name "Northside BJJ" --owner-email YOUR_EMAIL --owner-first YOURFIRSTNAME --owner-last YOURSURNAME --owner-belt YOURBELT --contact-email COACH_EMAIL --timezone Europe/Dublin --app-url https://matos-pi.vercel.app
+   ```
 
-  ```
-  npm run provision-gym -- --relink --owner-email COACH_EMAIL --app-url https://matos-pi.vercel.app
-  ```
+   `--contact-email` is what shows as the academy's contact, so it stays correct after you step back. It should print a note that your email already has a MatOS login. That's expected.
 
-## Part 2: at the academy, on the coach's laptop
+4. **Open the link it prints, straight away,** and enter your existing password. MatOS opens the setup steps.
 
-Let the coach do the typing. You'll spot what's confusing, and they'll remember how it works.
+**If something goes wrong:** if the script reports an error, or you lose the link before using it, don't run it again. Bring the message to Claude. The script's usual `--relink` command won't work for your email, because your account already owns the old demo gym.
 
-### 1. Claim the account
+## Part 2: set up the academy (about 45 minutes)
 
-Open the owner link on the coach's laptop. They set a password and tick the consent box. MatOS then opens the setup steps by itself.
+Work through the setup steps. You can leave and come back by signing in again; anything saved stays saved.
 
-If they stop at any point, they can sign in again later and continue. "Skip" or "Finish later" loses nothing that has been saved.
+| Step             | What to do                                                                                               |
+| ---------------- | -------------------------------------------------------------------------------------------------------- |
+| **Your academy** | Check the name, add the address, and confirm the time zone is Europe/Dublin. Check-in times depend on it |
+| **Timetable**    | Add each weekly class: name, type, day, start time, length. Set Programme and Coach if you know them     |
+| **Coaches**      | Add the head coach and any other coaches. See below                                                      |
+| **Members**      | Skip for now. See Part 3                                                                                 |
+| **Invites**      | Skip for now                                                                                             |
+| **Done**         | Finish. You land on the Dashboard                                                                        |
 
-### 2. Work through the setup steps
+### Adding the head coach as an owner
 
-| Step             | What to do                                                                                    | Tip                                                                      |
-| ---------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| **Your academy** | Check the name, add the address and contact email, and confirm the time zone is Europe/Dublin | Check-in times depend on this zone                                       |
-| **Timetable**    | Add each weekly class: name, type, day, start time, length                                    | Set Programme (Kids, Fundamentals and so on) and Coach if they know them |
-| **Coaches**      | Add other coaches, then give each their link                                                  | Skip it if the head coach runs everything; they can add coaches later    |
-| **Members**      | Paste the list or upload the CSV, fix anything flagged in red, then import                    | Add each person's real belt, stripes and join date                       |
-| **Invites**      | Choose who to invite, then use Print sheet, or send links by WhatsApp                         | Each link is personal, works once and lasts 7 days                       |
-| **Done**         | Finish                                                                                        | Lands on the Dashboard                                                   |
+Order matters here, because changing someone's role cancels any unused link:
 
-**About kids:** leave the email blank for a child. They appear on the roster with no login, and a coach can mark them present or they can use a kiosk. To give a parent a login, open the child's profile and add them under **Parents**.
+1. In **Coaches**, add the head coach. Ignore the link it offers.
+2. Go to **Settings → Team** and change their role to **Owner**.
+3. Create a new invite link for them, and keep it for Part 4. It lasts 7 days, so create a fresh one if the visit is further away than that. Treat it like a password.
 
-**About payments:** MatOS won't show old months as overdue. It only counts months from now on.
+Create links for the other coaches now or later, as suits.
 
-### 3. Settings the head coach should check
+### Settings to check
 
-These are under **Settings**. Do them today if you have time; none of them should hold up the rest.
+Under **Settings**:
 
-- **Membership plans:** add real names and prices. Prices only pre-fill the payment form; MatOS doesn't charge anyone.
-- **Waiver:** paste the waiver text and publish it. Members are then asked to sign. Have the coach read it first, because it's their legal text.
-- **Promotions:** classes and months per stripe. The defaults are 30 classes or 3 months.
-- **Logo:** upload the academy's logo, if they have one to hand.
+- **Membership plans:** add the real names and prices. Prices only pre-fill the payment form; MatOS doesn't charge anyone.
+- **Promotions:** classes and months per stripe. The defaults are 30 classes or 3 months. Check these with the coach.
+- **Logo:** upload the academy's logo if you have it.
+- **Waiver:** leave this for Part 4. It's the coach's legal text, so they should read and publish it.
 
-Leave **Free trial link** and **Front-desk kiosk** for another day unless the coach asks for them.
+Leave **Free trial link** and **Front-desk kiosk** for later unless the coach asks.
 
-## Part 3: you, on your phone
+## Part 3: get members on
 
-1. Have the coach add you as a member, using **your personal email**, then invite you. If you were on the roster they imported, they only need to invite you.
-2. Open your invite link. It will say this email already has a MatOS account, so enter your existing password.
-3. You'll land on your athlete **Home** page. If you have more than one workspace, use the switcher in the menu to change between them.
+**A sign-up link works for one person, once.** Whoever opens it first uses it up, so **a single link posted in the group chat won't work**. The second person would be refused.
 
-### Quick test together
+Until there's a shareable group link, use this:
 
-Run this once while you're both there:
+1. **Send sign-up links privately.** On **Members**, create a sign-up link for each person and message it to them directly. Each lasts 7 days, and you can have up to 30 unused at a time. Each person enters their own details, belt and password, and joins as an athlete.
+2. **Post in the group chat** that links are going out, so nobody treats theirs as spam:
 
-1. **Check in on your phone.** Check-in opens 30 minutes before a class and closes when it ends, so you need a class in that window. If there isn't one, have the coach add a temporary class for today. Afterwards, remove your check-in under Attendance and then delete the class, because a class with check-ins can't be deleted.
+   > Northside is moving to MatOS for check-ins and memberships. You'll get a personal link from me. It takes two minutes and only works for you, so please don't forward it.
+
+3. **After about a week, add the rest by hand.** Use **Members → Import** or add them one at a time, with their real belt, stripes and join date. Then invite them from **Invites**, by message or a printed QR sheet.
+
+**Order matters:** if someone is already on the roster, their sign-up link is refused and they need a personal invite instead. So let people sign up first and add stragglers after.
+
+**Kids:** sign-up links aren't for children. Add each child by hand with the email left blank, which gives them no login. A coach can mark them present. To give a parent a login, open the child's profile and add them under **Parents**.
+
+**Payments:** MatOS won't show months before this one as overdue. It only counts from the month the academy was created.
+
+## Part 4: at the academy, with the coach (20–30 minutes)
+
+Let the coach do the typing on their own laptop.
+
+1. **Coach claims their account.** They open their invite link, set a password and tick the consent box. If the link has expired, create a new one under **Settings → Team**.
+2. **Show them around:** Dashboard, Members, Attendance, Payments, Settings.
+3. **Publish the waiver.** The coach pastes in the text, reads it and publishes it under **Settings → Waiver**. Members are then asked to sign.
+4. **Run the test below,** while you're still an owner.
+5. **Hand over.** The coach goes to **Settings → Team** and changes your role to **Athlete**. Only they can do this, because nobody can change their own role.
+   Do this last, once you've confirmed the coach can sign in by themselves.
+6. **Fix your own record.** The coach opens your profile and sets your real join date and plan. You now count as a paying athlete if you're on a monthly plan.
+
+### Quick test
+
+1. **Check in on your phone.** Check-in opens 30 minutes before a class and closes when it ends, so you need a class in that window. If there isn't one, add a temporary class for today. Afterwards, remove your check-in under Attendance and delete the class, because a class with check-ins can't be deleted.
 2. **Coach:** open **Attendance** and confirm your check-in appears.
-3. **Coach:** open **Payments** and mark yourself as paid for this month.
-4. **You:** refresh Home and confirm your membership shows as paid.
-5. **Coach:** open the assistant button and ask "who's overdue?"
-6. **Coach:** post a test announcement, check that it shows on your Home page, then take it down.
+3. **Coach:** open **Settings → Team** and confirm you're both listed as owners. This is the first run of the owner handover since the rebrand, so check it before relying on it.
+4. **Coach:** open the assistant button and ask "who's overdue?"
+5. **Coach:** post a test announcement, check that it shows on the Dashboard, then take it down.
 
 ## Before you leave
 
 - [ ] Coach can sign in by themselves on their laptop
 - [ ] Coach has saved their password somewhere safe
-- [ ] Printed QR sheet, or links sent to members
+- [ ] You now show as **Athlete**, and the coach as **Owner**
+- [ ] Waiver published, or a date agreed for doing it
+- [ ] Anyone still missing has been added, or the coach knows how to do it
 - [ ] Coach knows who to ask when something goes wrong (you)
 - [ ] Agreed when you'll check in again, for example after one week
 
-**What to tell members:** "Scan your QR code, set a password, and check in on your phone when you arrive at class." On a phone they can also add the site to their home screen so it opens like an app. There's no App Store app yet.
+**What to tell members:** "Check in on your phone when you arrive at class." On a phone they can also add the site to their home screen so it opens like an app. There's no App Store app yet.
 
-## If something goes wrong on the day
+## If something goes wrong
 
-| Problem                                             | What to do                                                                                                                           |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| A member forgot their password                      | Coach opens the member's profile and creates a reset link. It works once, for 1 hour                                                 |
-| An invite link expired or was lost                  | Coach opens the member's profile and sends a new invite                                                                              |
-| The head coach forgot their password                | You run the `--owner-reset` command from Part 1, using the coach's email                                                             |
-| A member can't check in                             | Check the time: it's only open from 30 minutes before a class until it ends. Otherwise the coach marks them present under Attendance |
-| Someone was imported with the wrong belt or details | Coach edits them on their profile                                                                                                    |
-| A check-in went to the wrong person                 | Coach removes it under Attendance                                                                                                    |
-| Anything else                                       | Write down what happened and what the screen said, and carry on. Bring it to Claude afterwards                                       |
+| Problem                                    | What to do                                                                                                                            |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| A sign-up link says it's already been used | Someone else opened it, or it was forwarded. Check **Members** for an unexpected name, deactivate them if needed, and send a new link |
+| A member forgot their password             | A coach opens the member's profile and creates a reset link. It works once, for 1 hour                                                |
+| An invite link expired or was lost         | A coach opens the member's profile and sends a new invite                                                                             |
+| The head coach forgot their password       | Run the `--owner-reset` command from Part 1 with the coach's email                                                                    |
+| A member can't check in                    | Check the time: it's only open from 30 minutes before a class until it ends. Otherwise a coach marks them present under Attendance    |
+| Someone has the wrong belt or details      | A coach edits them on their profile                                                                                                   |
+| A check-in went to the wrong person        | A coach removes it under Attendance                                                                                                   |
+| Anything else                              | Write down what happened and what the screen said, and carry on. Bring it to Claude afterwards                                        |
 
 Email isn't switched on yet, so MatOS won't email invites or password resets. Everything goes by link or QR code. `matos_email_setup.md` covers this for when you get a domain.
