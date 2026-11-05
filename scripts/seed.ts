@@ -2,7 +2,7 @@
 // `npx tsx scripts/seed.ts`. Uses the service-role client per CLAUDE.md
 // Rule 4 (seeding is one of the three sanctioned service-role use cases).
 //
-// Scope: only ever touches the "Northside BJJ" gym's own rows. Never
+// Scope: only ever touches the "Northside BJJ (demo)" gym's own rows. Never
 // touches other gyms (this Supabase project has accumulated a lot of
 // leftover throwaway gyms from Stage verification scripts — not this
 // script's job to clean those up).
@@ -482,7 +482,9 @@ const PLAN_AMOUNT: Record<AthleteDef["plan"], number> = {
 // ── main ─────────────────────────────────────────────────────────────────
 
 async function main() {
-  const GYM_NAME = "Northside BJJ";
+  // The fictional demo gym. Renamed 2026-11-05 so the real "Northside BJJ"
+  // (provisioned with scripts/provision-gym.ts) can never be wiped by a reseed.
+  const GYM_NAME = "Northside BJJ (demo)";
   const OWNER_EMAIL = "matijukm@gmail.com";
   const COACH_EMAIL = "coach@northsidebjj.demo";
   const DEMO_ATHLETE_EMAIL = "demo.athlete@northsidebjj.demo";
