@@ -1119,3 +1119,11 @@ Browser-checked as a throwaway athlete on an emulated iPhone:
 **Wording.** User-facing text says "academy". Identifiers, routes, enum values, audit action names and the schema stay `gym`, so this is copy only. The parked mobile app's own strings still say "gym". Mobile received icons, splash and colours only; emoji tabs remain (they need an icon dependency) and nothing was run on a device.
 
 **Local-only by choice.** `docs/strategy/`, the original concept assets and the discovery zip are git-ignored as not needed for production. The older v1.0 strategy, which contradicts BJJ-first, was marked superseded.
+
+### 2026-11-06 — Shared sign-up QR code
+
+**Context.** The founder wanted to print one QR code for a whole class to sign up at training. One-time links (Stage O7) can't do this.
+
+**Decision.** Migration `20261106120000`: `signup_links.max_uses` and `use_count`; `redeem_signup_link` counts uses under its row lock, and `used_at` now means "no more places". One-time links behave as before. `POST /api/signup-links/shared` is owner-only, one live link per academy, 24 hours, up to 60 sign-ups, cancellable from the sign-up link list. Athlete role only. A shared link refuses emails that already have an account, so it can't be used to guess passwords. The attempt limit is 10 × `max_uses`. The print poster reuses the invite sheet's print rules.
+
+**Gate.** Combined security and database review: no BLOCKED. **Accepted:** the O2/O7 email-squatting risk now applies to a printed code: a holder can create up to 60 confirmed logins for any email address, each with a member row. Bounded by 24 hours, the cap, cancel and audit rows; the owner checks the members list afterwards. The real fix is email confirmation, tied to `matos_email_setup.md`. Also accepted: anyone holding the link can use up its attempts and lock it (cancel and make a new one), can tell whether an email has an account or is on the roster, and the one-live-link check is check-then-insert, so a double click could make two links.

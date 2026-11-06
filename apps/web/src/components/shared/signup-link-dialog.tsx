@@ -4,9 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { QRCodeSVG } from "qrcode.react";
 import { formatDistanceToNow } from "date-fns";
-import { Check, Copy, Mail, MessageCircle, Plus, QrCode, Share2 } from "lucide-react";
+import { Check, Copy, Mail, MessageCircle, Plus, QrCode, Share2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { GroupQrDialog } from "@/components/shared/group-qr-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -39,6 +40,7 @@ export function SignupLinkDialog({
   const [copied, setCopied] = useState<"link" | "message" | null>(null);
   const [showQr, setShowQr] = useState(false);
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const [groupOpen, setGroupOpen] = useState(false);
   const openRef = useRef(open);
   openRef.current = open;
 
@@ -57,12 +59,23 @@ export function SignupLinkDialog({
       const supabase = createClient();
       const { data, error } = await supabase
         .from("signup_links")
-        .select("id, created_at, expires_at")
+        .select("id, created_at, expires_at, max_uses, use_count")
         .is("used_at", null)
         .gt("expires_at", new Date().toISOString())
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
+    },
+  });
+
+  // UX only: the route is owner-only regardless of what this says.
+  const { data: isOwner } = useQuery({
+    queryKey: ["signup-links", "is-owner"],
+    enabled: open,
+    queryFn: async () => {
+      const { data } = await createClient().rpc("current_member");
+      const row = (Array.isArray(data) ? data[0] : data) as { role?: string } | null;
+      return row?.role === "gym_owner";
     },
   });
 
@@ -124,136 +137,154 @@ export function SignupLinkDialog({
   const otherPending = (pending ?? []).filter((p) => p.id !== link?.id);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Sign-up link</DialogTitle>
-          <DialogDescription>
-            Send a link and the person fills in their own name, email and belt. Each link signs up
-            one person, once, within 7 days.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <GroupQrDialog open={groupOpen} onOpenChange={setGroupOpen} />
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Sign-up link</DialogTitle>
+            <DialogDescription>
+              Send a link and the person fills in their own name, email and belt. Each link signs up
+              one person, once, within 7 days.
+            </DialogDescription>
+          </DialogHeader>
 
-        {!link ? (
-          <Button className="h-11" onClick={createLink} disabled={creating}>
-            {creating ? "Creating link..." : "Create sign-up link"}
-          </Button>
-        ) : (
-          <div className="flex flex-col gap-4">
-            <div className="flex gap-2">
-              <Input
-                readOnly
-                value={link.url}
-                aria-label="Sign-up link"
-                className="h-11 font-mono text-xs"
-                onFocus={(e) => e.currentTarget.select()}
-              />
-              <Button
-                variant="outline"
-                className="h-11 shrink-0"
-                onClick={() => copy(link.url, "link")}
-                aria-label="Copy link"
-              >
-                {copied === "link" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                variant="outline"
-                className="h-11"
-                onClick={() => setShowQr((v) => !v)}
-                aria-expanded={showQr}
-              >
-                <QrCode className="mr-2 h-4 w-4" /> {showQr ? "Hide QR" : "Show QR"}
-              </Button>
-              <Button asChild variant="outline" className="h-11">
-                <a
-                  href={`https://wa.me/?text=${encodeURIComponent(message)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <MessageCircle className="mr-2 h-4 w-4" /> WhatsApp
-                </a>
-              </Button>
-              <Button asChild variant="outline" className="h-11">
-                <a
-                  href={`mailto:?subject=${encodeURIComponent(
-                    `Join ${gymName} on MatOS`,
-                  )}&body=${encodeURIComponent(message)}`}
-                >
-                  <Mail className="mr-2 h-4 w-4" /> Email
-                </a>
-              </Button>
-              <Button variant="outline" className="h-11" onClick={() => copy(message, "message")}>
-                {copied === "message" ? (
-                  <Check className="mr-2 h-4 w-4" />
-                ) : (
-                  <Copy className="mr-2 h-4 w-4" />
-                )}
-                Copy message
-              </Button>
-              {canNativeShare ? (
+          {!link ? (
+            <Button className="h-11" onClick={createLink} disabled={creating}>
+              {creating ? "Creating link..." : "Create sign-up link"}
+            </Button>
+          ) : (
+            <div className="flex flex-col gap-4">
+              <div className="flex gap-2">
+                <Input
+                  readOnly
+                  value={link.url}
+                  aria-label="Sign-up link"
+                  className="h-11 font-mono text-xs"
+                  onFocus={(e) => e.currentTarget.select()}
+                />
                 <Button
                   variant="outline"
-                  className="col-span-2 h-11"
-                  onClick={() =>
-                    navigator
-                      .share({ title: `Join ${gymName} on MatOS`, text: message })
-                      .catch(() => {})
-                  }
+                  className="h-11 shrink-0"
+                  onClick={() => copy(link.url, "link")}
+                  aria-label="Copy link"
                 >
-                  <Share2 className="mr-2 h-4 w-4" /> More options
+                  {copied === "link" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                 </Button>
-              ) : null}
-            </div>
-
-            {showQr ? (
-              <div className="flex flex-col items-center gap-2 rounded-md border bg-white p-4">
-                {/* Rendered locally — the link never goes to a QR service. */}
-                <QRCodeSVG value={link.url} size={208} level="M" marginSize={1} />
-                <p className="text-center text-xs text-neutral-600">
-                  Scan with a phone camera. Works for one person only.
-                </p>
               </div>
-            ) : null}
 
-            <p className="text-xs text-muted-foreground">
-              Whoever opens this first becomes a member, so send it to one person only.
-            </p>
-
-            <Button variant="outline" className="h-11" onClick={createLink} disabled={creating}>
-              <Plus className="mr-2 h-4 w-4" />
-              {creating ? "Creating link..." : "Create another link"}
-            </Button>
-          </div>
-        )}
-
-        {otherPending.length > 0 ? (
-          <div className="flex flex-col gap-2 border-t pt-4">
-            <p className="text-sm font-medium">
-              {otherPending.length} unused link{otherPending.length === 1 ? "" : "s"}
-            </p>
-            <ul className="flex flex-col gap-1">
-              {otherPending.map((p) => (
-                <li key={p.id} className="flex items-center justify-between gap-2 text-sm">
-                  <span className="text-muted-foreground">
-                    Made {formatDistanceToNow(new Date(p.created_at), { addSuffix: true })}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    className="h-11"
-                    disabled={cancelling === p.id}
-                    onClick={() => cancelLink(p.id)}
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  className="h-11"
+                  onClick={() => setShowQr((v) => !v)}
+                  aria-expanded={showQr}
+                >
+                  <QrCode className="mr-2 h-4 w-4" /> {showQr ? "Hide QR" : "Show QR"}
+                </Button>
+                <Button asChild variant="outline" className="h-11">
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(message)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
                   >
-                    {cancelling === p.id ? "Cancelling..." : "Cancel"}
+                    <MessageCircle className="mr-2 h-4 w-4" /> WhatsApp
+                  </a>
+                </Button>
+                <Button asChild variant="outline" className="h-11">
+                  <a
+                    href={`mailto:?subject=${encodeURIComponent(
+                      `Join ${gymName} on MatOS`,
+                    )}&body=${encodeURIComponent(message)}`}
+                  >
+                    <Mail className="mr-2 h-4 w-4" /> Email
+                  </a>
+                </Button>
+                <Button variant="outline" className="h-11" onClick={() => copy(message, "message")}>
+                  {copied === "message" ? (
+                    <Check className="mr-2 h-4 w-4" />
+                  ) : (
+                    <Copy className="mr-2 h-4 w-4" />
+                  )}
+                  Copy message
+                </Button>
+                {canNativeShare ? (
+                  <Button
+                    variant="outline"
+                    className="col-span-2 h-11"
+                    onClick={() =>
+                      navigator
+                        .share({ title: `Join ${gymName} on MatOS`, text: message })
+                        .catch(() => {})
+                    }
+                  >
+                    <Share2 className="mr-2 h-4 w-4" /> More options
                   </Button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-      </DialogContent>
-    </Dialog>
+                ) : null}
+              </div>
+
+              {showQr ? (
+                <div className="flex flex-col items-center gap-2 rounded-md border bg-white p-4">
+                  {/* Rendered locally — the link never goes to a QR service. */}
+                  <QRCodeSVG value={link.url} size={208} level="M" marginSize={1} />
+                  <p className="text-center text-xs text-neutral-600">
+                    Scan with a phone camera. Works for one person only.
+                  </p>
+                </div>
+              ) : null}
+
+              <p className="text-xs text-muted-foreground">
+                Whoever opens this first becomes a member, so send it to one person only.
+              </p>
+
+              <Button variant="outline" className="h-11" onClick={createLink} disabled={creating}>
+                <Plus className="mr-2 h-4 w-4" />
+                {creating ? "Creating link..." : "Create another link"}
+              </Button>
+            </div>
+          )}
+
+          {isOwner ? (
+            <Button
+              variant="ghost"
+              className="h-11"
+              onClick={() => {
+                onOpenChange(false);
+                setGroupOpen(true);
+              }}
+            >
+              <Users className="mr-2 h-4 w-4" /> Signing up a whole class? Make a group QR code
+            </Button>
+          ) : null}
+
+          {otherPending.length > 0 ? (
+            <div className="flex flex-col gap-2 border-t pt-4">
+              <p className="text-sm font-medium">
+                {otherPending.length} unused link{otherPending.length === 1 ? "" : "s"}
+              </p>
+              <ul className="flex flex-col gap-1">
+                {otherPending.map((p) => (
+                  <li key={p.id} className="flex items-center justify-between gap-2 text-sm">
+                    <span className="text-muted-foreground">
+                      {p.max_uses > 1
+                        ? `Group QR code, ${p.use_count} of ${p.max_uses} signed up, ends ${formatDistanceToNow(new Date(p.expires_at), { addSuffix: true })}`
+                        : `Made ${formatDistanceToNow(new Date(p.created_at), { addSuffix: true })}`}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      className="h-11"
+                      disabled={cancelling === p.id}
+                      onClick={() => cancelLink(p.id)}
+                    >
+                      {cancelling === p.id ? "Cancelling..." : "Cancel"}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

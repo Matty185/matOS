@@ -21,17 +21,29 @@ type LinkRow = {
   used_at: string | null;
   expires_at: string;
   attempt_count: number;
+  max_uses: number;
   gyms: { name: string; kind: string; active: boolean } | null;
 };
 
 const ASK = "Ask your coach for a new one.";
 
+// A shared link serves up to max_uses people, each with their own mistakes.
+function attemptLimit(link: LinkRow): number {
+  return MAX_JOIN_ATTEMPTS * link.max_uses;
+}
+
 function unavailable(link: LinkRow | null): Response | null {
   if (!link) return apiError(404, "LINK_NOT_FOUND", "This sign-up link isn't valid.");
   if (link.used_at) {
-    return apiError(410, "LINK_USED", `This sign-up link has already been used. ${ASK}`);
+    return apiError(
+      410,
+      "LINK_USED",
+      link.max_uses > 1
+        ? `This sign-up link is full. ${ASK}`
+        : `This sign-up link has already been used. ${ASK}`,
+    );
   }
-  if (link.attempt_count >= MAX_JOIN_ATTEMPTS) {
+  if (link.attempt_count >= attemptLimit(link)) {
     return apiError(410, "LINK_LOCKED", `This sign-up link has been locked. ${ASK}`);
   }
   if (
@@ -48,7 +60,7 @@ function unavailable(link: LinkRow | null): Response | null {
 async function findLink(token: string): Promise<LinkRow | null> {
   const { data } = await createServiceRoleClient()
     .from("signup_links")
-    .select("id, gym_id, used_at, expires_at, attempt_count, gyms(name, kind, active)")
+    .select("id, gym_id, used_at, expires_at, attempt_count, max_uses, gyms(name, kind, active)")
     .eq("token_hash", hashInviteToken(token))
     .maybeSingle();
   return (data as LinkRow | null) ?? null;
@@ -84,7 +96,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     console.error("[join] failed to increment attempt_count", attemptError);
     return apiError(500, "INTERNAL_ERROR", "Something went wrong — please try again.");
   }
-  if (attempts > MAX_JOIN_ATTEMPTS) {
+  if (attempts > attemptLimit(link)) {
     return apiError(410, "LINK_LOCKED", `This sign-up link has been locked. ${ASK}`);
   }
 
@@ -113,6 +125,15 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
 
   // Branch decided from our own lookup; the client's flag only has to agree.
   const existingUser = await findUserByEmail(supabase, input.email);
+  // A shared link is seen by a whole room, so it creates new accounts only.
+  // Accepting a password here would let anyone holding it guess at accounts.
+  if (existingUser && link.max_uses > 1) {
+    return apiError(
+      409,
+      "ACCOUNT_EXISTS_SHARED",
+      "This email already has a MatOS account. Ask your coach for a personal invite.",
+    );
+  }
   if (existingUser && !input.existing_account) {
     return apiError(
       409,
@@ -214,7 +235,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
           "You're already a member of this academy — just sign in.",
         );
       case "LINK_UNAVAILABLE":
-        return apiError(410, "LINK_USED", `This sign-up link has already been used. ${ASK}`);
+        return apiError(410, "LINK_USED", `This sign-up link is no longer available. ${ASK}`);
       default:
         console.error("[join] redeem failed", redeemError);
         return apiError(500, "JOIN_FAILED", "Something went wrong — you haven't been signed up.");

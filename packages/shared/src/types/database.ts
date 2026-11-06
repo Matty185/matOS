@@ -1516,8 +1516,10 @@ export type Database = {
           created_by: string | null;
           expires_at: string;
           gym_id: string;
+          max_uses: number;
           id: string;
           token_hash: string;
+          use_count: number;
           used_at: string | null;
           used_by_member_id: string | null;
         };
@@ -1528,7 +1530,9 @@ export type Database = {
           expires_at: string;
           gym_id: string;
           id?: string;
+          max_uses?: number;
           token_hash: string;
+          use_count?: number;
           used_at?: string | null;
           used_by_member_id?: string | null;
         };
@@ -1538,8 +1542,10 @@ export type Database = {
           created_by?: string | null;
           expires_at?: string;
           gym_id?: string;
+          max_uses?: number;
           id?: string;
           token_hash?: string;
+          use_count?: number;
           used_at?: string | null;
           used_by_member_id?: string | null;
         };

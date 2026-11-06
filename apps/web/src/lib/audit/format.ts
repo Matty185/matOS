@@ -330,6 +330,8 @@ export function describeAuditEntry(row: AuditLogRow, ctx: AuditNameContext): str
     }
     case "signup_link.created":
       return `${actor} created a sign-up link.`;
+    case "signup_link.shared_created":
+      return `${actor} created a group sign-up QR code.`;
     case "signup_link.cancelled":
       return `${actor} cancelled a sign-up link.`;
     case "member.self_registered":
