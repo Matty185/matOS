@@ -21,11 +21,13 @@ You do most of this at home as a temporary owner, then hand over to the head coa
    - the monthly prices;
    - the waiver text, if they have one;
    - their OK for you to hold owner access during setup. You'll be able to see member and payment details.
-2. **Check your own password.** Sign in at the site with your personal email. You'll need this password in step 4. If you've forgotten it, run this and open the link:
+2. **Set your own password first.** Your personal email already has an account from the old demo gym, but you don't have its password, and you'll need one in step 4. Run this, open the link it prints within the hour, and choose a password:
 
    ```
    npm run provision-gym -- --owner-reset --owner-email YOUR_EMAIL --app-url https://matos-pi.vercel.app
    ```
+
+   The link works once. Save the password in your password manager. You don't need to do anything else on the old demo gym.
 
 3. **Create the academy.** In a terminal, from the project folder:
 
