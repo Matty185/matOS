@@ -7,6 +7,7 @@ import { CreditCard, ChevronLeft, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PaymentCellDialog } from "@/components/shared/payment-cell-dialog";
+import { OnlinePaymentsReview } from "@/components/shared/online-payments-review";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -48,6 +49,7 @@ type PaymentRow = {
   status: PaymentStatus;
   amount: number | null;
   notes: string | null;
+  source: string;
 };
 
 const WINDOW_LENGTH = 6;
@@ -118,7 +120,7 @@ export default function PaymentsPage() {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("payments")
-        .select("member_id, period_month, period_year, status, amount, notes")
+        .select("member_id, period_month, period_year, status, amount, notes, source")
         .gte("period_year", minYear)
         .lte("period_year", maxYear)
         .order("member_id", { ascending: true })
@@ -174,7 +176,9 @@ export default function PaymentsPage() {
       : overdue
         ? "Overdue"
         : status === "paid"
-          ? "Paid"
+          ? row?.source === "stripe"
+            ? "Paid online"
+            : "Paid"
           : status === "waived"
             ? "Waived"
             : "Unpaid";
@@ -238,6 +242,8 @@ export default function PaymentsPage() {
           monthly.
         </p>
       </div>
+
+      <OnlinePaymentsReview onChanged={refetch} />
 
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">

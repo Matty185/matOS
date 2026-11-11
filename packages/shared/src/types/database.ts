@@ -924,6 +924,47 @@ export type Database = {
           },
         ];
       };
+      gym_stripe_webhooks: {
+        Row: {
+          connected_at: string | null;
+          created_at: string;
+          created_by: string | null;
+          endpoint_id: string;
+          gym_id: string;
+          id: string;
+          last_event_at: string | null;
+          signing_secret_ciphertext: string | null;
+        };
+        Insert: {
+          connected_at?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          endpoint_id: string;
+          gym_id: string;
+          id?: string;
+          last_event_at?: string | null;
+          signing_secret_ciphertext?: string | null;
+        };
+        Update: {
+          connected_at?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          endpoint_id?: string;
+          gym_id?: string;
+          id?: string;
+          last_event_at?: string | null;
+          signing_secret_ciphertext?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "gym_stripe_webhooks_gym_id_fkey";
+            columns: ["gym_id"];
+            isOneToOne: false;
+            referencedRelation: "gyms";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       gyms: {
         Row: {
           active: boolean;
@@ -1339,10 +1380,96 @@ export type Database = {
           },
         ];
       };
+      payment_events: {
+        Row: {
+          amount: number | null;
+          checkout_session_id: string;
+          created_at: string;
+          currency: string | null;
+          event_type: string;
+          gym_id: string;
+          id: string;
+          livemode: boolean;
+          member_id: string | null;
+          outcome: Database["public"]["Enums"]["payment_event_outcome"];
+          payer_email: string | null;
+          payment_id: string | null;
+          period_month: number | null;
+          period_year: number | null;
+          reference: string | null;
+          reviewed_at: string | null;
+          reviewed_by: string | null;
+          stripe_event_id: string;
+        };
+        Insert: {
+          amount?: number | null;
+          checkout_session_id: string;
+          created_at?: string;
+          currency?: string | null;
+          event_type: string;
+          gym_id: string;
+          id?: string;
+          livemode: boolean;
+          member_id?: string | null;
+          outcome: Database["public"]["Enums"]["payment_event_outcome"];
+          payer_email?: string | null;
+          payment_id?: string | null;
+          period_month?: number | null;
+          period_year?: number | null;
+          reference?: string | null;
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
+          stripe_event_id: string;
+        };
+        Update: {
+          amount?: number | null;
+          checkout_session_id?: string;
+          created_at?: string;
+          currency?: string | null;
+          event_type?: string;
+          gym_id?: string;
+          id?: string;
+          livemode?: boolean;
+          member_id?: string | null;
+          outcome?: Database["public"]["Enums"]["payment_event_outcome"];
+          payer_email?: string | null;
+          payment_id?: string | null;
+          period_month?: number | null;
+          period_year?: number | null;
+          reference?: string | null;
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
+          stripe_event_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "payment_events_gym_id_fkey";
+            columns: ["gym_id"];
+            isOneToOne: false;
+            referencedRelation: "gyms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payment_events_member_id_fkey";
+            columns: ["member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payment_events_payment_id_fkey";
+            columns: ["payment_id"];
+            isOneToOne: false;
+            referencedRelation: "payments";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       payments: {
         Row: {
           amount: number | null;
           created_at: string;
+          external_ref: string | null;
           gym_id: string;
           id: string;
           member_id: string;
@@ -1351,11 +1478,13 @@ export type Database = {
           period_month: number;
           period_year: number;
           recorded_by: string | null;
+          source: string;
           status: Database["public"]["Enums"]["payment_status"];
         };
         Insert: {
           amount?: number | null;
           created_at?: string;
+          external_ref?: string | null;
           gym_id: string;
           id?: string;
           member_id: string;
@@ -1364,11 +1493,13 @@ export type Database = {
           period_month: number;
           period_year: number;
           recorded_by?: string | null;
+          source?: string;
           status?: Database["public"]["Enums"]["payment_status"];
         };
         Update: {
           amount?: number | null;
           created_at?: string;
+          external_ref?: string | null;
           gym_id?: string;
           id?: string;
           member_id?: string;
@@ -1377,6 +1508,7 @@ export type Database = {
           period_month?: number;
           period_year?: number;
           recorded_by?: string | null;
+          source?: string;
           status?: Database["public"]["Enums"]["payment_status"];
         };
         Relationships: [
@@ -1825,6 +1957,26 @@ export type Database = {
           member_id: string;
         }[];
       };
+      record_stripe_payment: {
+        Args: {
+          p_amount_cents: number | null;
+          p_currency: string | null;
+          p_event_id: string;
+          p_event_type: string;
+          p_expected_cents: number | null;
+          p_gym_id: string;
+          p_is_class: boolean;
+          p_livemode: boolean;
+          p_member_id: string | null;
+          p_payer_email: string | null;
+          p_payment_status: string | null;
+          p_period_month: number | null;
+          p_period_year: number | null;
+          p_reference: string | null;
+          p_session_id: string;
+        };
+        Returns: string;
+      };
       redeem_signup_link: {
         Args: {
           p_consent_version: string;
@@ -1893,9 +2045,19 @@ export type Database = {
       entitlement_source: "iap_apple" | "iap_google" | "stripe" | "manual";
       entitlement_status: "active" | "trialing" | "canceled" | "expired";
       gym_kind: "gym" | "personal";
-      initiated_by: "coach_manual" | "agent" | "self_service" | "kiosk";
+      initiated_by: "coach_manual" | "agent" | "self_service" | "kiosk" | "payment_provider";
       member_role: "gym_owner" | "coach" | "athlete" | "guardian";
       membership_plan: "monthly" | "casual" | "comp_team";
+      payment_event_outcome:
+        | "recorded"
+        | "class_payment"
+        | "pending"
+        | "already_paid"
+        | "failed"
+        | "unmatched"
+        | "not_billable"
+        | "amount_mismatch"
+        | "test_payment";
       payment_status: "paid" | "unpaid" | "waived";
       push_platform: "ios" | "android";
       share_link_type: "profile" | "breakdown";

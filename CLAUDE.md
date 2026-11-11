@@ -42,7 +42,7 @@ Every path elsewhere in this file that looks like `src/...` means `apps/web/src/
 1. **Multi-tenant from day one.** Every tenant table has `gym_id` (FK, indexed). One gym exists in alpha; the model supports many.
 2. **RLS at the database layer is the security boundary.** Application-layer checks are UX convenience only. Every table has RLS enabled. No public SELECT on anything.
 3. **Roles:** `gym_owner` > `coach` > `athlete`. Owner adds gym settings + coach management on top of coach. Athletes see and touch ONLY their own data — enforced by RLS, and payment `amount` is additionally filtered server-side for athlete queries (two layers).
-4. **Two Supabase clients:** browser client (RLS-respecting) for everything user-facing; service-role client (env var, server-only, never in bundle) ONLY for invite generation, audit log inserts, and seeding (plus the later, Decision-Logged additions: GDPR export/execute, signup, solo deletion, public share resolution, and — Stage O2 — Admin-Auth password-recovery links and the operator's `scripts/provision-gym.ts`). The agent uses the RLS client exclusively.
+4. **Two Supabase clients:** browser client (RLS-respecting) for everything user-facing; service-role client (env var, server-only, never in bundle) ONLY for invite generation, audit log inserts, and seeding (plus the later, Decision-Logged additions: GDPR export/execute, signup, solo deletion, public share resolution, and — Stage O2 — Admin-Auth password-recovery links and the operator's `scripts/provision-gym.ts`; and the later kiosk, trial-request and Stage L2 Stripe webhook routes). The agent uses the RLS client exclusively.
 5. **Every API route** is wrapped in `withAuth(handler, requiredRole?)`: session → gym_id match → role → Zod input validation → rate limit (agent route only). Error shape: `{ error, code, status }`. Never leak internals in errors.
 6. **Deletes are mostly disabled.** Members are deactivated, not deleted. Audit log is immutable. GDPR deletion anonymises (see plan §7) rather than hard-deleting payments and audit entries.
 7. **Classes use a template model** (recurring class + attendance dated by check-in timestamp). This is a known simplification — flag anything that would make the future refactor to per-session instances harder.
@@ -1127,3 +1127,74 @@ Browser-checked as a throwaway athlete on an emulated iPhone:
 **Decision.** Migration `20261106120000`: `signup_links.max_uses` and `use_count`; `redeem_signup_link` counts uses under its row lock, and `used_at` now means "no more places". One-time links behave as before. `POST /api/signup-links/shared` is owner-only, one live link per academy, 24 hours, up to 60 sign-ups, cancellable from the sign-up link list. Athlete role only. A shared link refuses emails that already have an account, so it can't be used to guess passwords. The attempt limit is 10 × `max_uses`. The print poster reuses the invite sheet's print rules.
 
 **Gate.** Combined security and database review: no BLOCKED. **Accepted:** the O2/O7 email-squatting risk now applies to a printed code: a holder can create up to 60 confirmed logins for any email address, each with a member row. Bounded by 24 hours, the cap, cancel and audit rows; the owner checks the members list afterwards. The real fix is email confirmation, tied to `matos_email_setup.md`. Also accepted: anyone holding the link can use up its attempts and lock it (cancel and make a new one), can tell whether an email has an account or is on the roster, and the one-live-link check is check-then-insert, so a double click could make two links.
+
+### 2026-11-11 — Online payments, stage L2: Stripe webhook marks months paid (flow audit 6.6)
+
+**Context.** L1 (2026-11-04) sends members to the academy's own Stripe Payment Link, and the coach marks the month paid by hand. L2 is the plan's "smaller step": Stripe tells MatOS when a payment succeeds. Still no Stripe Connect, no subscriptions, no money or card data in MatOS. It's another narrow, decision-logged extension of "payment processing out of scope".
+
+**Decision.** Migrations `20261111120000` (the `initiated_by` value `payment_provider`, in its own file) and `20261111120100`:
+
+- **`gym_stripe_webhooks`:** one per gym, with a random public `endpoint_id` (128 bits).
+  - The owner's `whsec_` signing secret is stored only as AES-256-GCM ciphertext under the new env var `PAYMENTS_SECRET_KEY`, with the gym id as associated data.
+  - No client role can read the ciphertext (column grant); owners see only "connected, last payment".
+- **`payment_events`:** one row per Stripe event.
+  - Columns: outcome, member, month, amount, test or live.
+  - Unique per `(gym_id, stripe_event_id)`.
+  - Staff read it and can only set `reviewed_at`; a guard trigger stamps who and when, and drops the payer's reference and email.
+- **`payments.source` (`manual` / `stripe`) and `external_ref`:** the Checkout Session, unique per gym. `payments_source_guard` means end users can never claim "paid online", and a manual status or amount change makes the row manual again.
+- **`record_stripe_payment`** (service_role only, one transaction) decides the outcome and marks the month. Locks serialise each session and each member-month. The outcomes are:
+  - `recorded`, `class_payment`, `pending` (SEPA), `test_payment`;
+  - `already_paid`, `failed`, `unmatched`, `not_billable`, `amount_mismatch` (these last five are "needs a look").
+
+Routes:
+
+- **`POST /api/stripe/webhook/[endpointId]`** (public; Rule 4, same category as kiosk and trial requests).
+  - Verifies `Stripe-Signature` by hand: HMAC-SHA256 of `t.rawBody`, constant-time, 5-minute window. This deviates from the plan's "use the stripe package", to avoid a large dependency for ~20 lines.
+  - Then parses L1's reference and resolves the 8-character member id prefix inside the endpoint's gym (a uuid range query).
+  - Computes the expected fee with `monthlyFee`, calls the RPC, and replies 200 to everything handled or ignored. A bad signature gets 400, and a server fault 5xx so Stripe retries. Capped at 120 events per gym per minute.
+- **`/api/gym/stripe-webhook`** (owner): set up, save or replace the secret, disconnect. Audited strictly; the secret never is.
+- **`POST /api/payment-events/[id]/review`** (coach): mark an event checked.
+
+Where it shows:
+
+- **Settings → Automatic online payments:** step-by-step setup.
+- **Payments:** "Paid online" on the grid and profile, and an Online payments section (needs a look, with Mark as checked; Recent).
+- **Dashboard:** a count.
+- **Members:** the pay hint warns that bank payments take days.
+- **Docs:** `matos_stripe_setup.md` section 5.
+
+**Rules chosen** (security gate):
+
+- A month is marked only when it is live mode, in euro, more than 0, and at least the plan price with sibling discount.
+- **A plan with no price is never auto-marked.** A member can edit the reference and pay through any cheaper link in the same Stripe account, so an unchecked amount would make months free. This was the gate's one BLOCKED finding, fixed before merge.
+- **Test-mode payments never mark a month.** They show as "test payment" so the owner can confirm setup. This replaces the plan's "livemode mismatch" check: test and live endpoints have separate secrets anyway.
+- **A paid or waived month is never overwritten**, and neither is a month a coach set back to unpaid after this session paid it. A second payment is flagged `already_paid`.
+- **The month must be within 24 months back and 12 ahead.**
+
+GDPR:
+
+- Erasure deletes the member's events, plus unmatched events carrying their email or their id in the reference.
+- Unmatched references and emails are dropped when checked, or after 12 months.
+- The export includes `online_payment_events`.
+- Personal workspaces can't connect.
+
+**Gate.** security + database + code reviewers.
+
+- Security BLOCKED once (B1, unpriced plans, above) and was fixed.
+- Also fixed from the gate:
+  - per-gym uniqueness of Stripe ids (one owner could otherwise pre-claim another academy's ids with their own secret);
+  - a race where two sessions for the same month both reported `recorded`;
+  - a session reused for another month causing endless retries;
+  - zero-amount sessions;
+  - PII retention for unmatched payers;
+  - the member lookup's 1000-row cap;
+  - the dashboard count disagreeing with the list, and the dashboard not refreshing after "Mark as checked";
+  - copy: readable references, links to the member, and test-mode and plan-price notes.
+
+**Accepted.**
+
+- **Refunds and disputes aren't sent to MatOS.** The coach marks the month unpaid (documented).
+- **A member can edit the reference to pay for someone else or another month.** It only ever pays a debt at full price; the coach fixes misplaced payments.
+- **`PAYMENTS_SECRET_KEY` has no rotation path.** Changing it disconnects every academy (they paste their secret again), and losing it does the same.
+- **`payments.amount` now holds what Stripe charged.** Rule 3 is unchanged: the app never shows it to members.
+- **Unauthenticated requests cost a database lookup and a decrypt** before the signature fails, which is bounded by the 128-bit endpoint id.

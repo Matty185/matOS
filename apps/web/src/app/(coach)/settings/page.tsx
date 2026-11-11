@@ -12,6 +12,7 @@ import { PromotionRulesForm } from "@/components/shared/promotion-rules-form";
 import { WaiverManager } from "@/components/shared/waiver-manager";
 import { TrialLinkManager } from "@/components/shared/trial-link-manager";
 import { PlansManager } from "@/components/shared/plans-manager";
+import { StripeWebhookManager } from "@/components/shared/stripe-webhook-manager";
 import { GymLogoSetting } from "@/components/shared/gym-logo-setting";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -107,6 +108,18 @@ export default async function SettingsPage() {
             dropInFee={gym?.drop_in_fee == null ? null : Number(gym.drop_in_fee)}
             memberCounts={memberCounts}
           />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Automatic online payments</CardTitle>
+          <CardDescription>
+            Mark months paid when members pay through a plan&apos;s Stripe link.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <StripeWebhookManager />
         </CardContent>
       </Card>
 

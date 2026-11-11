@@ -609,7 +609,7 @@ function PaymentsTab({
       const supabase = createClient();
       const { data, error } = await supabase
         .from("payments")
-        .select("period_month, period_year, status, amount, notes, paid_at")
+        .select("period_month, period_year, status, amount, notes, paid_at, source")
         .eq("member_id", memberId)
         .order("period_year", { ascending: false })
         .order("period_month", { ascending: false });
@@ -656,9 +656,9 @@ function PaymentsTab({
       ) : null}
       {billable && payOnline ? (
         <p className="text-sm text-muted-foreground">
-          Pays online: their plan has a Stripe payment link. Payments show in your Stripe dashboard
-          with their name and the month in the reference; mark the month paid here once it&apos;s
-          through.
+          Pays online: their plan has a Stripe payment link. If online payments are connected in
+          Settings, the month is marked paid when they pay. Otherwise check your Stripe dashboard
+          (their name and the month are in the reference) and mark the month paid here.
         </p>
       ) : null}
       {billable ? (
@@ -710,7 +710,13 @@ function PaymentsTab({
                 month: row.period_month,
                 year: row.period_year,
               });
-            const label = isFrozen ? "frozen" : overdue ? "overdue" : row.status;
+            const label = isFrozen
+              ? "frozen"
+              : overdue
+                ? "overdue"
+                : row.status === "paid" && row.source === "stripe"
+                  ? "paid online"
+                  : row.status;
             const periodLabel = format(
               new Date(row.period_year, row.period_month - 1),
               "MMMM yyyy",

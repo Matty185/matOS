@@ -247,6 +247,14 @@ async function getDashboardData() {
     .select("id", { count: "exact", head: true })
     .eq("status", "new");
 
+  // Stage L2: online payments a coach should look at (paid twice, failed,
+  // couldn't match, wrong amount) and hasn't marked as checked.
+  const { count: paymentsToCheck } = await supabase
+    .from("payment_events")
+    .select("id", { count: "exact", head: true })
+    .is("reviewed_at", null)
+    .in("outcome", ["already_paid", "failed", "unmatched", "not_billable", "amount_mismatch"]);
+
   // Flow audit 9.3: active members (not owners) who haven't signed the
   // current waiver. Degrades to none if anything can't be read.
   let waiverMissing = 0;
@@ -275,6 +283,7 @@ async function getDashboardData() {
     readyForPromotion,
     waiverMissing,
     newTrials: newTrials ?? 0,
+    paymentsToCheck: paymentsToCheck ?? 0,
     teachingToday,
     activeMemberCount: activeMembers.length,
     classesThisWeekCount: (allClasses ?? []).length,
@@ -438,6 +447,19 @@ export default async function DashboardPage() {
           <span>
             <span className="font-medium">{data.newTrials}</span> new trial{" "}
             {data.newTrials === 1 ? "request" : "requests"}. Follow up →
+          </span>
+        </Link>
+      ) : null}
+
+      {data.paymentsToCheck > 0 ? (
+        <Link
+          href="/payments"
+          className="flex min-h-11 items-center gap-2 rounded-md border border-primary/40 bg-primary/5 p-3 text-sm hover:bg-primary/10"
+        >
+          <CreditCard className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+          <span>
+            <span className="font-medium">{data.paymentsToCheck}</span> online{" "}
+            {data.paymentsToCheck === 1 ? "payment needs" : "payments need"} a look. Check →
           </span>
         </Link>
       ) : null}
