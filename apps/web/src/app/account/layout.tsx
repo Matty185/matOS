@@ -13,7 +13,8 @@ import { AppShell } from "@/components/shared/app-shell";
 export default async function AccountLayout({ children }: { children: React.ReactNode }) {
   const member = await getCurrentMember();
 
-  if (!member) redirect("/login");
+  // "/" decides: login, or the "waiting for approval" page.
+  if (!member) redirect("/");
 
   const isSolo = member.gymKind === "personal";
   const isGuardian = member.role === "guardian";

@@ -8,6 +8,7 @@ import { Check, Copy, Mail, MessageCircle, Plus, QrCode, Share2, Users } from "l
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { GroupQrDialog } from "@/components/shared/group-qr-dialog";
+import { PermanentQrDialog } from "@/components/shared/permanent-qr-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -41,6 +42,7 @@ export function SignupLinkDialog({
   const [showQr, setShowQr] = useState(false);
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [groupOpen, setGroupOpen] = useState(false);
+  const [permanentOpen, setPermanentOpen] = useState(false);
   const openRef = useRef(open);
   openRef.current = open;
 
@@ -60,6 +62,8 @@ export function SignupLinkDialog({
       const { data, error } = await supabase
         .from("signup_links")
         .select("id, created_at, expires_at, max_uses, use_count")
+        // The permanent wall code has its own dialog.
+        .eq("permanent", false)
         .is("used_at", null)
         .gt("expires_at", new Date().toISOString())
         .order("created_at", { ascending: false });
@@ -139,6 +143,7 @@ export function SignupLinkDialog({
   return (
     <>
       <GroupQrDialog open={groupOpen} onOpenChange={setGroupOpen} />
+      <PermanentQrDialog open={permanentOpen} onOpenChange={setPermanentOpen} />
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
           <DialogHeader>
@@ -254,6 +259,18 @@ export function SignupLinkDialog({
               }}
             >
               <Users className="mr-2 h-4 w-4" /> Signing up a whole class? Make a group QR code
+            </Button>
+          ) : null}
+          {isOwner ? (
+            <Button
+              variant="ghost"
+              className="h-11"
+              onClick={() => {
+                onOpenChange(false);
+                setPermanentOpen(true);
+              }}
+            >
+              <QrCode className="mr-2 h-4 w-4" /> Permanent QR code for the wall
             </Button>
           ) : null}
 
