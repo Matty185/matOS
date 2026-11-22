@@ -89,7 +89,7 @@ export function MembershipStatusCard({
         <p className="text-xs text-muted-foreground">
           {target === "class"
             ? "You'll pay on Stripe's secure page."
-            : "You'll pay on Stripe's secure page. Your coach marks it paid once it comes through."}
+            : "You'll pay on Stripe's secure page. It's marked paid once it comes through; a bank payment can take a few days, so don't pay twice."}
           {isTestLink ? " This is a test link: no real money is taken." : ""}
         </p>
       </div>

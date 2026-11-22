@@ -191,6 +191,9 @@ export const POST = withAuth(
       leadsByEmailResult,
       guardianLinksResult,
       dropInsResult,
+      paymentEventsResult,
+      paymentEventsByRefResult,
+      paymentEventsByEmailResult,
     ] = await Promise.all([
       serviceClient.from("attendance").delete().eq("member_id", member.id),
       serviceClient.from("athlete_logs").delete().eq("member_id", member.id),
@@ -253,6 +256,25 @@ export const POST = withAuth(
             .eq("gym_id", member.gym_id)
             .eq("email", member.email.toLowerCase())
         : Promise.resolve({ error: null }),
+      // Stage L2: online payment events Stripe reported for them (member
+      // id, amount, month). The payments rows they produced are kept like
+      // any other payment.
+      serviceClient.from("payment_events").delete().eq("member_id", member.id),
+      // ...unmatched ones whose reference carries their id (and so their name)...
+      serviceClient
+        .from("payment_events")
+        .delete()
+        .eq("gym_id", member.gym_id)
+        .eq("outcome", "unmatched")
+        .like("reference", `%_${member.id.replace(/-/g, "").slice(0, 8)}`),
+      // ...and unmatched ones that carry their email (stored lowercased).
+      member.email && !/@anonymized\.invalid$/.test(member.email)
+        ? serviceClient
+            .from("payment_events")
+            .delete()
+            .eq("gym_id", member.gym_id)
+            .eq("payer_email", member.email.toLowerCase())
+        : Promise.resolve({ error: null }),
     ]);
 
     for (const [label, result] of [
@@ -270,6 +292,9 @@ export const POST = withAuth(
       ["trial_leads (email)", leadsByEmailResult],
       ["member_guardians", guardianLinksResult],
       ["drop_in_visits", dropInsResult],
+      ["payment_events", paymentEventsResult],
+      ["payment_events (reference)", paymentEventsByRefResult],
+      ["payment_events (email)", paymentEventsByEmailResult],
     ] as const) {
       if (result.error) {
         console.error(`[gdpr] failed to clean up ${label}`, result.error);

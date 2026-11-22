@@ -81,6 +81,7 @@ export async function resolveAuditNames(
 
 function actorNameFor(row: AuditLogRow, ctx: AuditNameContext): string {
   if (row.actor_id) return ctx.byUserId.get(row.actor_id) ?? "A former member";
+  if (row.initiated_by === "payment_provider") return "Stripe";
   return row.initiated_by === "agent" ? "The assistant" : "System";
 }
 
@@ -188,6 +189,20 @@ export function describeAuditEntry(row: AuditLogRow, ctx: AuditNameContext): str
       return `${actor} marked ${subjectNameFor(row, ctx)}'s ${PERIOD_LABEL(after)} payment as unpaid.`;
     case "payment.waived":
       return `${actor} waived ${subjectNameFor(row, ctx)}'s ${PERIOD_LABEL(after)} payment.`;
+    case "payment.paid_online":
+      return `${subjectNameFor(row, ctx)} paid ${PERIOD_LABEL(after)} online.`;
+    case "payment_event.reviewed":
+      return `${actor} marked an online payment as checked.`;
+    case "payment_event.unreviewed":
+      return `${actor} marked an online payment as not checked.`;
+    case "stripe_webhook.created":
+      return `${actor} started setting up automatic online payments.`;
+    case "stripe_webhook.connected":
+      return `${actor} connected automatic online payments.`;
+    case "stripe_webhook.secret_replaced":
+      return `${actor} replaced the Stripe signing secret.`;
+    case "stripe_webhook.disconnected":
+      return `${actor} disconnected automatic online payments.`;
     case "payment.bulk_marked_paid": {
       const count = Array.isArray(after.member_ids) ? after.member_ids.length : "several";
       return `${actor} marked ${count} overdue payment${count === 1 ? "" : "s"} as paid for ${PERIOD_LABEL(after)}.`;

@@ -95,6 +95,15 @@ export const GET = withAuth(async (_request, context) => {
       .eq("child_member_id", context.memberId),
   ]);
 
+  // Stage L2: online payments Stripe reported for this member. Staff-only
+  // under RLS, so read with the service role, scoped to this member.
+  const paymentEvents = await serviceClient
+    .from("payment_events")
+    .select(
+      "created_at, event_type, livemode, period_month, period_year, amount, currency, outcome",
+    )
+    .eq("member_id", context.memberId);
+
   const breakdownIds = (breakdowns.data ?? []).map((b) => b.id);
   const [breakdownPositions, breakdownEvents] =
     breakdownIds.length === 0
@@ -109,6 +118,7 @@ export const GET = withAuth(async (_request, context) => {
     member: member.data ?? null,
     attendance: attendance.data ?? [],
     payments: payments.data ?? [],
+    online_payment_events: paymentEvents.data ?? [],
     belt_history: beltHistory.data ?? [],
     athlete_logs: logs.data ?? [],
     breakdowns: breakdowns.data ?? [],
