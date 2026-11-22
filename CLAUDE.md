@@ -1199,6 +1199,18 @@ GDPR:
 - **`payments.amount` now holds what Stripe charged.** Rule 3 is unchanged: the app never shows it to members.
 - **Unauthenticated requests cost a database lookup and a decrypt** before the signature fails, which is bounded by the 128-bit endpoint id.
 
+**Verified after the migrations (2026-11-22).** The migrations were re-dated from `20261111…` to `20261122130000`/`130100` before being applied, because the permanent join code migration had already been applied with a later date and `db push` refuses out-of-order files; neither had been applied anywhere before. The user applied both. Live test 47/47 on the rehearsal academy, with signed events against a local server and throwaway owner, coach, athletes and plan, all removed afterwards:
+
+- **Setup:** owner-only; the ciphertext can't be read by any client, and the secret is stored encrypted.
+- **Signatures:** a bad or stale signature and an unknown endpoint are refused, and other event types are ignored.
+- **Recording a month:** a month is recorded at the plan price with a Stripe audit row; resends are duplicates.
+- **Bank payments:** pending, then recorded, with failures flagged.
+- **Flagged for a coach:** unmatched, another academy's member, under-price, unpriced plan, zero amount, not euro, far-off month, test mode (never marks a month), one session paying two months, and concurrent double payments.
+- **Staff:** they can't forge "paid online" or outcomes; checking an event stamps it and drops payer details.
+- **Disconnect:** stops the address.
+
+Browser-checked at 390px: the Settings card, the Payments review list, "Paid online" in the grid, and the dashboard count dropping after Mark as checked.
+
 ### 2026-11-22 — Permanent join QR code with coach approval
 
 **Context.** The founder wanted a permanent join QR code for Northside's wall. The 24-hour group code (2026-11-06) can't do this, and its accepted email-squatting risk was justified only by being short-lived. Asked which shape to build, the user chose **never expires, but every sign-up needs a coach's approval**.

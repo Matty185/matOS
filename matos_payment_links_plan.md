@@ -1,6 +1,6 @@
 # MatOS — Online Payments via Stripe Payment Links (flow audit 6.6, option 1)
 
-Status: **L1 built 2026-11-04**, **L2 built 2026-11-11** (see the CLAUDE.md Decision Log). Scope: the web app only. Same staged-with-explicit-go-ahead
+Status: **L1 built 2026-11-04**, **L2 live 2026-11-22** (see the CLAUDE.md Decision Log). Scope: the web app only. Same staged-with-explicit-go-ahead
 discipline and review gates as every other plan. Where this conflicts with `matos_project_plan.md`
 for payments scope, this plan wins once its Decision Log entry is written.
 
