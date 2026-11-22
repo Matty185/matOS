@@ -1132,7 +1132,7 @@ Browser-checked as a throwaway athlete on an emulated iPhone:
 
 **Context.** L1 (2026-11-04) sends members to the academy's own Stripe Payment Link, and the coach marks the month paid by hand. L2 is the plan's "smaller step": Stripe tells MatOS when a payment succeeds. Still no Stripe Connect, no subscriptions, no money or card data in MatOS. It's another narrow, decision-logged extension of "payment processing out of scope".
 
-**Decision.** Migrations `20261111120000` (the `initiated_by` value `payment_provider`, in its own file) and `20261111120100`:
+**Decision.** Migrations `20261122130000` (the `initiated_by` value `payment_provider`, in its own file) and `20261122130100`:
 
 - **`gym_stripe_webhooks`:** one per gym, with a random public `endpoint_id` (128 bits).
   - The owner's `whsec_` signing secret is stored only as AES-256-GCM ciphertext under the new env var `PAYMENTS_SECRET_KEY`, with the gym id as associated data.
@@ -1198,3 +1198,68 @@ GDPR:
 - **`PAYMENTS_SECRET_KEY` has no rotation path.** Changing it disconnects every academy (they paste their secret again), and losing it does the same.
 - **`payments.amount` now holds what Stripe charged.** Rule 3 is unchanged: the app never shows it to members.
 - **Unauthenticated requests cost a database lookup and a decrypt** before the signature fails, which is bounded by the 128-bit endpoint id.
+
+### 2026-11-22 — Permanent join QR code with coach approval
+
+**Context.** The founder wanted a permanent join QR code for Northside's wall. The 24-hour group code (2026-11-06) can't do this, and its accepted email-squatting risk was justified only by being short-lived. Asked which shape to build, the user chose **never expires, but every sign-up needs a coach's approval**.
+
+**Decision.** Migration `20261122120000`:
+
+- **`signup_links`:** gains `permanent`, `requires_approval`, `display_token` and `attempt_window_started_at`.
+  - One live permanent code per academy, enforced by a partial unique index.
+  - It's owner-only to create, show, reprint, cancel and replace.
+  - `display_token` keeps the raw code so the poster can be reprinted. Staff can read it, which is fine because it's printed on a wall. Cancelling clears it.
+- **`members.pending_approval`:** a sign-up through the code becomes an inactive member with `pending_approval`. The constraint `members_pending_not_active` means a row can't be pending and active at once. RLS helpers need `members.active`, so a pending login can open nothing except `/pending`, which uses `my_signup_status()` to name the academy.
+  - `redeem_signup_link` sets `memberships.active` up front. Without that, approval left the person locked out; this was the gate's BLOCKED finding.
+  - **Guard trigger:** end users can never set pending. Only a coach or owner of that academy can clear it, and never on their own row (`members_update_self` would otherwise let a pending login approve itself).
+- **Approve:** `POST /api/members/[id]/approve` (coach) flips `active` and `pending_approval` together, audited strictly.
+- **Reject:** `POST /api/members/[id]/reject` (coach) calls `reject_pending_signup` (service_role only, one transaction, row-locked). It refuses if anything has been recorded against the person: attendance, a payment, an invite, a log or a breakdown. It then deletes the starting rank, consent, membership and member row, and the route deletes the login if it belongs to no other academy. This is the one place a member row is deleted, because a pending sign-up was never a member. Audit-first.
+- **Limits on the public code**, which never locks, since a lock would let anyone kill the poster:
+  - 60 requests per rolling hour, refused ones included (`increment_permanent_attempt`);
+  - 10 new pending sign-ups per hour;
+  - at most 25 waiting at once, checked before any login is made and again in the RPC;
+  - existing accounts are refused, as for the group code.
+- **Clean-up:** sign-ups not approved within 14 days are removed (logins included) on later requests to the code, audited as `member.signup_expired`.
+
+Where it shows:
+
+- **Members → Sign-up link → Permanent QR code for the wall:** QR, print poster, Replace.
+- **Members page:** a "waiting for approval" section with Approve and Reject. Pending people are kept out of every other list.
+- **Dashboard:** a count.
+- **Join page:** says a coach approves sign-ups.
+- **Reactivate** refuses pending rows.
+- **Reports** don't count pending people as joined.
+- **Layouts** send a member-less session to `/`, which picks login or `/pending`.
+
+**Gate.** security + database (BLOCKING) + code reviewers.
+
+- Both BLOCKING reviews found the `memberships.active` gap; fixed.
+- Security also found:
+  - self-approval through REST;
+  - unlimited probing of the public code;
+  - group codes being blocked by the permanent one;
+  - lingering pending logins;
+  - the stored token outliving a cancel.
+- The database review found reject wasn't atomic.
+- The code review found:
+  - a reject/approve race;
+  - reports counting pending people;
+  - no way to check status on `/pending`;
+  - accessibility on the QR and its retry.
+- All fixed, then re-verified by the security and database reviewers.
+
+**Accepted.**
+
+- **Email squatting while pending.** Whoever photographs the poster can create logins for emails that aren't theirs: up to 25 at once, each for at most 14 days, with no access to anything. A coach who approves a squatted email hands that person a real athlete account, so coaches should only approve people they recognise. The 2026-11-06 "24 hours bounds it" reasoning doesn't apply to this code. Email confirmation (`matos_email_setup.md`) remains the real fix.
+- A pending login can read its academy's `gyms` row (name, contact email, address, settings), through `gyms_select_member`. Nothing secret is in it.
+- The 10-per-hour count only sees sign-ups still pending; the 60-request and 25-pending limits bound it anyway.
+- The stale-sign-up purge runs inside public requests (at most 5 per request).
+
+**Verified after the migration.** The user applied `20261122120000`. Live test 35/35 on the rehearsal academy with throwaway owner, coach and sign-ups, all removed afterwards:
+
+- **The code:** owner-only create, show again, replace and cancel; the old poster stops working and the stored code is cleared; a group QR still works alongside it.
+- **Waiting sign-ups:** existing accounts are refused. A pending login has no current member, reads no members or classes, and can't approve itself.
+- **Approve and reject:** approve lets the person straight in. Reject removes the row and the login, and is refused (with nothing deleted) once attendance exists. Reactivate refuses pending rows.
+- **Limits and audit:** the 61st request in an hour gets 429 without locking the code; audit rows are written.
+
+Browser-checked at 390px through the real pages: the owner dialog, the join page, sign-up landing on `/pending`, `/home` sending a pending login back there, the Members section with no sideways scroll, the dashboard count, and approve taking the person into the app. The printed poster uses the group QR code's print rules; it hasn't been printed.

@@ -37,7 +37,7 @@ export default function JoinGymPage({ params }: { params: { token: string } }) {
     data: info,
     isLoading,
     error: fetchError,
-  } = useQuery<{ gymName: string | null }, ApiErrorBody>({
+  } = useQuery<{ gymName: string | null; requiresApproval?: boolean }, ApiErrorBody>({
     queryKey: ["join-link", params.token],
     queryFn: async () => {
       const res = await fetch(`/api/join/${params.token}`);
@@ -110,7 +110,8 @@ export default function JoinGymPage({ params }: { params: { token: string } }) {
       router.replace("/login");
       return;
     }
-    router.replace("/");
+    // Permanent join code: the account waits for a coach to approve it.
+    router.replace(body.pendingApproval ? "/pending" : "/");
     router.refresh();
   }
 
@@ -146,6 +147,9 @@ export default function JoinGymPage({ params }: { params: { token: string } }) {
           </CardTitle>
           <CardDescription>
             Join {gymLabel}. Fill in your details and choose a password — this takes about a minute.
+            {info?.requiresApproval
+              ? " A coach checks new sign-ups, so you can use MatOS once they've approved you."
+              : ""}
           </CardDescription>
         </CardHeader>
         <CardContent>

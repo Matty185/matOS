@@ -22,14 +22,65 @@ type LinkRow = {
   expires_at: string;
   attempt_count: number;
   max_uses: number;
+  permanent: boolean;
+  requires_approval: boolean;
   gyms: { name: string; kind: string; active: boolean } | null;
 };
 
 const ASK = "Ask your coach for a new one.";
 
 // A shared link serves up to max_uses people, each with their own mistakes.
+// The permanent wall code is never locked (anyone could then kill the
+// poster); it's limited per hour instead, and every sign-up waits for
+// approval.
 function attemptLimit(link: LinkRow): number {
-  return MAX_JOIN_ATTEMPTS * link.max_uses;
+  return link.permanent ? Number.POSITIVE_INFINITY : MAX_JOIN_ATTEMPTS * link.max_uses;
+}
+const PERMANENT_SIGNUPS_PER_HOUR = 10;
+const PERMANENT_ATTEMPTS_PER_HOUR = 60;
+const PERMANENT_MAX_PENDING = 25;
+/** Pending sign-ups nobody acted on are removed after this long. */
+const PENDING_EXPIRY_DAYS = 14;
+
+/**
+ * Removes pending sign-ups (and their logins) that no coach approved within
+ * PENDING_EXPIRY_DAYS, a few at a time, so squatted logins don't linger.
+ * Best effort: a failure here never blocks a real sign-up.
+ */
+async function purgeStalePending(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  gymId: string,
+) {
+  const cutoff = new Date(Date.now() - PENDING_EXPIRY_DAYS * 24 * 3600 * 1000).toISOString();
+  const { data: stale } = await supabase
+    .from("members")
+    .select("id")
+    .eq("gym_id", gymId)
+    .eq("pending_approval", true)
+    .lt("created_at", cutoff)
+    .limit(5);
+  for (const row of stale ?? []) {
+    const { data: userId, error } = await supabase.rpc("reject_pending_signup", {
+      p_member_id: row.id,
+      p_gym_id: gymId,
+    });
+    if (error) continue;
+    if (userId) {
+      const { count } = await supabase
+        .from("members")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId);
+      if ((count ?? 0) === 0) await supabase.auth.admin.deleteUser(userId);
+    }
+    await writeAuditLog({
+      gymId,
+      actorId: null,
+      action: "member.signup_expired",
+      entityType: "members",
+      entityId: row.id,
+      initiatedBy: "self_service",
+    });
+  }
 }
 
 function unavailable(link: LinkRow | null): Response | null {
@@ -38,9 +89,11 @@ function unavailable(link: LinkRow | null): Response | null {
     return apiError(
       410,
       "LINK_USED",
-      link.max_uses > 1
-        ? `This sign-up link is full. ${ASK}`
-        : `This sign-up link has already been used. ${ASK}`,
+      link.permanent
+        ? `This join code has been replaced. Ask a coach for the new one.`
+        : link.max_uses > 1
+          ? `This sign-up link is full. ${ASK}`
+          : `This sign-up link has already been used. ${ASK}`,
     );
   }
   if (link.attempt_count >= attemptLimit(link)) {
@@ -60,7 +113,9 @@ function unavailable(link: LinkRow | null): Response | null {
 async function findLink(token: string): Promise<LinkRow | null> {
   const { data } = await createServiceRoleClient()
     .from("signup_links")
-    .select("id, gym_id, used_at, expires_at, attempt_count, max_uses, gyms(name, kind, active)")
+    .select(
+      "id, gym_id, used_at, expires_at, attempt_count, max_uses, permanent, requires_approval, gyms(name, kind, active)",
+    )
     .eq("token_hash", hashInviteToken(token))
     .maybeSingle();
   return (data as LinkRow | null) ?? null;
@@ -79,7 +134,10 @@ export async function GET(_request: NextRequest, { params }: { params: { token: 
   const link = await findLink(params.token);
   const blocked = unavailable(link);
   if (blocked || !link) return blocked!;
-  return NextResponse.json({ gymName: link.gyms?.name ?? null });
+  return NextResponse.json({
+    gymName: link.gyms?.name ?? null,
+    requiresApproval: link.requires_approval,
+  });
 }
 
 export async function POST(request: NextRequest, { params }: { params: { token: string } }) {
@@ -88,16 +146,65 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
   const blocked = unavailable(link);
   if (blocked || !link) return blocked!;
 
-  const { data: attempts, error: attemptError } = await supabase.rpc(
-    "increment_signup_link_attempt",
-    { p_link_id: link.id },
-  );
-  if (attemptError || attempts === null) {
-    console.error("[join] failed to increment attempt_count", attemptError);
-    return apiError(500, "INTERNAL_ERROR", "Something went wrong — please try again.");
-  }
-  if (attempts > attemptLimit(link)) {
-    return apiError(410, "LINK_LOCKED", `This sign-up link has been locked. ${ASK}`);
+  if (link.permanent) {
+    const slowDown = () =>
+      apiError(
+        429,
+        "SLOW_DOWN",
+        "Lots of people are signing up right now. Please try again in an hour, or ask a coach.",
+      );
+    // Every request counts, refused ones included (they'd otherwise show
+    // whether an email is on the roster or has an account, without limit).
+    const { data: attempts, error: attemptError } = await supabase.rpc(
+      "increment_permanent_attempt",
+      { p_link_id: link.id },
+    );
+    if (attemptError || attempts === null) {
+      return apiError(500, "INTERNAL_ERROR", "Something went wrong — please try again.");
+    }
+    if (attempts > PERMANENT_ATTEMPTS_PER_HOUR) return slowDown();
+
+    await purgeStalePending(supabase, link.gym_id);
+
+    // Counted from the database, not the (best-effort) audit log.
+    const hourAgo = new Date(Date.now() - 3600 * 1000).toISOString();
+    const [recent, waiting] = await Promise.all([
+      supabase
+        .from("members")
+        .select("id", { count: "exact", head: true })
+        .eq("gym_id", link.gym_id)
+        .eq("pending_approval", true)
+        .gte("created_at", hourAgo),
+      supabase
+        .from("members")
+        .select("id", { count: "exact", head: true })
+        .eq("gym_id", link.gym_id)
+        .eq("pending_approval", true),
+    ]);
+    if (recent.error || waiting.error) {
+      return apiError(500, "INTERNAL_ERROR", "Something went wrong — please try again.");
+    }
+    if ((recent.count ?? 0) >= PERMANENT_SIGNUPS_PER_HOUR) return slowDown();
+    // Checked again inside redeem_signup_link; here so no login is made first.
+    if ((waiting.count ?? 0) >= PERMANENT_MAX_PENDING) {
+      return apiError(
+        429,
+        "TOO_MANY_PENDING",
+        "The academy has a lot of sign-ups waiting for approval. Please ask a coach.",
+      );
+    }
+  } else {
+    const { data: attempts, error: attemptError } = await supabase.rpc(
+      "increment_signup_link_attempt",
+      { p_link_id: link.id },
+    );
+    if (attemptError || attempts === null) {
+      console.error("[join] failed to increment attempt_count", attemptError);
+      return apiError(500, "INTERNAL_ERROR", "Something went wrong — please try again.");
+    }
+    if (attempts > attemptLimit(link)) {
+      return apiError(410, "LINK_LOCKED", `This sign-up link has been locked. ${ASK}`);
+    }
   }
 
   let body: unknown;
@@ -234,6 +341,12 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
           "ALREADY_MEMBER",
           "You're already a member of this academy — just sign in.",
         );
+      case "TOO_MANY_PENDING":
+        return apiError(
+          429,
+          "TOO_MANY_PENDING",
+          "The academy has a lot of sign-ups waiting for approval. Please ask a coach.",
+        );
       case "LINK_UNAVAILABLE":
         return apiError(410, "LINK_USED", `This sign-up link is no longer available. ${ASK}`);
       default:
@@ -248,9 +361,17 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     action: "member.self_registered",
     entityType: "members",
     entityId: memberId,
-    afterState: { signup_link_id: link.id, belt: input.belt, stripes: input.stripes },
+    afterState: {
+      signup_link_id: link.id,
+      belt: input.belt,
+      stripes: input.stripes,
+      pending_approval: link.requires_approval,
+    },
     initiatedBy: "self_service",
   });
 
-  return NextResponse.json({ success: true, email: input.email }, { status: 201 });
+  return NextResponse.json(
+    { success: true, email: input.email, pendingApproval: link.requires_approval },
+    { status: 201 },
+  );
 }

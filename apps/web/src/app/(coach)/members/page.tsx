@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { PaymentCellDialog } from "@/components/shared/payment-cell-dialog";
 import { BulkInviteDialog } from "@/components/shared/bulk-invite-dialog";
 import { SignupLinkDialog } from "@/components/shared/signup-link-dialog";
+import { PendingSignups, type PendingSignup } from "@/components/shared/pending-signups";
 import { PLAN_LABELS } from "@/lib/constants/member-labels";
 import { MemberAvatar, useSignedPhotos } from "@/components/shared/image-upload";
 import { isBillable } from "@/lib/payments/overdue";
@@ -232,6 +233,8 @@ export default function MembersPage() {
   const filtered = useMemo(() => {
     if (!members) return [];
     return members.filter((m) => {
+      // Waiting for approval: listed in their own section above.
+      if (m.pending_approval) return false;
       if (!showInactive && !m.active) return false;
       // Applied once the status is known (and only if the gym has a waiver),
       // so ?waiver=missing never shows an empty list while loading.
@@ -391,6 +394,10 @@ export default function MembersPage() {
           </Button>
         </div>
       </div>
+
+      <PendingSignups
+        pending={members.filter((m) => m.pending_approval) as unknown as PendingSignup[]}
+      />
 
       <div className="flex flex-wrap items-center gap-3">
         <Input

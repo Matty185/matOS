@@ -255,6 +255,12 @@ async function getDashboardData() {
     .is("reviewed_at", null)
     .in("outcome", ["already_paid", "failed", "unmatched", "not_billable", "amount_mismatch"]);
 
+  // Sign-ups from the permanent join QR code waiting for a coach.
+  const { count: pendingSignups } = await supabase
+    .from("members")
+    .select("id", { count: "exact", head: true })
+    .eq("pending_approval", true);
+
   // Flow audit 9.3: active members (not owners) who haven't signed the
   // current waiver. Degrades to none if anything can't be read.
   let waiverMissing = 0;
@@ -284,6 +290,7 @@ async function getDashboardData() {
     waiverMissing,
     newTrials: newTrials ?? 0,
     paymentsToCheck: paymentsToCheck ?? 0,
+    pendingSignups: pendingSignups ?? 0,
     teachingToday,
     activeMemberCount: activeMembers.length,
     classesThisWeekCount: (allClasses ?? []).length,
@@ -433,6 +440,20 @@ export default async function DashboardPage() {
           <span>
             <span className="font-medium">{data.readyForPromotion}</span>{" "}
             {data.readyForPromotion === 1 ? "member is" : "members are"} ready for promotion. Review
+            →
+          </span>
+        </Link>
+      ) : null}
+
+      {data.pendingSignups > 0 ? (
+        <Link
+          href="/members"
+          className="flex min-h-11 items-center gap-2 rounded-md border border-primary/40 bg-primary/5 p-3 text-sm hover:bg-primary/10"
+        >
+          <UserPlus className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+          <span>
+            <span className="font-medium">{data.pendingSignups}</span>{" "}
+            {data.pendingSignups === 1 ? "sign-up is" : "sign-ups are"} waiting for approval. Review
             →
           </span>
         </Link>

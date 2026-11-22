@@ -1188,6 +1188,7 @@ export type Database = {
           membership_plan: Database["public"]["Enums"]["membership_plan"];
           notes: string | null;
           phone: string | null;
+          pending_approval: boolean;
           photo_url: string | null;
           plan_id: string | null;
           role: Database["public"]["Enums"]["member_role"];
@@ -1210,6 +1211,7 @@ export type Database = {
           membership_plan?: Database["public"]["Enums"]["membership_plan"];
           notes?: string | null;
           phone?: string | null;
+          pending_approval?: boolean;
           photo_url?: string | null;
           plan_id?: string | null;
           role?: Database["public"]["Enums"]["member_role"];
@@ -1232,6 +1234,7 @@ export type Database = {
           membership_plan?: Database["public"]["Enums"]["membership_plan"];
           notes?: string | null;
           phone?: string | null;
+          pending_approval?: boolean;
           photo_url?: string | null;
           plan_id?: string | null;
           role?: Database["public"]["Enums"]["member_role"];
@@ -1651,6 +1654,9 @@ export type Database = {
           max_uses: number;
           id: string;
           token_hash: string;
+          permanent: boolean;
+          requires_approval: boolean;
+          display_token: string | null;
           use_count: number;
           used_at: string | null;
           used_by_member_id: string | null;
@@ -1664,6 +1670,9 @@ export type Database = {
           id?: string;
           max_uses?: number;
           token_hash: string;
+          permanent?: boolean;
+          requires_approval?: boolean;
+          display_token?: string | null;
           use_count?: number;
           used_at?: string | null;
           used_by_member_id?: string | null;
@@ -1677,6 +1686,9 @@ export type Database = {
           max_uses?: number;
           id?: string;
           token_hash?: string;
+          permanent?: boolean;
+          requires_approval?: boolean;
+          display_token?: string | null;
           use_count?: number;
           used_at?: string | null;
           used_by_member_id?: string | null;
@@ -1947,6 +1959,12 @@ export type Database = {
       increment_signup_link_attempt: {
         Args: { p_link_id: string };
         Returns: number;
+      };
+      increment_permanent_attempt: { Args: { p_link_id: string }; Returns: number };
+      my_signup_status: { Args: never; Returns: { gym_name: string }[] };
+      reject_pending_signup: {
+        Args: { p_gym_id: string; p_member_id: string };
+        Returns: string;
       };
       promotion_progress: {
         Args: { p_member_id?: string };

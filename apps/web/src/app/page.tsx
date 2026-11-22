@@ -15,7 +15,13 @@ import { createClient } from "@/lib/supabase/server";
 export default async function RootPage() {
   const member = await getCurrentMember();
 
-  if (!member) redirect("/login");
+  if (!member) {
+    // Signed up with the permanent join code and not approved yet: their
+    // member row is inactive, so current_member() finds nothing.
+    const { data: pending } = await createClient().rpc("my_signup_status");
+    if (pending && pending.length > 0) redirect("/pending");
+    redirect("/login");
+  }
   if (member.gymKind === "personal") redirect("/analysis");
 
   // Stage O4: an owner of a freshly provisioned gym (setup not finished,

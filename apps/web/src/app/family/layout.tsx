@@ -11,7 +11,8 @@ import { ROLE_LABEL } from "@/lib/constants/member-labels";
 // home. Each role keeps its own navigation.
 export default async function FamilyLayout({ children }: { children: React.ReactNode }) {
   const member = await getCurrentMember();
-  if (!member) redirect("/login");
+  // "/" decides: login, or the "waiting for approval" page.
+  if (!member) redirect("/");
   if (member.gymKind === "personal") redirect("/analysis");
 
   const isGuardian = member.role === "guardian";
