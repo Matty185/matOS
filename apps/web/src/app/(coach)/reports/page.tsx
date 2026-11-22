@@ -84,7 +84,12 @@ export default async function ReportsPage() {
         .range(a, b),
     ),
     supabase.from("classes").select("id, name"),
-    supabase.from("members").select("id, join_date, active, role").neq("role", "guardian"),
+    supabase
+      .from("members")
+      .select("id, join_date, active, role")
+      .neq("role", "guardian")
+      // Sign-ups waiting for approval haven't joined yet.
+      .eq("pending_approval", false),
     supabase
       .from("audit_log")
       .select("action, timestamp, entity_id")

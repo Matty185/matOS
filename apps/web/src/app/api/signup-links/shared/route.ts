@@ -25,6 +25,8 @@ export const POST = withAuth(
       .select("id", { count: "exact", head: true })
       .eq("gym_id", context.gymId)
       .gt("max_uses", 1)
+      // The permanent wall code is separate and doesn't block a group code.
+      .eq("permanent", false)
       .is("used_at", null)
       .gt("expires_at", new Date().toISOString());
     if (countError) {

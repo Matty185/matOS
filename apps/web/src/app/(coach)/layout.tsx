@@ -18,7 +18,8 @@ export default async function CoachLayout({ children }: { children: React.ReactN
   // in the full coach shell — Members/Attendance/Classes/Payments/Audit
   // Log all meaningless for a gym of one. Solo users belong at /analysis
   // (their functional home, per the confirmed S2 scope), not here.
-  if (!member) redirect("/login");
+  // "/" decides: login, or the "waiting for approval" page.
+  if (!member) redirect("/");
   // Staff only: athletes and parents (guardian role) have their own areas.
   if (!isStaffRole(member.role)) redirect(homePathFor(member.role));
   if (member.gymKind === "personal") redirect("/analysis");

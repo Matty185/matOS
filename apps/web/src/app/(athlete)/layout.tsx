@@ -7,7 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 export default async function AthleteLayout({ children }: { children: React.ReactNode }) {
   const member = await getCurrentMember();
 
-  if (!member) redirect("/login");
+  // "/" decides: login, or the "waiting for approval" page.
+  if (!member) redirect("/");
   if (member.role !== "athlete") redirect(homePathFor(member.role));
 
   const memberships = await getUserGymMemberships();

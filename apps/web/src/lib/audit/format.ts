@@ -144,6 +144,12 @@ export function describeAuditEntry(row: AuditLogRow, ctx: AuditNameContext): str
       return `${actor} deactivated ${subjectNameFor(row, ctx)}.`;
     case "member.reactivated":
       return `${actor} reactivated ${subjectNameFor(row, ctx)}.`;
+    case "member.signup_approved":
+      return `${actor} approved ${subjectNameFor(row, ctx)}'s sign-up.`;
+    case "member.signup_rejected":
+      return `${actor} rejected a sign-up from the join QR code.`;
+    case "signup_link.permanent_created":
+      return `${actor} made the permanent join QR code.`;
     case "member.hold_added":
     case "member.hold_changed":
     case "member.hold_removed": {
@@ -335,7 +341,11 @@ export function describeAuditEntry(row: AuditLogRow, ctx: AuditNameContext): str
     case "signup_link.cancelled":
       return `${actor} cancelled a sign-up link.`;
     case "member.self_registered":
-      return `${subjectNameFor(row, ctx)} joined using a sign-up link.`;
+      return asRecord(row.after_state).pending_approval === true
+        ? `${subjectNameFor(row, ctx)} signed up with the join QR code and is waiting for approval.`
+        : `${subjectNameFor(row, ctx)} joined using a sign-up link.`;
+    case "member.signup_expired":
+      return "A sign-up from the join QR code was removed after 14 days without approval.";
     case "gym.provisioned":
       return "Academy created on MatOS.";
     default:

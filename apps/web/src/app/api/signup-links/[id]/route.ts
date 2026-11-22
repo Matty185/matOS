@@ -16,12 +16,20 @@ export const DELETE = withAuth(
     const supabase = createClient();
     const { data: link } = await supabase
       .from("signup_links")
-      .select("id, used_at, expires_at")
+      .select("id, used_at, expires_at, permanent")
       .eq("id", id)
       .maybeSingle();
 
     if (!link) return apiError(404, "LINK_NOT_FOUND", "That link wasn't found.");
     if (link.used_at) return apiError(409, "LINK_USED", "That link has already been used.");
+    // The permanent join code is the owner's, like creating it.
+    if (link.permanent && context.role !== "gym_owner") {
+      return apiError(
+        403,
+        "FORBIDDEN",
+        "Only the academy owner can cancel the permanent join code.",
+      );
+    }
     if (new Date(link.expires_at) <= new Date()) {
       return NextResponse.json({ success: true });
     }
@@ -44,7 +52,17 @@ export const DELETE = withAuth(
 
     const { error } = await createServiceRoleClient()
       .from("signup_links")
-      .update({ expires_at: new Date().toISOString() })
+      .update(
+        link.permanent
+          ? // used_at frees the one-live-code slot for a replacement; the
+            // stored token isn't needed once the code stops working.
+            {
+              expires_at: new Date().toISOString(),
+              used_at: new Date().toISOString(),
+              display_token: null,
+            }
+          : { expires_at: new Date().toISOString() },
+      )
       .eq("id", link.id)
       .is("used_at", null);
     if (error) {

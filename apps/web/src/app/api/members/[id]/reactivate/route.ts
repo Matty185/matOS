@@ -23,7 +23,7 @@ export const POST = withAuth(
     const supabase = createClient();
     const { data: member, error: memberError } = await supabase
       .from("members")
-      .select("active, email")
+      .select("active, email, pending_approval")
       .eq("id", id)
       .single();
     if (memberError || !member) {
@@ -31,6 +31,13 @@ export const POST = withAuth(
     }
     if (member.active) {
       return apiError(409, "ALREADY_ACTIVE", "This member is already active.");
+    }
+    if (member.pending_approval) {
+      return apiError(
+        409,
+        "PENDING_APPROVAL",
+        "This person signed up with the join QR code and is waiting for approval. Approve them from the Members page.",
+      );
     }
 
     const { data: erased, error: erasedError } = await supabase
