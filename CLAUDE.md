@@ -1183,3 +1183,12 @@ Where it shows:
 - A pending login can read its academy's `gyms` row (name, contact email, address, settings), through `gyms_select_member`. Nothing secret is in it.
 - The 10-per-hour count only sees sign-ups still pending; the 60-request and 25-pending limits bound it anyway.
 - The stale-sign-up purge runs inside public requests (at most 5 per request).
+
+**Verified after the migration.** The user applied `20261122120000`. Live test 35/35 on the rehearsal academy with throwaway owner, coach and sign-ups, all removed afterwards:
+
+- **The code:** owner-only create, show again, replace and cancel; the old poster stops working and the stored code is cleared; a group QR still works alongside it.
+- **Waiting sign-ups:** existing accounts are refused. A pending login has no current member, reads no members or classes, and can't approve itself.
+- **Approve and reject:** approve lets the person straight in. Reject removes the row and the login, and is refused (with nothing deleted) once attendance exists. Reactivate refuses pending rows.
+- **Limits and audit:** the 61st request in an hour gets 429 without locking the code; audit rows are written.
+
+Browser-checked at 390px through the real pages: the owner dialog, the join page, sign-up landing on `/pending`, `/home` sending a pending login back there, the Members section with no sideways scroll, the dashboard count, and approve taking the person into the app. The printed poster uses the group QR code's print rules; it hasn't been printed.
